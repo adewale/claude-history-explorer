@@ -88,6 +88,67 @@ claude-history info
 
 Shows where Claude Code stores data and statistics about your usage.
 
+### View statistics
+
+```bash
+# Global statistics
+claude-history stats
+
+# Project-specific statistics
+claude-history stats -p auriga
+
+# JSON output format
+claude-history stats --format json
+```
+
+Shows detailed statistics including message counts, duration, storage size, and agent usage.
+
+### Generate summary
+
+```bash
+# Global summary (text format)
+claude-history summary
+
+# Project-specific summary
+claude-history summary -p auriga
+
+# Markdown format
+claude-history summary --format markdown
+
+# Save to file
+claude-history summary -o summary.md
+```
+
+Generates a comprehensive summary with insights, ASCII bar charts, and sparklines for trend visualization. The summary command reuses the stats functionality for analysis.
+
+### Tell project story
+
+```bash
+# Global story of all projects
+claude-history story
+
+# Story for specific project
+claude-history story -p auriga
+
+# Different story formats
+claude-history story --format brief
+claude-history story --format detailed
+claude-history story --format timeline
+
+# Save story to file
+claude-history story -p auriga -o auriga_story.md
+```
+
+Generates narrative insights about your development journey, including:
+- **Project lifecycle** and evolution patterns
+- **Collaboration style** and agent usage patterns
+- **Work intensity** and session patterns
+- **Project personality** traits
+- **Key insights** and productivity patterns
+- **Timeline visualization** with sparklines showing daily activity patterns
+
+The story command transforms raw conversation data into compelling narratives about your coding journey, work patterns, and development personality.
+
 ## How Claude Code Stores History
 
 Claude Code stores conversation history in:
