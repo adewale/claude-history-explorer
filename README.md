@@ -1,8 +1,32 @@
 # Claude History Explorer
 
-A CLI tool to explore your Claude Code conversation history.
+A CLI tool to explore your Claude Code conversation history stored locally at `~/.claude/projects/`. Turns raw JSONL files into searchable conversations and insights about your coding journey.
 
-Claude Code stores all conversation history locally at `~/.claude/projects/` as JSONL files. This tool helps you browse, search, and export that history.
+## Highlights
+
+- **Story Generation** - Analyzes sessions to create narratives about work patterns, personality traits, and collaboration style
+- **Concurrent Claude Detection** - Identifies when you've used multiple Claude instances in parallel
+- **Rich Terminal UI** - Tables, panels, sparklines, and syntax highlighting
+- **Multiple Export Formats** - JSON, Markdown, plain text
+- **Regex Search** - Search across all conversations with full regex support
+- **Read-Only by Design** - Never modifies your Claude history files
+- **Streaming JSONL** - Line-by-line parsing handles large files efficiently
+
+### Example Output
+
+```
+📖 Keyboardia Project Story
+============================
+
+📅 3 days of development
+🤝 heavy delegation (16 agents, 2 main sessions)
+⚡ 1873 messages at 25.0 msgs/hour
+🎯 steady, productive flow with marathon sessions
+🎭 agent-driven, deep-work focused, high-intensity
+🔀 Used up to 3 Claude instances in parallel
+
+💡 Key insight: Most productive session: 1530 messages
+```
 
 ## Installation
 
