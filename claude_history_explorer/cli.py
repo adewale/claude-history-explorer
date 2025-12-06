@@ -16,6 +16,8 @@ Commands:
 """
 
 import json
+import re
+
 import click
 from rich.console import Console
 from rich.table import Table
@@ -40,6 +42,8 @@ from .history import (
     GlobalStats,
     ProjectStory,
 )
+
+__all__ = ["main"]
 
 console = Console()
 
@@ -374,8 +378,6 @@ def search(
 
             # Show context around match
             content = msg.content
-            import re
-
             flags = 0 if case_sensitive else re.IGNORECASE
             match = re.search(pattern, content, flags)
             if match:
@@ -932,8 +934,8 @@ def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
                 if sparkline_list:
                     lines.append(f"Session trend: {sparkline_list[0]}")
                     lines.append("")
-        except Exception:
-            pass
+        except (ValueError, TypeError):
+            pass  # sparklines may fail with invalid data
 
         for proj_stats in sorted(
             stats.projects, key=lambda p: p.total_sessions, reverse=True
@@ -959,8 +961,8 @@ def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
                 if sparkline_list:
                     lines.append(f"Message trend: {sparkline_list[0]}")
                     lines.append("")
-        except Exception:
-            pass
+        except (ValueError, TypeError):
+            pass  # sparklines may fail with invalid data
 
         for proj_stats in sorted(
             stats.projects, key=lambda p: p.total_messages, reverse=True
@@ -1068,8 +1070,8 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
                     if sparkline_list:
                         lines.append(f"📈 Activity: {sparkline_list[0]}")
                         lines.append("")
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                pass  # sparklines may fail with invalid data
 
         lines.append("### Daily Progress:")
 
@@ -1116,8 +1118,8 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
                     if sparkline_list:
                         lines.append(f"📈 Daily Activity: {sparkline_list[0]}")
                         lines.append("")
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                pass  # sparklines may fail with invalid data
 
         lines.append(
             f"🏔️  Peak Activity: {story.peak_day[1]} messages on {story.peak_day[0].strftime('%B %d')}"

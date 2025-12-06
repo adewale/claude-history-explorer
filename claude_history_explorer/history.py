@@ -30,13 +30,37 @@ Example:
 """
 
 import json
-import os
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterator, Optional, Dict, List
+
+__all__ = [
+    # Data models
+    "Message",
+    "Session",
+    "Project",
+    "ProjectStats",
+    "GlobalStats",
+    "ProjectStory",
+    # Path functions
+    "get_claude_dir",
+    "get_projects_dir",
+    # Core functions
+    "list_projects",
+    "find_project",
+    "parse_session",
+    "search_sessions",
+    "get_session_by_id",
+    # Statistics functions
+    "calculate_project_stats",
+    "calculate_global_stats",
+    # Story functions
+    "generate_project_story",
+    "generate_global_story",
+]
 
 
 def get_claude_dir() -> Path:
@@ -88,7 +112,6 @@ class Message:
         Returns:
             Message object or None if the data is not a valid message
         """
-        """Parse a message from JSONL data."""
         msg_type = data.get("type")
 
         if msg_type not in ("user", "assistant"):
@@ -1010,8 +1033,6 @@ def generate_global_story() -> dict:
     all_traits = []
     for story in project_stories:
         all_traits.extend(story.personality_traits)
-
-    from collections import Counter
 
     common_traits = Counter(all_traits).most_common(3)
 
