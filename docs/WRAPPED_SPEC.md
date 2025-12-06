@@ -10,77 +10,36 @@ A web app that lets users share their Claude Code usage story as a single sharea
 User runs CLI command -> Generates encoded URL -> Shares URL -> Recipients see rich visualization
 ```
 
+---
+
 ## Example URLs
 
-### Minimal Story (Power User)
+### Power User
 ```
-https://wrapped.claude.codes/2025#eyJwIjo0LCJzIjo3MCwibSI6NTMxNiwiaCI6MzEyLCJ0IjpbIkFnZW50LWRyaXZlbiIsIkRlZXAtd29yayBmb2N1c2VkIiwiSGlnaC1pbnRlbnNpdHkiXSwiYyI6IkhlYXZ5IGRlbGVnYXRpb24iLCJ3IjoiU3RlYWR5IGZsb3ciLCJwcCI6IktleWJvYXJkaWEiLCJwbSI6MTg3MywiY2kiOjMsImxzIjo1MC41LCJhIjpbMTIsMzQsNTYsNzgsOTAsMTIzLDE1NiwxODksMjEwLDI0NSwyNzgsMzAwXSwidHAiOlt7Im4iOiJLZXlib2FyZGlhIiwibSI6MTg3MywiZCI6M30seyJuIjoiQXVyaWdhIiwibSI6MTcwMSwiZCI6MTR9LHsibiI6IkxlbXBpY2thIiwibSI6ODc2LCJkIjo3fV19
-```
-
-Decodes to:
-```json
-{
-  "p": 4,
-  "s": 70,
-  "m": 5316,
-  "h": 312,
-  "t": ["Agent-driven", "Deep-work focused", "High-intensity"],
-  "c": "Heavy delegation",
-  "w": "Steady flow",
-  "pp": "Keyboardia",
-  "pm": 1873,
-  "ci": 3,
-  "ls": 50.5,
-  "a": [12, 34, 56, 78, 90, 123, 156, 189, 210, 245, 278, 300],
-  "tp": [
-    {"n": "Keyboardia", "m": 1873, "d": 3},
-    {"n": "Auriga", "m": 1701, "d": 14},
-    {"n": "Lempicka", "m": 876, "d": 7}
-  ]
-}
+https://wrapped.claude.codes/2025/eyJwIjo0LCJzIjo3MCwibSI6NTMxNi4uLg
 ```
 
 ### With Display Name
 ```
-https://wrapped.claude.codes/2025#eyJuIjoiQWRld2FsZSIsInAiOjQsInMiOjcwLCJtIjo1MzE2LCJoIjozMTIsInQiOlsiQWdlbnQtZHJpdmVuIl0sImMiOiJIZWF2eSBkZWxlZ2F0aW9uIiwidyI6IlN0ZWFkeSBmbG93IiwicHAiOiJLZXlib2FyZGlhIiwicG0iOjE4NzMsImNpIjozLCJscyI6NTAuNSwiYSI6WzEyLDM0LDU2LDc4LDkwLDEyMywxNTYsMTg5LDIxMCwyNDUsMjc4LDMwMF0sInRwIjpbXX0
+https://wrapped.claude.codes/2025/eyJuIjoiQWRld2FsZSIsInAiOjQsInMiOjcwLi4u
 ```
 
-Decodes to same as above but with `"n": "Adewale"` added.
-
-### Casual User (Smaller Payload)
+### OG Image URL (auto-generated)
 ```
-https://wrapped.claude.codes/2025#eyJwIjoxLCJzIjo1LCJtIjoxNTAsImgiOjgsInQiOlsiSGFuZHMtb24iXSwiYyI6IlNvbG8gd29yayIsInciOiJEZWxpYmVyYXRlIiwicHAiOiJteS1hcHAiLCJwbSI6MTUwLCJjaSI6MSwiYSI6WzAsMCwwLDAsMCwwLDAsMCwwLDE1MCwwLDBdLCJ0cCI6W119
-```
-
-Decodes to:
-```json
-{
-  "p": 1,
-  "s": 5,
-  "m": 150,
-  "h": 8,
-  "t": ["Hands-on"],
-  "c": "Solo work",
-  "w": "Deliberate",
-  "pp": "my-app",
-  "pm": 150,
-  "ci": 1,
-  "a": [0, 0, 0, 0, 0, 0, 0, 0, 0, 150, 0, 0],
-  "tp": []
-}
+https://wrapped.claude.codes/og/eyJwIjo0LCJzIjo3MCwibSI6NTMxNi4uLg.png
 ```
 
 ### URL Structure
 
 ```
-https://wrapped.claude.codes/2025#<base64url-encoded-msgpack>
-        └──────────┬──────────┘ └─┬─┘ └───────────┬──────────┘
-                domain          year    encoded story data
+https://wrapped.claude.codes/2025/<base64url-encoded-data>
+        └──────────┬──────────┘ └─┬─┘ └─────────┬─────────┘
+                domain          year    encoded story data (in path, not fragment)
 ```
 
-- **Domain**: `wrapped.claude.codes` (or similar)
-- **Year**: `/2025` path segment for future year support
-- **Fragment**: `#...` contains all data (never sent to server in HTTP requests)
+**Note**: Data is in the path (not fragment) so the server can read it and generate dynamic OG tags for social sharing.
+
+---
 
 ## Data Model
 
@@ -120,66 +79,371 @@ interface WrappedStory {
 }
 ```
 
-### Field Reference
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `n` | string | No | Display name |
-| `p` | number | Yes | Total projects |
-| `s` | number | Yes | Total sessions |
-| `m` | number | Yes | Total messages |
-| `h` | number | Yes | Total hours |
-| `t` | string[] | Yes | Personality traits (max 3) |
-| `c` | string | Yes | Collaboration style |
-| `w` | string | Yes | Work pace |
-| `pp` | string | Yes | Peak project name |
-| `pm` | number | Yes | Peak project messages |
-| `ci` | number | Yes | Max concurrent instances |
-| `ls` | number | Yes | Longest session (hours) |
-| `a` | number[] | Yes | Monthly activity (12 values) |
-| `tp` | array | Yes | Top projects (up to 3) |
-
 ### URL Encoding Strategy
 
 1. JSON -> MessagePack (binary, ~40% smaller than JSON)
 2. MessagePack -> Base64URL (URL-safe encoding)
-3. Place in URL fragment (`#`) so it's never sent to server in logs
+3. Place in URL **path** (so server can generate OG tags)
 
 **Size budget**: ~2KB encoded = rich story that fits in any URL
 
+---
+
 ## Architecture
 
+### With Dynamic OG Images (Recommended)
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Cloudflare Workers                           │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │  Worker: wrapped.claude.codes                               ││
-│  │  - Serves static HTML/JS/CSS (embedded or from R2)         ││
-│  │  - No data processing - all client-side                    ││
-│  │  - Returns same SPA for all routes                         ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Client-Side App                              │
-│  ┌───────────────┐  ┌───────────────┐  ┌─────────────────────┐ │
-│  │  URL Decoder  │  │  Visualizer   │  │  Share Generator    │ │
-│  │  (msgpack +   │  │  (Canvas/SVG  │  │  (Copy link,        │ │
-│  │   base64url)  │  │   animations) │  │   social cards)     │ │
-│  └───────────────┘  └───────────────┘  └─────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                     Cloudflare Pages                               │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                      Router                                   │  │
+│  │  /2025/<data>     -> HTML with dynamic OG tags + SPA         │  │
+│  │  /og/<data>.png   -> Generate PNG image on-the-fly           │  │
+│  │  /                -> Landing page                            │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              │                                     │
+│              ┌───────────────┴───────────────┐                    │
+│              ▼                               ▼                    │
+│  ┌──────────────────────┐      ┌──────────────────────┐          │
+│  │   HTML Generator     │      │   Image Generator    │          │
+│  │   (inject OG tags)   │      │   (Satori + Resvg)   │          │
+│  └──────────────────────┘      └──────────────────────┘          │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-### Cloudflare Services Used
+### Cloudflare Services
 
-| Service | Purpose |
-|---------|---------|
-| **Workers** | Serve the SPA, handle routing |
-| **Pages** | Alternative: static site hosting |
-| **R2** | Optional: store static assets |
+| Service | Free Tier | Use |
+|---------|-----------|-----|
+| **Pages** | Unlimited static, 500 builds/mo | Host SPA |
+| **Pages Functions** | 100k req/day, 10ms CPU | Routing, OG tags |
+| **R2** | 10GB, free egress | Cache generated images |
+| **Workers Paid** | $5/mo, 30s CPU | Required for PNG generation |
 
-**No KV, D1, or Durable Objects needed** - all data lives in the URL.
+**Key constraint**: Free tier has 10ms CPU limit. PNG generation with Satori + resvg takes 50-200ms. Options:
+1. **Pay $5/month** for Workers Paid (recommended)
+2. **SVG-only** OG images (may not render on all platforms)
+3. **External service** like Vercel OG for image generation
+
+---
+
+## Social Card Generation
+
+### Dynamic OG Meta Tags
+
+The Worker decodes the URL data and injects personalized OG tags:
+
+```html
+<!-- Primary Meta Tags -->
+<title>Adewale's Claude Code Wrapped 2025</title>
+<meta name="description" content="5,316 messages across 4 projects. Agent-driven, Deep-work focused." />
+
+<!-- Open Graph / Facebook / LinkedIn -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://wrapped.claude.codes/2025/eyJ..." />
+<meta property="og:title" content="Adewale's Claude Code Wrapped 2025" />
+<meta property="og:description" content="5,316 messages across 4 projects" />
+<meta property="og:image" content="https://wrapped.claude.codes/og/eyJ....png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Adewale's Claude Code Wrapped 2025" />
+<meta name="twitter:description" content="5,316 messages across 4 projects" />
+<meta name="twitter:image" content="https://wrapped.claude.codes/og/eyJ....png" />
+```
+
+### Image Generation with Satori
+
+```typescript
+import satori from 'satori';
+import { Resvg } from '@resvg/resvg-wasm';
+
+async function generateOgImage(story: WrappedStory): Promise<Uint8Array> {
+  const svg = await satori(
+    <div style={{
+      width: 1200,
+      height: 630,
+      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'Inter',
+      color: 'white',
+    }}>
+      <div style={{ fontSize: 32, opacity: 0.8 }}>Claude Code Wrapped 2025</div>
+      <div style={{ fontSize: 72, fontWeight: 'bold', marginTop: 20 }}>
+        {story.m.toLocaleString()} messages
+      </div>
+      <div style={{ fontSize: 36, marginTop: 20 }}>
+        {story.p} projects · {story.h} hours
+      </div>
+      <div style={{ fontSize: 28, marginTop: 40, opacity: 0.9 }}>
+        {story.t.join(' · ')}
+      </div>
+    </div>,
+    { width: 1200, height: 630, fonts: [/* Inter font */] }
+  );
+
+  const resvg = new Resvg(svg);
+  return resvg.render().asPng();
+}
+```
+
+### Platform Image Sizes
+
+| Platform | Size | Notes |
+|----------|------|-------|
+| Twitter/X | 1200x628 | `twitter:card` = `summary_large_image` |
+| LinkedIn | 1200x627 | Crops slightly, keep text centered |
+| Facebook | 1200x630 | Standard OG image |
+| iMessage | 1200x630 | Uses OG image |
+
+---
+
+## Visualization Approaches
+
+### Approach A: Spotify Wrapped Style (Emotional/Narrative)
+
+A series of animated cards the user taps through, building a story:
+
+#### Card 1: The Hook
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│           You and Claude Code           │
+│              had a big year             │
+│                                         │
+│              [Tap to begin]             │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+#### Card 2: Mind-Bending Comparison
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│         You exchanged                   │
+│                                         │
+│             5,316                       │
+│            messages                     │
+│                                         │
+│   That's more words than The Great      │
+│   Gatsby. You wrote a novel this year.  │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**Comparison thresholds**:
+- < 500: "That's a solid short story"
+- 500-2000: "Longer than a PhD thesis"
+- 2000-5000: "The Great Gatsby territory"
+- 5000-10000: "War and Peace vibes"
+- 10000+: "You could fill a bookshelf"
+
+#### Card 3: Activity Timeline
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│         Your year in code               │
+│                                         │
+│        ▁▂▃▅▇█▇▅▃▂▁▃                     │
+│        J F M A M J J A S O N D          │
+│                                         │
+│      October was your peak month.       │
+│      Something big was happening.       │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**Pattern-based copy**:
+- Steady: "Consistent builder. You showed up every month."
+- End-loaded: "Late bloomer. You found your flow in Q4."
+- Start-loaded: "Strong start. Hit the ground running."
+- Spiky: "Burst worker. When you ship, you ship hard."
+
+#### Card 4: Personality Archetype
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│     Your Claude Code Personality:       │
+│                                         │
+│         ╔═══════════════════╗          │
+│         ║  THE ARCHITECT    ║          │
+│         ╚═══════════════════╝          │
+│                                         │
+│         🤖 Agent-driven                │
+│         🧘 Deep-work focused           │
+│         ⚡ High-intensity              │
+│                                         │
+│   You don't code—you orchestrate.      │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**Personality archetypes** (computed from traits):
+- **The Architect**: Agent-driven + Deep-work → "You design systems"
+- **The Sprinter**: High-intensity + Burst → "Fast and focused"
+- **The Collaborator**: Hands-on + Iterative → "Think out loud"
+- **The Craftsperson**: Deliberate + Solo → "Trust the process"
+
+#### Card 5: Top Project
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│          Your #1 Project                │
+│                                         │
+│            Keyboardia                   │
+│                                         │
+│      1,873 messages · 3 days            │
+│                                         │
+│   You were locked in.                   │
+│   This project got your best work.      │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+#### Card 6: Parallel Power (if ci > 1)
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│   At your peak, you were running        │
+│                                         │
+│          🤖     🤖     🤖              │
+│                                         │
+│   3 Claude instances simultaneously     │
+│                                         │
+│        You don't multitask.             │
+│        You parallelize.                 │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+#### Card 7: Longest Session
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│      Your longest session:              │
+│                                         │
+│           50.5 hours                    │
+│                                         │
+│    ☕☕☕☕☕☕☕☕☕☕☕☕☕☕☕☕            │
+│                                         │
+│      That's over 2 days straight.       │
+│      Please tell us you slept.          │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**Duration-based copy**:
+- < 2h: "Quick and focused. In and out."
+- 2-4h: "A proper deep work session."
+- 4-8h: "Full day energy."
+- 8-24h: "Marathon mode. Respect."
+- 24h+: "...are you okay? We're concerned."
+
+#### Card 8: Share Card
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│      CLAUDE CODE WRAPPED 2025           │
+│                                         │
+│              Adewale                    │
+│                                         │
+│    5,316 messages · 312 hours           │
+│                                         │
+│        ▁▂▃▅▇█▇▅▃▂▁▃                    │
+│                                         │
+│         THE ARCHITECT                   │
+│    Agent-driven · Deep-work focused     │
+│                                         │
+│    [ Share ]  [ Download Image ]        │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### Approach B: Tufte Style (Data-Dense/Analytical)
+
+Inspired by Edward Tufte's principles: maximize data-ink ratio, use sparklines, enable micro/macro readings.
+
+#### Integrated Text + Graphics
+
+Tufte advocates embedding graphics inline with text, "word-sized":
+
+```
+In 2025, you exchanged 5,316 messages across 70 sessions
+                        ▁▂▃▅▇█▇▅▃▂▁▃
+spanning 312 hours—your peak month was July, when you
+sent 189 messages in a single day while juggling
+3 Claude instances on Keyboardia.
+
+Your style: Agent-driven, Steady flow, Heavy delegation.
+```
+
+#### Small Multiples for Projects
+
+Same structure repeated, enabling instant comparison:
+
+```
+TOP PROJECTS
+
+Keyboardia          Auriga             Lempicka
+━━━━━━━━━━━        ━━━━━━━━━━━        ━━━━━━━━━━━
+1,873 messages     1,701 messages     876 messages
+3 days active      14 days active     7 days active
+│█████████│        │████████ │        │████     │
+```
+
+#### Slopegraph for Comparisons
+
+Compare yourself to averages (if available):
+
+```
+        You                         Average
+        ───                         ───────
+ 5,316 ─messages───────────────────── 2,100
+   312 ─hours────────────────────────── 180
+    70 ─sessions──────────────────────── 45
+```
+
+#### Layered Sparklines
+
+Multiple data dimensions on same axis:
+
+```
+2025 ACTIVITY
+
+Hours:    ▁▂▃▅▇█▇▅▃▂▁▃  (312 total)
+Messages: ▂▃▄▆█▇▆▅▄▃▂▄  (5,316 total)
+          J F M A M J J A S O N D
+                    ↑
+                 October
+```
+
+#### Data-Ink Ratio: Strip Decoration
+
+**Avoid:**
+```
+┌──────────────────────────┐
+│  📊 MESSAGES: 5,316      │
+│  ⏱️  HOURS: 312           │
+│  📁 PROJECTS: 4          │
+└──────────────────────────┘
+```
+
+**Prefer:**
+```
+5,316 messages   312 hours   70 sessions   4 projects
+```
+
+### Recommendation: Hybrid Approach
+
+Use **Spotify style for the interactive experience** (cards, narrative, emotion) but incorporate **Tufte principles for the final share card** (data-dense, sparklines, no chartjunk).
+
+---
 
 ## CLI Integration
 
@@ -211,236 +475,71 @@ claude-history wrapped --raw
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Share your story:
-https://wrapped.claude.codes/2025#eyJuIjoiQWRld2FsZSI...
+https://wrapped.claude.codes/2025/eyJuIjoiQWRld2FsZSI...
 
 📋 Copied to clipboard!
 ```
 
-## Web App Screens
-
-### 1. Landing Page (no hash)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│                   Claude Code Wrapped 2025                      │
-│                                                                 │
-│         Discover your coding journey with Claude Code           │
-│                                                                 │
-│    ┌─────────────────────────────────────────────────────┐     │
-│    │                                                     │     │
-│    │   To generate your Wrapped, run:                    │     │
-│    │                                                     │     │
-│    │   $ claude-history wrapped                          │     │
-│    │                                                     │     │
-│    │   Don't have it? pip install claude-history-explorer│     │
-│    │                                                     │     │
-│    └─────────────────────────────────────────────────────┘     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 2. Wrapped Visualization (with hash)
-
-A series of animated "cards" the user can tap/click through (Spotify-style):
-
-**Card 1: The Hook**
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│           You and Claude Code           │
-│              had a big year             │
-│                                         │
-│              [Tap to begin]             │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-**Card 2: Volume**
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│         You exchanged                   │
-│                                         │
-│             5,316                       │
-│            messages                     │
-│                                         │
-│    That's like reading War and Peace    │
-│              1.5 times                  │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-**Card 3: Time**
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│      You spent 312 hours coding         │
-│           with Claude                   │
-│                                         │
-│        ▁▂▃▅▇█▇▅▃▂▁▃                     │
-│        J F M A M J J A S O N D          │
-│                                         │
-│       Peak month: October               │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-**Card 4: Personality**
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│        Your coding personality:         │
-│                                         │
-│          🤖 Agent-driven                │
-│          🧘 Deep-work focused           │
-│          ⚡ High-intensity              │
-│                                         │
-│   You like to delegate and go deep      │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-**Card 5: Top Project**
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│         Your top project was            │
-│                                         │
-│             Keyboardia                  │
-│                                         │
-│       1,873 messages over 3 days        │
-│                                         │
-│    You were in the zone.                │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-**Card 6: Parallel Power** (if ci > 1)
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│        You ran up to 3 Claude           │
-│        instances at once                │
-│                                         │
-│           🤖  🤖  🤖                    │
-│                                         │
-│     A true parallel processing mind     │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-**Card 7: Share**
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│       That's your 2025 Wrapped!         │
-│                                         │
-│    ┌─────────┐  ┌─────────┐            │
-│    │  Share  │  │  Copy   │            │
-│    │   X     │  │  Link   │            │
-│    └─────────┘  └─────────┘            │
-│                                         │
-│    ┌─────────┐  ┌─────────┐            │
-│    │ LinkedIn│  │Download │            │
-│    │         │  │  Image  │            │
-│    └─────────┘  └─────────┘            │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-## Technical Implementation
-
-### Worker Code (Minimal)
-
-```typescript
-export default {
-  async fetch(request: Request): Promise<Response> {
-    // Serve the same SPA for all routes
-    // The client JS handles URL parsing
-    return new Response(HTML_CONTENT, {
-      headers: {
-        'Content-Type': 'text/html;charset=UTF-8',
-        'Cache-Control': 'public, max-age=3600',
-      },
-    });
-  },
-};
-```
-
-### Client-Side Decoder
-
-```typescript
-import { decode } from '@msgpack/msgpack';
-
-function decodeWrapped(hash: string): WrappedStory | null {
-  try {
-    const base64 = hash.slice(1); // Remove #
-    const binary = base64UrlDecode(base64);
-    return decode(binary) as WrappedStory;
-  } catch {
-    return null;
-  }
-}
-
-// On page load
-const story = decodeWrapped(window.location.hash);
-if (story) {
-  renderVisualization(story);
-} else {
-  renderLandingPage();
-}
-```
-
-### Social Card Generation
-
-Generate OG image client-side using Canvas, then offer download:
-
-```typescript
-async function generateShareImage(story: WrappedStory): Promise<Blob> {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1200;
-  canvas.height = 630; // OG image dimensions
-  
-  const ctx = canvas.getContext('2d')!;
-  
-  // Draw branded background
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(0, 0, 1200, 630);
-  
-  // Draw stats
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 72px system-ui';
-  ctx.fillText(`${story.m.toLocaleString()} messages`, 100, 200);
-  
-  // ... more drawing
-  
-  return new Promise(resolve => {
-    canvas.toBlob(blob => resolve(blob!), 'image/png');
-  });
-}
-```
+---
 
 ## Privacy Considerations
 
 | Concern | Mitigation |
 |---------|------------|
-| Data in URL visible to recipients | Only aggregate stats, no conversation content |
-| Server logging | Data in fragment (#) never sent to server |
-| Analytics tracking | No analytics, or privacy-respecting only |
+| Data visible to recipients | Only aggregate stats, no conversation content |
+| Server sees data | Acceptable—it's just stats for OG generation |
+| Analytics tracking | None, or privacy-respecting only |
 | Name disclosure | Name field is optional |
+
+---
 
 ## File Structure
 
 ```
 claude-code-wrapped/
 ├── src/
-│   ├── worker.ts          # Cloudflare Worker entry
-│   └── index.html         # Embedded SPA (inline JS/CSS)
+│   ├── index.ts           # Pages Function entry
+│   ├── og.ts              # OG image generation
+│   └── index.html         # SPA template
+├── public/
+│   └── fonts/             # Inter font for Satori
 ├── wrangler.toml          # Cloudflare config
 ├── package.json
 └── README.md
 ```
+
+---
+
+## Implementation Checklist
+
+### Phase 1: CLI Command
+- [ ] Add `wrapped` command to claude-history
+- [ ] Collect 2025 data (filter by year)
+- [ ] Generate WrappedStory JSON
+- [ ] Encode with MessagePack + Base64URL
+- [ ] Output URL and copy to clipboard
+
+### Phase 2: Basic Web App
+- [ ] Set up Cloudflare Pages project
+- [ ] Create landing page
+- [ ] Implement URL decoder
+- [ ] Build card-based visualization
+- [ ] Add share/copy buttons
+
+### Phase 3: Social Cards
+- [ ] Move data from fragment to path
+- [ ] Implement dynamic OG tag injection
+- [ ] Set up Satori + resvg for PNG generation
+- [ ] Add R2 caching for generated images
+- [ ] Test on Twitter, LinkedIn, Facebook
+
+### Phase 4: Polish
+- [ ] Add animations (Framer Motion)
+- [ ] Mobile optimization
+- [ ] Error handling for invalid URLs
+- [ ] Analytics (privacy-respecting)
+
+---
 
 ## Future Enhancements
 
@@ -448,16 +547,17 @@ claude-code-wrapped/
 - **Comparison mode**: "You coded 50% more than last year"
 - **Badges/Achievements**: "Night Owl", "Weekend Warrior", "Agent Whisperer"
 - **Audio**: Background music like Spotify Wrapped
-- **Animation**: More sophisticated transitions (Framer Motion)
 - **QR Code**: Generate QR for easy mobile sharing
 - **Embeddable widget**: For blogs/READMEs
+
+---
 
 ## Summary
 
 | Aspect | Decision |
 |--------|----------|
 | **Storage** | None - all data in URL |
-| **Privacy** | Maximum - no server-side data |
-| **Complexity** | Minimal - single Worker + SPA |
-| **Shareability** | Single URL contains everything |
-| **Cost** | Near-zero (Workers free tier) |
+| **Privacy** | High - only aggregate stats shared |
+| **Social Cards** | Dynamic OG images via Satori |
+| **Cost** | $5/month (Workers Paid for image generation) |
+| **Visualization** | Hybrid Spotify (narrative) + Tufte (data-dense) |
