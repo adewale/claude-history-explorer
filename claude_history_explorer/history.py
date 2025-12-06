@@ -37,17 +37,37 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterator, Optional, Dict, List
 
+from .constants import (
+    MESSAGE_RATE_HIGH,
+    MESSAGE_RATE_MEDIUM,
+    MESSAGE_RATE_LOW,
+    SESSION_LENGTH_LONG,
+    SESSION_LENGTH_EXTENDED,
+    SESSION_LENGTH_STANDARD,
+    AGENT_RATIO_HIGH,
+    AGENT_RATIO_BALANCED,
+    ACTIVITY_INTENSITY_HIGH,
+    ACTIVITY_INTENSITY_MEDIUM,
+)
+
 __all__ = [
     # Data models
     "Message",
     "Session",
+    "SessionInfo",
     "Project",
     "ProjectStats",
     "GlobalStats",
     "ProjectStory",
+    "GlobalStory",
     # Path functions
     "get_claude_dir",
     "get_projects_dir",
+    # Helper functions
+    "format_duration",
+    "duration_minutes",
+    "format_timestamp",
+    "classify",
     # Core functions
     "list_projects",
     "find_project",
@@ -61,6 +81,91 @@ __all__ = [
     "generate_project_story",
     "generate_global_story",
 ]
+
+
+def format_duration(minutes: int) -> str:
+    """Format a duration in minutes as a human-readable string.
+
+    Args:
+        minutes: Duration in minutes
+
+    Returns:
+        Formatted string like "45m" or "2h 30m"
+
+    Example:
+        >>> format_duration(90)
+        '1h 30m'
+        >>> format_duration(45)
+        '45m'
+    """
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    mins = minutes % 60
+    return f"{hours}h {mins}m"
+
+
+def duration_minutes(start: datetime, end: datetime) -> int:
+    """Calculate duration in minutes between two datetimes.
+
+    Args:
+        start: Start datetime
+        end: End datetime
+
+    Returns:
+        Duration in minutes
+
+    Example:
+        >>> from datetime import datetime, timedelta
+        >>> start = datetime.now()
+        >>> end = start + timedelta(hours=2, minutes=30)
+        >>> duration_minutes(start, end)
+        150
+    """
+    return int((end - start).total_seconds() / 60)
+
+
+def format_timestamp(dt: Optional[datetime], fmt: str = "%Y-%m-%d %H:%M") -> str:
+    """Format a datetime with a default pattern.
+
+    Args:
+        dt: Datetime to format (None returns "unknown")
+        fmt: Format string (default: "%Y-%m-%d %H:%M")
+
+    Returns:
+        Formatted string or "unknown" if dt is None
+
+    Example:
+        >>> from datetime import datetime
+        >>> dt = datetime(2024, 1, 15, 14, 30)
+        >>> format_timestamp(dt)
+        '2024-01-15 14:30'
+    """
+    return dt.strftime(fmt) if dt else "unknown"
+
+
+def classify(value: float, thresholds: list[tuple[float, str]], default: str) -> str:
+    """Classify a value into a category based on thresholds.
+
+    Thresholds are checked in order; the first threshold exceeded returns
+    the corresponding label.
+
+    Args:
+        value: The value to classify
+        thresholds: List of (threshold, label) tuples, checked in order
+        default: Label to return if no threshold is exceeded
+
+    Returns:
+        The label for the matching threshold, or default
+
+    Example:
+        >>> classify(25, [(30, "high"), (20, "medium"), (10, "low")], "minimal")
+        'medium'
+    """
+    for threshold, label in thresholds:
+        if value > threshold:
+            return label
+    return default
 
 
 def get_claude_dir() -> Path:
@@ -140,9 +245,7 @@ class Message:
                                 "input": item.get("input", {}),
                             }
                         )
-                    elif item.get("type") == "tool_result":
-                        # Skip tool results in content display
-                        pass
+                    # tool_result types are intentionally skipped
 
         # Handle direct user messages
         if role == "user" and not content_parts:
@@ -210,11 +313,7 @@ class Session:
         if self.start_time and self.end_time:
             delta = self.end_time - self.start_time
             minutes = int(delta.total_seconds() / 60)
-            if minutes < 60:
-                return f"{minutes}m"
-            hours = minutes // 60
-            mins = minutes % 60
-            return f"{hours}h {mins}m"
+            return format_duration(minutes)
         return "unknown"
 
 
@@ -268,6 +367,11 @@ class Project:
     @property
     def session_count(self) -> int:
         return len(self.session_files)
+
+    @property
+    def short_name(self) -> str:
+        """Get the short name (last path component) of the project."""
+        return self.path.split("/")[-1]
 
     @property
     def last_modified(self) -> Optional[datetime]:
@@ -503,12 +607,7 @@ class ProjectStats:
     @property
     def total_duration_str(self) -> str:
         """Format total duration as readable string."""
-        total_minutes = self.total_duration_minutes
-        if total_minutes < 60:
-            return f"{total_minutes}m"
-        hours = total_minutes // 60
-        mins = total_minutes % 60
-        return f"{hours}h {mins}m"
+        return format_duration(self.total_duration_minutes)
 
 
 @dataclass
@@ -551,12 +650,7 @@ class GlobalStats:
     @property
     def total_duration_str(self) -> str:
         """Format total duration as readable string (e.g., '24h 30m')."""
-        total_minutes = self.total_duration_minutes
-        if total_minutes < 60:
-            return f"{total_minutes}m"
-        hours = total_minutes // 60
-        mins = total_minutes % 60
-        return f"{hours}h {mins}m"
+        return format_duration(self.total_duration_minutes)
 
 
 def calculate_project_stats(project: Project) -> ProjectStats:
@@ -583,7 +677,6 @@ def calculate_project_stats(project: Project) -> ProjectStats:
     main_sessions = 0
     total_size_bytes = 0
     longest_duration_minutes = 0
-    longest_session_id = ""
     most_recent_session = None
 
     for session_file in project.session_files:
@@ -605,13 +698,10 @@ def calculate_project_stats(project: Project) -> ProjectStats:
 
         # Duration
         if session.start_time and session.end_time:
-            duration_minutes = int(
-                (session.end_time - session.start_time).total_seconds() / 60
-            )
-            total_duration_minutes += duration_minutes
-            if duration_minutes > longest_duration_minutes:
-                longest_duration_minutes = duration_minutes
-                longest_session_id = session.session_id
+            duration = duration_minutes(session.start_time, session.end_time)
+            total_duration_minutes += duration
+            if duration > longest_duration_minutes:
+                longest_duration_minutes = duration
 
         # Most recent session
         if session.start_time:
@@ -621,14 +711,6 @@ def calculate_project_stats(project: Project) -> ProjectStats:
     avg_messages = (
         total_messages / project.session_count if project.session_count > 0 else 0
     )
-
-    # Format longest duration
-    if longest_duration_minutes < 60:
-        longest_duration_str = f"{longest_duration_minutes}m"
-    else:
-        hours = longest_duration_minutes // 60
-        mins = longest_duration_minutes % 60
-        longest_duration_str = f"{hours}h {mins}m"
 
     return ProjectStats(
         project=project,
@@ -640,7 +722,7 @@ def calculate_project_stats(project: Project) -> ProjectStats:
         main_sessions=main_sessions,
         total_size_bytes=total_size_bytes,
         avg_messages_per_session=avg_messages,
-        longest_session_duration=longest_duration_str,
+        longest_session_duration=format_duration(longest_duration_minutes),
         most_recent_session=most_recent_session,
     )
 
@@ -719,6 +801,64 @@ def calculate_global_stats(project_filter: Optional[str] = None) -> GlobalStats:
 
 
 @dataclass
+class SessionInfo:
+    """Summary information about a parsed session.
+
+    Used internally for story generation to avoid repeated parsing
+    and to provide structured access to session metrics.
+
+    Attributes:
+        session_id: Unique identifier for the session
+        start_time: When the session started
+        end_time: When the session ended (may be None)
+        duration_minutes: Length of session in minutes
+        message_count: Total messages in session
+        user_message_count: Messages from user
+        is_agent: Whether this is an agent session
+        slug: Optional session title/slug
+    """
+
+    session_id: str
+    start_time: datetime
+    end_time: Optional[datetime]
+    duration_minutes: int
+    message_count: int
+    user_message_count: int
+    is_agent: bool
+    slug: Optional[str]
+
+    @classmethod
+    def from_session(cls, session: Session, is_agent: bool) -> Optional["SessionInfo"]:
+        """Create SessionInfo from a Session object.
+
+        Args:
+            session: The parsed Session
+            is_agent: Whether this is an agent session
+
+        Returns:
+            SessionInfo with computed metrics, or None if session has no start_time
+        """
+        start_time = session.start_time
+        if start_time is None:
+            return None
+
+        duration = 0
+        if session.end_time:
+            duration = duration_minutes(start_time, session.end_time)
+
+        return cls(
+            session_id=session.session_id,
+            start_time=start_time,
+            end_time=session.end_time,
+            duration_minutes=duration,
+            message_count=session.message_count,
+            user_message_count=session.user_message_count,
+            is_agent=is_agent,
+            slug=session.slug,
+        )
+
+
+@dataclass
 class ProjectStory:
     """Narrative analysis of a project's development journey.
 
@@ -744,10 +884,12 @@ class ProjectStory:
         longest_session_hours: Maximum session length
         session_style: Description (e.g., "Marathon sessions")
         personality_traits: List of traits (e.g., ["Agent-driven", "Deep-work focused"])
-        most_productive_session: Dict with session details
+        most_productive_session: SessionInfo
         daily_engagement: Description of engagement pattern
         insights: List of key insight strings
         daily_activity: Dict mapping dates to message counts (for sparklines)
+        concurrent_claude_instances: Maximum number of Claude instances used simultaneously
+        concurrent_insights: List of insights about concurrent usage patterns
     """
 
     project_name: str
@@ -768,15 +910,15 @@ class ProjectStory:
     longest_session_hours: float
     session_style: str
     personality_traits: List[str]
-    most_productive_session: dict
+    most_productive_session: SessionInfo
     daily_engagement: str
     insights: List[str]
     daily_activity: Dict[datetime, int] = field(default_factory=dict)
+    concurrent_claude_instances: int = 0
+    concurrent_insights: List[str] = field(default_factory=list)
 
 
-def generate_project_story(
-    project: Project, format_type: str = "detailed"
-) -> ProjectStory:
+def generate_project_story(project: Project) -> ProjectStory:
     """Generate narrative insights about a project's development journey.
 
     Analyzes session patterns to determine work style, collaboration patterns,
@@ -784,7 +926,6 @@ def generate_project_story(
 
     Args:
         project: Project to analyze
-        format_type: Output format hint (doesn't affect data, just for context)
 
     Returns:
         ProjectStory with narrative insights and metrics
@@ -798,42 +939,29 @@ def generate_project_story(
         >>> print(f"Personality: {', '.join(story.personality_traits)}")
     """
     # Collect all sessions
-    sessions = []
+    sessions: list[SessionInfo] = []
     for session_file in project.session_files:
         session = parse_session(session_file, project.path)
-        if session.start_time:
-            sessions.append(
-                {
-                    "session_id": session.session_id,
-                    "start_time": session.start_time,
-                    "end_time": session.end_time,
-                    "duration_minutes": int(
-                        (session.end_time - session.start_time).total_seconds() / 60
-                    )
-                    if session.end_time
-                    else 0,
-                    "message_count": session.message_count,
-                    "user_message_count": session.user_message_count,
-                    "is_agent": session_file.name.startswith("agent-"),
-                    "slug": session.slug,
-                }
-            )
+        is_agent = session_file.name.startswith("agent-")
+        info = SessionInfo.from_session(session, is_agent)
+        if info is not None:
+            sessions.append(info)
 
     if not sessions:
         raise ValueError(f"No sessions found for project {project.path}")
 
-    sessions.sort(key=lambda x: x["start_time"])
+    sessions.sort(key=lambda x: x.start_time)
 
     # Basic lifecycle data
     first_session = sessions[0]
     last_session = sessions[-1]
-    lifecycle_days = (last_session["start_time"] - first_session["start_time"]).days + 1
+    lifecycle_days = (last_session.start_time - first_session.start_time).days + 1
 
     # Daily activity analysis
     daily_activity = defaultdict(int)
     for session in sessions:
-        day = session["start_time"].date()
-        daily_activity[day] += session["message_count"]
+        day = session.start_time.date()
+        daily_activity[day] += session.message_count
 
     # Find peak day and break periods
     peak_day = None
@@ -849,9 +977,51 @@ def generate_project_story(
             if gap_days > 1:
                 break_periods.append((sorted_days[i - 1], sorted_days[i], gap_days))
 
+    # Detect concurrent Claude instances
+    # Look for sessions with overlapping timestamps
+    concurrent_claude_instances = 0
+
+    for i, session1 in enumerate(sessions):
+        overlapping_sessions = 0
+        for j, session2 in enumerate(sessions):
+            if i != j and session1.start_time and session2.start_time:
+                # Check if sessions overlap (within 30 minutes suggests concurrent use)
+                time_diff = abs(
+                    (session1.start_time - session2.start_time).total_seconds() / 60
+                )
+                if (
+                    time_diff < 30
+                ):  # Sessions starting within 30 minutes likely concurrent
+                    overlapping_sessions += 1
+
+        if overlapping_sessions > 2:  # Session overlaps with 2+ others
+            concurrent_claude_instances = max(
+                concurrent_claude_instances, overlapping_sessions
+            )
+
+    # Generate insights about concurrent usage
+    concurrent_insights = []
+    if concurrent_claude_instances > 3:
+        concurrent_insights.append(
+            f"Highly parallel workflow - used up to {concurrent_claude_instances} Claude instances simultaneously"
+        )
+    elif concurrent_claude_instances > 2:
+        concurrent_insights.append(
+            f"Parallel development patterns - often used {concurrent_claude_instances} Claude instances at once"
+        )
+    elif concurrent_claude_instances > 1:
+        concurrent_insights.append(
+            "Occasional multi-instance workflow for complex tasks"
+        )
+
+    if concurrent_claude_instances == 0:
+        concurrent_insights.append(
+            "Sequential workflow - used one Claude instance at a time"
+        )
+
     # Agent collaboration analysis
-    agent_sessions = len([s for s in sessions if s["is_agent"]])
-    main_sessions = len([s for s in sessions if not s["is_agent"]])
+    agent_sessions = len([s for s in sessions if s.is_agent])
+    main_sessions = len([s for s in sessions if not s.is_agent])
 
     if main_sessions > 0:
         agent_ratio = agent_sessions / main_sessions
@@ -865,63 +1035,79 @@ def generate_project_story(
         collaboration_style = "Agent-only work"
 
     # Work intensity analysis
-    total_messages = sum(s["message_count"] for s in sessions)
-    total_dev_time = sum(s["duration_minutes"] for s in sessions) / 60
+    total_messages = sum(s.message_count for s in sessions)
+    total_dev_time = sum(s.duration_minutes for s in sessions) / 60
     message_rate = total_messages / total_dev_time if total_dev_time > 0 else 0
 
-    if message_rate > 30:
-        work_pace = "Rapid-fire development"
-    elif message_rate > 20:
-        work_pace = "Steady, productive flow"
-    elif message_rate > 10:
-        work_pace = "Deliberate, thoughtful work"
-    else:
-        work_pace = "Careful, methodical development"
+    work_pace = classify(
+        message_rate,
+        [
+            (MESSAGE_RATE_HIGH, "Rapid-fire development"),
+            (MESSAGE_RATE_MEDIUM, "Steady, productive flow"),
+            (MESSAGE_RATE_LOW, "Deliberate, thoughtful work"),
+        ],
+        "Careful, methodical development",
+    )
 
     # Session patterns
-    session_lengths = [
-        s["duration_minutes"] for s in sessions if s["duration_minutes"] > 0
-    ]
+    session_lengths = [s.duration_minutes for s in sessions if s.duration_minutes > 0]
     avg_session_hours = (
         sum(session_lengths) / len(session_lengths) / 60 if session_lengths else 0
     )
     longest_session_hours = max(session_lengths) / 60 if session_lengths else 0
 
-    if avg_session_hours > 2:
-        session_style = "Marathon sessions (deep, focused work)"
-    elif avg_session_hours > 1:
-        session_style = "Extended sessions (sustained effort)"
-    elif avg_session_hours > 0.5:
-        session_style = "Standard sessions (balanced approach)"
-    else:
-        session_style = "Quick sprints (iterative development)"
+    session_style = classify(
+        avg_session_hours,
+        [
+            (SESSION_LENGTH_LONG, "Marathon sessions (deep, focused work)"),
+            (SESSION_LENGTH_EXTENDED, "Extended sessions (sustained effort)"),
+            (SESSION_LENGTH_STANDARD, "Standard sessions (balanced approach)"),
+        ],
+        "Quick sprints (iterative development)",
+    )
 
     # Personality traits
     personality_traits = []
 
-    if agent_sessions / len(sessions) > 0.8:
-        personality_traits.append("Agent-driven")
-    elif agent_sessions / len(sessions) > 0.5:
-        personality_traits.append("Collaborative")
-    else:
-        personality_traits.append("Hands-on")
+    # Agent ratio trait
+    agent_ratio = agent_sessions / len(sessions)
+    personality_traits.append(
+        classify(
+            agent_ratio,
+            [
+                (AGENT_RATIO_HIGH, "Agent-driven"),
+                (AGENT_RATIO_BALANCED, "Collaborative"),
+            ],
+            "Hands-on",
+        )
+    )
 
-    if avg_session_hours > 2:
-        personality_traits.append("Deep-work focused")
-    elif avg_session_hours > 1:
-        personality_traits.append("Steady-paced")
-    else:
-        personality_traits.append("Quick-iterative")
+    # Session length trait
+    personality_traits.append(
+        classify(
+            avg_session_hours,
+            [
+                (SESSION_LENGTH_LONG, "Deep-work focused"),
+                (SESSION_LENGTH_EXTENDED, "Steady-paced"),
+            ],
+            "Quick-iterative",
+        )
+    )
 
-    if total_messages / lifecycle_days > 300:
-        personality_traits.append("High-intensity")
-    elif total_messages / lifecycle_days > 100:
-        personality_traits.append("Moderately active")
-    else:
-        personality_traits.append("Deliberate")
+    # Intensity trait
+    personality_traits.append(
+        classify(
+            total_messages / lifecycle_days,
+            [
+                (ACTIVITY_INTENSITY_HIGH, "High-intensity"),
+                (ACTIVITY_INTENSITY_MEDIUM, "Moderately active"),
+            ],
+            "Deliberate",
+        )
+    )
 
     # Most productive session
-    most_productive = max(sessions, key=lambda x: x["message_count"])
+    most_productive = max(sessions, key=lambda x: x.message_count)
 
     # Daily engagement pattern
     if len(break_periods) == 0 and lifecycle_days > 1:
@@ -934,16 +1120,15 @@ def generate_project_story(
     # Generate insights
     insights = []
     insights.append(
-        f"Most productive session: {most_productive['message_count']} messages"
+        f"Most productive session: {most_productive.message_count} messages"
     )
 
     if agent_sessions and main_sessions:
         agent_efficiency = (
-            sum(s["message_count"] for s in sessions if s["is_agent"]) / agent_sessions
+            sum(s.message_count for s in sessions if s.is_agent) / agent_sessions
         )
         main_efficiency = (
-            sum(s["message_count"] for s in sessions if not s["is_agent"])
-            / main_sessions
+            sum(s.message_count for s in sessions if not s.is_agent) / main_sessions
         )
 
         if agent_efficiency > main_efficiency:
@@ -954,11 +1139,11 @@ def generate_project_story(
     insights.append(daily_engagement)
 
     return ProjectStory(
-        project_name=project.path.split("/")[-1],
+        project_name=project.short_name,
         project_path=project.path,
         lifecycle_days=lifecycle_days,
-        birth_date=first_session["start_time"],
-        last_active=last_session["start_time"],
+        birth_date=first_session.start_time,
+        last_active=last_session.start_time,
         peak_day=peak_day,
         break_periods=break_periods,
         agent_sessions=agent_sessions,
@@ -974,41 +1159,63 @@ def generate_project_story(
         personality_traits=personality_traits,
         most_productive_session=most_productive,
         daily_engagement=daily_engagement,
-        insights=insights,
+        insights=insights + concurrent_insights,
         daily_activity=dict(daily_activity),
+        concurrent_claude_instances=concurrent_claude_instances,
+        concurrent_insights=concurrent_insights,
     )
 
 
-def generate_global_story() -> dict:
+@dataclass
+class GlobalStory:
+    """Narrative analysis across all projects.
+
+    Aggregates insights from individual project stories to provide
+    a holistic view of development patterns and personality.
+
+    Attributes:
+        total_projects: Number of projects analyzed
+        total_messages: Sum of all messages across projects
+        total_dev_time: Total development hours
+        avg_agent_ratio: Average agent collaboration ratio
+        avg_session_length: Average session length in hours
+        common_traits: List of (trait, count) tuples for most common traits
+        project_stories: List of individual ProjectStory objects
+        recent_activity: List of (timestamp, project_name) for recent work
+    """
+
+    total_projects: int
+    total_messages: int
+    total_dev_time: float
+    avg_agent_ratio: float
+    avg_session_length: float
+    common_traits: List[tuple[str, int]]
+    project_stories: List[ProjectStory]
+    recent_activity: List[tuple[datetime, str]]
+
+
+def generate_global_story() -> GlobalStory:
     """Generate a narrative story across all projects.
 
     Aggregates project stories and identifies common patterns
     and personality traits across the entire development history.
 
     Returns:
-        Dictionary containing:
-            - total_projects: Number of projects
-            - total_messages: Sum of all messages
-            - total_dev_time: Total hours of development
-            - avg_agent_ratio: Average agent collaboration ratio
-            - avg_session_length: Average session length in hours
-            - common_traits: List of (trait, count) tuples
-            - project_stories: List of ProjectStory objects
-            - recent_activity: List of (timestamp, project_name) tuples
+        GlobalStory with aggregated insights
 
     Raises:
         ValueError: If no projects with sessions are found
 
     Example:
         >>> story = generate_global_story()
-        >>> print(f"{story['total_projects']} projects analyzed")
+        >>> print(f"{story.total_projects} projects analyzed")
     """
     all_projects = list_projects()
     project_stories = []
 
     for project in all_projects:
         try:
-            story = generate_project_story(project, "brief")
+            story = generate_project_story(project)
             project_stories.append(story)
         except ValueError:
             continue
@@ -1054,13 +1261,13 @@ def generate_global_story() -> dict:
 
     recent_activity.sort()
 
-    return {
-        "total_projects": total_projects,
-        "total_messages": total_messages,
-        "total_dev_time": total_dev_time,
-        "avg_agent_ratio": avg_agent_ratio,
-        "avg_session_length": avg_session_length,
-        "common_traits": common_traits,
-        "project_stories": project_stories,
-        "recent_activity": recent_activity,
-    }
+    return GlobalStory(
+        total_projects=total_projects,
+        total_messages=total_messages,
+        total_dev_time=total_dev_time,
+        avg_agent_ratio=avg_agent_ratio,
+        avg_session_length=avg_session_length,
+        common_traits=common_traits,
+        project_stories=project_stories,
+        recent_activity=recent_activity,
+    )

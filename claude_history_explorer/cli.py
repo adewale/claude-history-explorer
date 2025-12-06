@@ -33,6 +33,7 @@ from .history import (
     parse_session,
     search_sessions,
     get_session_by_id,
+    get_claude_dir,
     get_projects_dir,
     calculate_project_stats,
     calculate_global_stats,
@@ -41,6 +42,7 @@ from .history import (
     ProjectStats,
     GlobalStats,
     ProjectStory,
+    GlobalStory,
 )
 
 __all__ = ["main"]
@@ -618,7 +620,7 @@ def story(project: str, output_format: str, output: str, example: bool):
                 console.print(f"[red]No project found matching '{project}'[/red]")
                 return
 
-            story_data = generate_project_story(proj, output_format)
+            story_data = generate_project_story(proj)
             story_text = _format_project_story(story_data, output_format)
         else:
             story_data = generate_global_story()
@@ -642,7 +644,6 @@ def info(example: bool):
     if example:
         show_examples("info")
         return
-    from .history import get_claude_dir, get_projects_dir
 
     claude_dir = get_claude_dir()
     projects_dir = get_projects_dir()
@@ -1044,9 +1045,20 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
             f"⚡ {story.total_messages} messages at {story.message_rate:.1f} msgs/hour",
             f"🎯 {story.work_pace.lower()} with {story.session_style.lower()}",
             f"🎭 {', '.join(story.personality_traits).lower()}",
-            "",
-            f"💡 Key insight: {story.insights[0] if story.insights else 'Steady progress'}",
         ]
+
+        # Add concurrent usage if significant
+        if story.concurrent_claude_instances > 1:
+            lines.append(
+                f"🔀 Used up to {story.concurrent_claude_instances} Claude instances in parallel"
+            )
+
+        lines.extend(
+            [
+                "",
+                f"💡 Key insight: {story.insights[0] if story.insights else 'Steady progress'}",
+            ]
+        )
         return "\n".join(lines)
 
     elif format_type == "timeline":
@@ -1090,10 +1102,17 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
                 f"• **Pace**: {story.work_pace}",
                 f"• **Personality**: {', '.join(story.personality_traits)}",
                 "",
-                f"📈 **Most Productive**: {story.most_productive_session['message_count']} messages",
+                f"📈 **Most Productive**: {story.most_productive_session.message_count} messages",
                 f"⏱️  **Longest Session**: {story.longest_session_hours:.1f} hours",
             ]
         )
+
+        # Add concurrent Claude usage insight
+        if story.concurrent_claude_instances > 1:
+            lines.append("")
+            lines.append(
+                f"🔀 **Parallel Workflow**: Used up to {story.concurrent_claude_instances} Claude instances simultaneously"
+            )
 
         return "\n".join(lines)
 
@@ -1145,6 +1164,22 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
                 f"   Longest Session: {story.longest_session_hours:.1f} hours",
                 f"   Style: {story.session_style}",
                 "",
+            ]
+        )
+
+        # Add concurrent Claude usage section
+        if story.concurrent_claude_instances > 1:
+            lines.extend(
+                [
+                    f"🔀 Parallel Workflow:",
+                    f"   Max concurrent instances: {story.concurrent_claude_instances}",
+                    f"   Pattern: {'Heavy multi-tasking' if story.concurrent_claude_instances > 3 else 'Moderate parallelism'}",
+                    "",
+                ]
+            )
+
+        lines.extend(
+            [
                 f"🎭 Project Personality:",
                 f"   {', '.join(story.personality_traits)}",
                 "",
@@ -1158,17 +1193,17 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
         return "\n".join(lines)
 
 
-def _format_global_story(story_data: dict, format_type: str) -> str:
+def _format_global_story(story: GlobalStory, format_type: str) -> str:
     """Format a global story for display."""
     if format_type == "brief":
         lines = [
             "🌍 Your Development Journey",
             "=" * 30,
             "",
-            f"📊 {story_data['total_projects']} projects, {story_data['total_messages']} messages",
-            f"⏱️  {story_data['total_dev_time']:.1f} hours of creation",
-            f"🤝 {story_data['avg_agent_ratio']:.1f}x agent collaboration ratio",
-            f"🎯 Common traits: {', '.join([trait[0] for trait in story_data['common_traits'][:3]])}",
+            f"📊 {story.total_projects} projects, {story.total_messages} messages",
+            f"⏱️  {story.total_dev_time:.1f} hours of creation",
+            f"🤝 {story.avg_agent_ratio:.1f}x agent collaboration ratio",
+            f"🎯 Common traits: {', '.join([trait[0] for trait in story.common_traits[:3]])}",
         ]
         return "\n".join(lines)
 
@@ -1180,7 +1215,7 @@ def _format_global_story(story_data: dict, format_type: str) -> str:
             "### Project Overview:",
         ]
 
-        for proj_story in story_data["project_stories"]:
+        for proj_story in story.project_stories:
             lines.append(
                 f"• **{proj_story.project_name}**: {proj_story.lifecycle_days} days, {proj_story.total_messages} messages"
             )
@@ -1189,16 +1224,16 @@ def _format_global_story(story_data: dict, format_type: str) -> str:
             [
                 "",
                 "### Work Patterns:",
-                f"• **Total Projects**: {story_data['total_projects']}",
-                f"• **Total Development Time**: {story_data['total_dev_time']:.1f} hours",
-                f"• **Average Session Length**: {story_data['avg_session_length']:.1f} hours",
-                f"• **Agent Collaboration**: {story_data['avg_agent_ratio']:.1f}x ratio",
+                f"• **Total Projects**: {story.total_projects}",
+                f"• **Total Development Time**: {story.total_dev_time:.1f} hours",
+                f"• **Average Session Length**: {story.avg_session_length:.1f} hours",
+                f"• **Agent Collaboration**: {story.avg_agent_ratio:.1f}x ratio",
                 "",
                 "### Personality Profile:",
             ]
         )
 
-        for trait, count in story_data["common_traits"]:
+        for trait, count in story.common_traits:
             lines.append(f"• **{trait}**: {count} projects")
 
         return "\n".join(lines)
@@ -1209,21 +1244,21 @@ def _format_global_story(story_data: dict, format_type: str) -> str:
             "=" * 30,
             "",
             f"📊 Overview:",
-            f"   Total Projects: {story_data['total_projects']}",
-            f"   Total Messages: {story_data['total_messages']}",
-            f"   Total Development Time: {story_data['total_dev_time']:.1f} hours",
-            f"   Average Agent Ratio: {story_data['avg_agent_ratio']:.1f}x",
-            f"   Average Session Length: {story_data['avg_session_length']:.1f} hours",
+            f"   Total Projects: {story.total_projects}",
+            f"   Total Messages: {story.total_messages}",
+            f"   Total Development Time: {story.total_dev_time:.1f} hours",
+            f"   Average Agent Ratio: {story.avg_agent_ratio:.1f}x",
+            f"   Average Session Length: {story.avg_session_length:.1f} hours",
             "",
             f"🎭 Your Development Personality:",
         ]
 
-        for trait, count in story_data["common_traits"]:
+        for trait, count in story.common_traits:
             lines.append(f"   • {trait}: {count} projects")
 
         lines.extend(["", "📖 Individual Project Stories:", ""])
 
-        for proj_story in story_data["project_stories"]:
+        for proj_story in story.project_stories:
             lines.extend(
                 [
                     f"🎬 {proj_story.project_name.title()}:",
@@ -1234,13 +1269,13 @@ def _format_global_story(story_data: dict, format_type: str) -> str:
                 ]
             )
 
-        if story_data["recent_activity"]:
+        if story.recent_activity:
             lines.extend(
                 [
                     "🔄 Recent Activity:",
                 ]
             )
-            for timestamp, project_name in story_data["recent_activity"][-5:]:
+            for timestamp, project_name in story.recent_activity[-5:]:
                 lines.append(f"   {timestamp.strftime('%m/%d %H:%M')} - {project_name}")
 
         return "\n".join(lines)

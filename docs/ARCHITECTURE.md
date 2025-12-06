@@ -7,45 +7,53 @@ Claude History Explorer is a command-line tool designed to read and analyze Clau
 ## High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLI Layer                            │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │   Commands      │  │   Formatters    │  │   Display    │ │
-│  │  (projects,    │  │  (tables,       │  │  (Rich       │ │
-│  │   sessions,     │  │   panels,       │  │   console)   │ │
-│  │   show, etc.)   │  │   charts)       │  │              │ │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        CLI Layer                                │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐ │
+│  │   Commands      │  │   Formatters    │  │   Display        │ │
+│  │  (projects,     │  │  (tables,       │  │  (Rich console,  │ │
+│  │   sessions,     │  │   panels,       │  │   sparklines)    │ │
+│  │   show, story)  │  │   charts)       │  │                  │ │
+│  └─────────────────┘  └─────────────────┘  └──────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Business Logic Layer                     │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │   Data Access   │  │   Statistics    │  │   Search     │ │
-│  │  (File I/O,     │  │  (ProjectStats, │  │  (Regex,     │ │
-│  │   Parsing)      │  │   GlobalStats)  │  │   Content)   │ │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    Business Logic Layer                         │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐ │
+│  │   Data Access   │  │   Statistics    │  │   Story          │ │
+│  │  (File I/O,     │  │  (ProjectStats, │  │  (ProjectStory,  │ │
+│  │   Parsing)      │  │   GlobalStats)  │  │   GlobalStory)   │ │
+│  └─────────────────┘  └─────────────────┘  └──────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      Data Model Layer                       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │    Message      │  │     Session     │  │   Project    │ │
-│  │  (role, content,│  │  (messages,    │  │  (path,      │ │
-│  │   tools, time)  │  │   duration,     │  │   sessions)  │ │
-│  │                 │  │   metadata)     │  │              │ │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                      Data Model Layer                           │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────────┐ │
+│  │  Message  │  │  Session  │  │  Project  │  │  SessionInfo  │ │
+│  │           │  │           │  │           │  │  (analysis)   │ │
+│  └───────────┘  └───────────┘  └───────────┘  └───────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   External Data Store                       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │  ~/.claude/     │  │  projects/      │  │  *.jsonl     │ │
-│  │  (config)       │  │  (project dirs) │  │  (sessions)  │ │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                   External Data Store                           │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐ │
+│  │  ~/.claude/     │  │  projects/      │  │  *.jsonl         │ │
+│  │  (config)       │  │  (project dirs) │  │  (sessions)      │ │
+│  └─────────────────┘  └─────────────────┘  └──────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Module Structure
+
+```
+claude_history_explorer/
+├── __init__.py      # Package metadata
+├── cli.py           # CLI commands and display formatting
+├── history.py       # Data models, parsing, statistics, story generation
+└── constants.py     # Thresholds for story personality analysis
 ```
 
 ## Core Components
@@ -65,7 +73,7 @@ class Message:
 **Responsibilities:**
 - Parse JSONL message data
 - Extract text content and tool usage
-- Handle different message formats (text, tool_use, tool_result)
+- Handle different message formats (text, tool_use)
 - Filter out irrelevant message types
 
 #### Session Class
@@ -102,7 +110,68 @@ class Project:
 - Manage session file discovery
 - Track project metadata
 
-### 2. Business Logic (`history.py`)
+#### SessionInfo Class
+```python
+@dataclass
+class SessionInfo:
+    start_time: datetime
+    end_time: datetime
+    message_count: int
+    duration_minutes: float
+    is_agent: bool
+```
+
+**Responsibilities:**
+- Lightweight session summary for story analysis
+- Track agent vs main session distinction
+- Enable concurrent usage detection
+
+#### ProjectStory & GlobalStory Classes
+```python
+@dataclass
+class ProjectStory:
+    project_name: str
+    lifecycle_days: int
+    personality_traits: List[str]
+    concurrent_claude_instances: int
+    # ... narrative insights
+    
+@dataclass
+class GlobalStory:
+    total_projects: int
+    common_traits: List[tuple[str, int]]
+    project_stories: List[ProjectStory]
+    # ... aggregated insights
+```
+
+**Responsibilities:**
+- Generate narrative insights about development patterns
+- Detect concurrent Claude instance usage
+- Classify work style and personality traits
+
+### 2. Constants (`constants.py`)
+
+Centralizes thresholds used for personality analysis:
+
+```python
+# Message rate thresholds (messages per hour)
+MESSAGE_RATE_HIGH = 30
+MESSAGE_RATE_MEDIUM = 20
+
+# Session duration thresholds (in hours)
+SESSION_LENGTH_LONG = 2.0
+SESSION_LENGTH_EXTENDED = 1.0
+
+# Agent collaboration ratios
+AGENT_RATIO_HIGH = 0.8
+AGENT_RATIO_BALANCED = 0.5
+
+# Activity intensity (messages per day)
+ACTIVITY_INTENSITY_HIGH = 300
+ACTIVITY_INTENSITY_MEDIUM = 100
+```
+
+### 3. Business Logic (`history.py`)
 
 #### Core Functions
 
@@ -117,6 +186,15 @@ class Project:
 - `calculate_project_stats()`: Generate project statistics
 - `calculate_global_stats()`: Aggregate statistics across projects
 
+**Story Generation:**
+- `generate_project_story()`: Create narrative insights for a project
+- `generate_global_story()`: Aggregate stories across all projects
+
+**Helper Functions:**
+- `format_duration()`: Convert minutes to human-readable format
+- `duration_minutes()`: Calculate duration between timestamps
+- `classify()`: Threshold-based classification for traits
+
 **Data Flow:**
 ```
 JSONL File → Message.from_json() → Message Object
@@ -126,9 +204,10 @@ Session File → parse_session() → Session Object
 Project Dir → Project.from_dir() → Project Object
      ↓
 All Projects → calculate_global_stats() → GlobalStats Object
+            → generate_global_story() → GlobalStory Object
 ```
 
-### 3. CLI Interface (`cli.py`)
+### 4. CLI Interface (`cli.py`)
 
 #### Command Structure
 ```python
@@ -136,32 +215,39 @@ All Projects → calculate_global_stats() → GlobalStats Object
 def main(): pass
 
 @main.command()
-def projects(): pass
+def projects(): pass    # List all projects
 
 @main.command()
-def sessions(): pass
+def sessions(): pass    # List sessions for a project
 
 @main.command()
-def show(): pass
+def show(): pass        # View session messages
 
 @main.command()
-def search(): pass
+def search(): pass      # Search across conversations
 
 @main.command()
-def export(): pass
+def export(): pass      # Export session to file
 
 @main.command()
-def stats(): pass
+def stats(): pass       # Show statistics
 
 @main.command()
-def summary(): pass
+def summary(): pass     # Generate summary with charts
+
+@main.command()
+def story(): pass       # Tell development journey story
+
+@main.command()
+def info(): pass        # Show storage info
 ```
 
 #### Output Formatting
 - **Rich Tables**: Structured data display
 - **Panels**: Highlighted information boxes
 - **Syntax Highlighting**: Code and JSON display
-- **Progress Indicators**: User feedback
+- **Sparklines**: Activity trend visualization
+- **Story Formats**: Brief, detailed, and timeline views
 
 ## Data Flow Architecture
 
@@ -169,39 +255,18 @@ def summary(): pass
 
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   CLI Cmd   │───▶│   Business  │───▶│   File I/O   │
-│  (Request)  │    │   Logic     │    │  (Read Only) │
+│   CLI Cmd   │───▶│   Business  │───▶│   File I/O  │
+│  (Request)  │    │   Logic     │    │  (Read Only)│
 └─────────────┘    └─────────────┘    └─────────────┘
-       │                   │                   │
-       ▼                   ▼                   ▼
+       │                  │                  │
+       ▼                  ▼                  ▼
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │   Display   │◀───│   Data      │◀───│  JSONL      │
 │  (Rich)     │    │ Processing  │    │  Files      │
 └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-### Session Parsing Pipeline
-
-```
-JSONL Line
-     │
-     ▼
-JSON Validation
-     │
-     ▼
-Message Type Filter
-     │
-     ▼
-Content Extraction
-     │
-     ▼
-Tool Use Processing
-     │
-     ▼
-Message Object
-```
-
-### Statistics Calculation Pipeline
+### Story Generation Pipeline
 
 ```
 Project Discovery
@@ -210,16 +275,19 @@ Project Discovery
 Session File Collection
      │
      ▼
-Session Parsing
+SessionInfo Extraction
      │
      ▼
-Message Aggregation
+Pattern Analysis (concurrent usage, work pace, collaboration style)
      │
      ▼
-Statistics Calculation
+Personality Classification (using constants thresholds)
      │
      ▼
-Stats Object (ProjectStats/GlobalStats)
+ProjectStory / GlobalStory Object
+     │
+     ▼
+Formatted Output (brief/detailed/timeline)
 ```
 
 ## Security & Safety
@@ -249,35 +317,9 @@ Result: /Users/username/Documents/my/project
 - **File Metadata**: Uses `stat()` for size/timestamp without opening
 - **Memory Management**: Generators for large result sets
 
-### Caching Strategy
-- **Project Discovery**: Cached during command execution
-- **Session Metadata**: Calculated once per session
-- **Statistics**: Aggregated from cached data
-
-## Extensibility
-
-### Plugin Architecture Potential
-```
-┌─────────────────┐
-│   Core Engine   │
-└─────────┬───────┘
-          │
-    ┌─────┴─────┐
-    │           │
-┌───▼───┐   ┌───▼───┐
-│Plugins│   │Themes│
-└───────┘   └───────┘
-```
-
-### Extension Points
-1. **Output Formatters**: New export formats
-2. **Data Sources**: Support for other chat histories
-3. **Analysis Modules**: Custom statistics and insights
-4. **Display Themes**: Different visual styles
-
 ## Testing Architecture
 
-### Test Pyramid
+### Test Categories
 ```
 ┌─────────────────┐
 │  Integration    │  (CLI commands, file operations)
@@ -290,64 +332,31 @@ Result: /Users/username/Documents/my/project
 └─────────────────┘
 ```
 
-### Test Categories
 1. **Unit Tests**: Individual component behavior
 2. **Integration Tests**: Command execution and data flow
 3. **Security Tests**: Read-only behavior verification
 4. **Error Handling Tests**: Edge cases and failure modes
 
-## Dependencies & External Interfaces
+## Dependencies
 
 ### Core Dependencies
 ```
-click>=8.1.0     # CLI framework
-rich>=13.0.0     # Terminal formatting
-```
-
-### External Interfaces
-- **File System**: Read-only access to `~/.claude/projects/`
-- **Standard Output**: Formatted text display
-- **Environment**: Home directory detection
-
-## Configuration Management
-
-### Runtime Configuration
-- **No config files**: All settings via CLI arguments
-- **Environment Detection**: Automatic Claude directory discovery
-- **Default Behaviors**: Sensible defaults for all options
-
-### Future Configuration
-```
-~/.claude-history-explorer/
-├── config.yaml      # User preferences
-├── themes/          # Custom themes
-└── plugins/         # User plugins
-```
-
-## Deployment Architecture
-
-### Installation Methods
-```
-Source Install → pip install .
-UV Install      → uv tool install .
-Docker         → docker run claude-history-explorer
-Standalone      → Single binary (PyInstaller)
+click>=8.1.0      # CLI framework
+rich>=13.0.0      # Terminal formatting
+sparklines>=0.5.0 # Activity visualization
 ```
 
 ### Runtime Requirements
 - **Python 3.10+**: Core language requirement
-- **File System**: Read access to user home directory
+- **File System**: Read access to `~/.claude/projects/`
 - **Terminal**: ANSI support for Rich formatting
-- **Memory**: Minimal (streaming processing)
 
 ## Summary
 
 The Claude History Explorer architecture emphasizes:
 
-1. **Simplicity**: Clear separation of concerns
+1. **Simplicity**: Clear separation of concerns across 3 modules
 2. **Safety**: Read-only design with comprehensive testing
 3. **Performance**: Efficient streaming and lazy loading
-4. **Extensibility**: Plugin-ready architecture
+4. **Insight**: Story generation with personality analysis
 5. **User Experience**: Rich terminal interface with multiple output formats
-
-The modular design allows for easy maintenance and extension while maintaining the core guarantee of read-only access to user data.
