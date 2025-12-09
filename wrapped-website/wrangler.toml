@@ -1,0 +1,12 @@
+name = "wrapped-claude-codes"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain (configure in Cloudflare dashboard)
+# routes = [
+#   { pattern = "wrapped.claude.codes/*", zone_name = "claude.codes" }
+# ]
+
+[build]
+command = "npm install"

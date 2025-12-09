@@ -8,6 +8,8 @@ dependencies = [
     "click>=8.1.0",
     "rich>=13.0.0",
     "sparklines>=0.4.0",
+    "msgpack>=1.0.0",
+    "pyperclip>=1.8.0",
 ]
 
 [project.scripts]

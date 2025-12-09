@@ -1,0 +1,21 @@
+{
+  "name": "wrapped-claude-codes",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev --remote",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "msgpack-lite": "^0.1.26"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "@types/msgpack-lite": "^0.1.12",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.91.0"
+  }
+}

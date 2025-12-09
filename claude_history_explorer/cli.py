@@ -39,10 +39,14 @@ from .history import (
     calculate_global_stats,
     generate_project_story,
     generate_global_story,
+    generate_wrapped_story,
+    encode_wrapped_story,
+    decode_wrapped_story,
     ProjectStats,
     GlobalStats,
     ProjectStory,
     GlobalStory,
+    WrappedStory,
 )
 
 __all__ = ["main"]
@@ -106,6 +110,15 @@ Examples:
     "info": """
 Examples:
   claude-history info                        # Show storage location and stats
+""",
+    "wrapped": """
+Examples:
+  claude-history wrapped                     # Generate wrapped for current year
+  claude-history wrapped --year 2025         # Generate wrapped for 2025
+  claude-history wrapped -y 2025 -n "Alice"  # With display name
+  claude-history wrapped --raw               # Output raw JSON
+  claude-history wrapped --decode <url>      # Decode and inspect any Wrapped URL
+  claude-history wrapped --no-copy           # Don't copy URL to clipboard
 """,
 }
 
@@ -1279,6 +1292,193 @@ def _format_global_story(story: GlobalStory, format_type: str) -> str:
                 lines.append(f"   {timestamp.strftime('%m/%d %H:%M')} - {project_name}")
 
         return "\n".join(lines)
+
+
+@main.command()
+@click.option("--year", "-y", type=int, default=None, help="Year to generate wrapped for (default: current year)")
+@click.option("--name", "-n", type=str, default=None, help="Display name to show on wrapped cards")
+@click.option("--raw", is_flag=True, help="Output raw JSON instead of URL")
+@click.option("--no-copy", is_flag=True, help="Don't copy URL to clipboard")
+@click.option("--decode", "-d", type=str, default=None, help="Decode and display a Wrapped URL")
+@click.option("--example", is_flag=True, help="Show usage examples")
+def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example: bool):
+    """Generate your Claude Code Wrapped URL for sharing.
+
+    Creates a shareable URL containing your year-in-review stats.
+    All data is encoded in the URL itself—no server storage.
+    """
+    import datetime as dt
+
+    if example:
+        show_examples("wrapped")
+        return
+
+    # Decode mode: inspect an existing URL
+    if decode:
+        _decode_wrapped_url(decode)
+        return
+
+    # Default to current year
+    if year is None:
+        year = dt.datetime.now().year
+
+    # Early January suggestion
+    now = dt.datetime.now()
+    if now.month == 1 and now.day <= 7 and year == now.year:
+        # Check if previous year has more data
+        try:
+            prev_story = generate_wrapped_story(year - 1, name)
+            curr_story = generate_wrapped_story(year, name)
+            if prev_story.s > curr_story.s * 10:
+                console.print(
+                    f"[yellow]ℹ️  It's early {year} and you have much more activity in {year - 1}.[/yellow]"
+                )
+                console.print(f"[yellow]   Consider using --year {year - 1}[/yellow]")
+                console.print()
+        except ValueError:
+            pass  # Ignore if either year has no data
+
+    try:
+        story = generate_wrapped_story(year, name)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        return
+
+    if raw:
+        console.print_json(data=story.to_dict())
+        return
+
+    # Generate URL
+    encoded = encode_wrapped_story(story)
+    url = f"https://wrapped.claude.codes/{year}/{encoded}"
+
+    # Display summary
+    _display_wrapped_summary(story, url, year)
+
+    # Copy to clipboard
+    if not no_copy:
+        try:
+            import pyperclip
+            pyperclip.copy(url)
+            console.print("\n[green]📋 Copied to clipboard![/green]")
+        except Exception:
+            console.print("\n[yellow]⚠️  Could not copy to clipboard[/yellow]")
+
+
+def _decode_wrapped_url(url_or_data: str) -> None:
+    """Decode and display a Wrapped URL."""
+    import re
+
+    # Extract year and data from URL
+    match = re.match(r"(?:https?://[^/]+/)?(\d{4})/([A-Za-z0-9_-]+)", url_or_data)
+    if not match:
+        # Try as raw encoded data
+        try:
+            story = decode_wrapped_story(url_or_data)
+            url_year = story.y
+        except ValueError as e:
+            console.print(f"[red]Error: Invalid Wrapped URL format[/red]")
+            console.print(f"[dim]{e}[/dim]")
+            return
+    else:
+        url_year = int(match.group(1))
+        encoded_data = match.group(2)
+        try:
+            story = decode_wrapped_story(encoded_data)
+        except ValueError as e:
+            console.print(f"[red]Error: Failed to decode URL[/red]")
+            console.print(f"[dim]{e}[/dim]")
+            return
+
+    # Validate year matches
+    if story.y != url_year:
+        console.print(
+            f"[yellow]⚠️  Warning: URL year ({url_year}) doesn't match data year ({story.y})[/yellow]"
+        )
+        console.print()
+
+    # Display decoded data
+    console.print("[bold cyan]🔍 Decoded Wrapped URL[/bold cyan]")
+    console.print()
+    console.print("━" * 50)
+    console.print()
+    console.print(f"[bold]Year:[/bold]           {story.y}")
+    if story.n:
+        console.print(f"[bold]Display Name:[/bold]   {story.n}")
+    console.print()
+    console.print("[bold]Core Stats:[/bold]")
+    console.print(f"  Projects:     {story.p}")
+    console.print(f"  Sessions:     {story.s}")
+    console.print(f"  Messages:     {story.m:,}")
+    console.print(f"  Hours:        {story.h:.0f}")
+    console.print()
+    console.print("[bold]Personality:[/bold]")
+    console.print(f"  Traits:       {', '.join(story.t)}")
+    console.print(f"  Work Pace:    {story.w}")
+    console.print(f"  Style:        {story.c}")
+    console.print()
+    console.print("[bold]Highlights:[/bold]")
+    console.print(f"  Peak Project: {story.pp} ({story.pm:,} messages)")
+    console.print(f"  Longest:      {story.ls:.1f} hours")
+    if story.ci > 1:
+        console.print(f"  Max Parallel: {story.ci} instances")
+    console.print()
+
+    # Monthly activity sparkline
+    if story.a and any(story.a):
+        try:
+            sparkline_list = sparklines(story.a)
+            if sparkline_list:
+                console.print("[bold]Monthly Activity:[/bold]")
+                console.print(f"  {sparkline_list[0]}")
+                console.print("  J F M A M J J A S O N D")
+                console.print()
+        except (ValueError, TypeError):
+            pass
+
+    # Top projects
+    if story.tp:
+        console.print("[bold]Top Projects:[/bold]")
+        for i, proj in enumerate(story.tp, 1):
+            console.print(f"  {i}. {proj['n']:15} {proj['m']:,} msgs, {proj['d']} days")
+        console.print()
+
+    console.print("━" * 50)
+    console.print()
+    console.print("[green]✓ This URL contains only aggregate statistics.[/green]")
+    console.print("[dim]  No conversation content, code, or file paths.[/dim]")
+
+
+def _display_wrapped_summary(story: WrappedStory, url: str, year: int) -> None:
+    """Display wrapped summary with rich formatting."""
+    console.print()
+    console.print(f"[bold green]🎁 Your Claude Code Wrapped {year} is ready![/bold green]")
+    console.print()
+    console.print("━" * 50)
+    console.print()
+    console.print(f"[bold]📊[/bold] {story.p} projects | {story.s} sessions | {story.m:,} messages")
+    console.print(f"[bold]⏱️[/bold]  {story.h:.0f} hours of development")
+    console.print(f"[bold]🎭[/bold] {', '.join(story.t)}")
+    if story.ci > 1:
+        console.print(f"[bold]🔀[/bold] Used up to {story.ci} Claude instances in parallel")
+    console.print()
+
+    # Monthly activity sparkline
+    if story.a and any(story.a):
+        try:
+            sparkline_list = sparklines(story.a)
+            if sparkline_list:
+                console.print(f"[bold]📈[/bold] {sparkline_list[0]}")
+                console.print("   J F M A M J J A S O N D")
+                console.print()
+        except (ValueError, TypeError):
+            pass
+
+    console.print("━" * 50)
+    console.print()
+    console.print("[bold]Share your story:[/bold]")
+    # Use soft_wrap=False to prevent line breaks in the URL
+    console.print(f"[cyan]{url}[/cyan]", soft_wrap=False, overflow="ignore")
 
 
 if __name__ == "__main__":
