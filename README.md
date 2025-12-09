@@ -9,7 +9,7 @@ The history is stored locally at `~/.claude/projects/` and this tool turns raw J
 - **Rich Terminal UI** - Tables, panels, sparklines, and syntax highlighting
 - **Multiple Export Formats** - JSON, Markdown, plain text
 - **Regex Search** - Search across all conversations with full regex support
-- **Read-Only by Design** - Never modifies your Claude history files
+- **Read-Only by Design** - Never modifies your Claude history files ([why trust this?](TRUST.md))
 - **Streaming JSONL** - Line-by-line parsing handles large files efficiently
 
 ### Example Output
