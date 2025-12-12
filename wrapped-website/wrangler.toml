@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 
 # Custom domain (configure in Cloudflare dashboard)
 # routes = [
-#   { pattern = "wrapped.claude.codes/*", zone_name = "claude.codes" }
+#   { pattern = "wrapped-claude-codes.adewale-883.workers.dev/*", zone_name = "workers.dev" }
 # ]
 
 [build]

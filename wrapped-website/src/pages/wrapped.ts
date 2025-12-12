@@ -12,7 +12,7 @@ interface RenderOptions {
 }
 
 export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: RenderOptions): string {
-  const pageUrl = `https://wrapped.claude.codes/${year}/${encodedData}`;
+  const pageUrl = `https://wrapped-claude-codes.adewale-883.workers.dev/${year}/${encodedData}`;
   const displayName = story.n || 'Someone';
   const sparkline = generateSparkline(story.a);
   const descriptor = getMessageDescriptor(story.m);

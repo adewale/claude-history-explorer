@@ -1,5 +1,5 @@
 /**
- * Landing page HTML for wrapped.claude.codes
+ * Landing page HTML for wrapped-claude-codes.adewale-883.workers.dev
  */
 
 export function renderLandingPage(): string {

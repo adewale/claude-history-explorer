@@ -1284,12 +1284,46 @@ def generate_global_story() -> GlobalStory:
 # =============================================================================
 
 
+# Wrapped URL encoding dictionaries - indices are used in URLs for compactness
+# These MUST stay in sync with wrapped-website/src/decoder.ts
+WRAPPED_TRAITS = [
+    "Agent-driven",      # 0
+    "Collaborative",     # 1
+    "Hands-on",          # 2
+    "Deep-work focused", # 3
+    "Steady-paced",      # 4
+    "Quick-iterative",   # 5
+    "High-intensity",    # 6
+    "Moderately active", # 7
+    "Deliberate",        # 8
+]
+
+WRAPPED_COLLAB_STYLES = [
+    "Heavy delegation",  # 0
+    "Balanced",          # 1
+    "Hands-on",          # 2
+    "Agent-only",        # 3
+]
+
+WRAPPED_WORK_PACES = [
+    "Rapid-fire",        # 0
+    "Steady",            # 1
+    "Deliberate",        # 2
+    "Methodical",        # 3
+]
+
+# Current encoding version - increment when format changes
+WRAPPED_VERSION = 2
+
+
 @dataclass
 class WrappedStory:
     """Compact, shareable summary of Claude Code usage for a year.
 
     This dataclass is designed to be serialized to a compact format (MessagePack)
     and encoded in a URL. All field names are single characters to minimize size.
+
+    Version 2 encoding uses indices for traits/styles/paces to save ~50 bytes.
 
     Attributes:
         y: Year (e.g., 2025)
@@ -1298,9 +1332,9 @@ class WrappedStory:
         s: Total sessions
         m: Total messages
         h: Total hours of development
-        t: Personality traits (max 3)
-        c: Collaboration style
-        w: Work pace
+        t: Personality traits (max 3) - stored as indices in v2
+        c: Collaboration style - stored as index in v2
+        w: Work pace - stored as index in v2
         pp: Peak project name
         pm: Peak project messages
         ci: Max concurrent Claude instances
@@ -1325,31 +1359,109 @@ class WrappedStory:
     tp: List[Dict[str, any]] = field(default_factory=list)  # top 3 projects
     n: Optional[str] = None  # display name
 
-    def to_dict(self) -> dict:
-        """Convert to dictionary for serialization."""
-        d = {
-            "y": self.y,
-            "p": self.p,
-            "s": self.s,
-            "m": self.m,
-            "h": round(self.h, 1),
-            "t": self.t,
-            "c": self.c,
-            "w": self.w,
-            "pp": self.pp,
-            "pm": self.pm,
-            "ci": self.ci,
-            "ls": round(self.ls, 1),
-            "a": self.a,
-            "tp": self.tp,
-        }
+    def to_dict(self, use_indices: bool = True) -> dict:
+        """Convert to dictionary for serialization.
+
+        Args:
+            use_indices: If True (default), encode traits/styles/paces as indices
+                        for v2 compact format. If False, use full strings (v1).
+        """
+        # Encode traits as indices for compactness
+        if use_indices:
+            trait_indices = []
+            for t in self.t:
+                try:
+                    trait_indices.append(WRAPPED_TRAITS.index(t))
+                except ValueError:
+                    trait_indices.append(t)  # Keep as string if not in dict
+
+            try:
+                collab_idx = WRAPPED_COLLAB_STYLES.index(self.c)
+            except ValueError:
+                collab_idx = self.c  # Keep as string if not in dict
+
+            try:
+                pace_idx = WRAPPED_WORK_PACES.index(self.w)
+            except ValueError:
+                pace_idx = self.w  # Keep as string if not in dict
+
+            d = {
+                "v": WRAPPED_VERSION,  # Version for forward compatibility
+                "y": self.y,
+                "p": self.p,
+                "s": self.s,
+                "m": self.m,
+                "h": round(self.h, 1),
+                "t": trait_indices,
+                "c": collab_idx,
+                "w": pace_idx,
+                "pp": self.pp,
+                "pm": self.pm,
+                "ci": self.ci,
+                "ls": round(self.ls, 1),
+                "a": self.a,
+                "tp": self.tp,
+            }
+        else:
+            # V1 format with full strings
+            d = {
+                "y": self.y,
+                "p": self.p,
+                "s": self.s,
+                "m": self.m,
+                "h": round(self.h, 1),
+                "t": self.t,
+                "c": self.c,
+                "w": self.w,
+                "pp": self.pp,
+                "pm": self.pm,
+                "ci": self.ci,
+                "ls": round(self.ls, 1),
+                "a": self.a,
+                "tp": self.tp,
+            }
         if self.n:
             d["n"] = self.n
         return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "WrappedStory":
-        """Create from dictionary."""
+        """Create from dictionary, handling both v1 (strings) and v2 (indices) formats."""
+        version = d.get("v", 1)  # Default to v1 if no version
+
+        # Decode traits
+        raw_traits = d.get("t", [])
+        if version >= 2:
+            # V2: decode indices to strings
+            traits = []
+            for t in raw_traits:
+                if isinstance(t, int) and 0 <= t < len(WRAPPED_TRAITS):
+                    traits.append(WRAPPED_TRAITS[t])
+                else:
+                    traits.append(str(t))  # Keep as-is if not valid index
+        else:
+            traits = raw_traits
+
+        # Decode collaboration style
+        raw_collab = d.get("c", "")
+        if version >= 2 and isinstance(raw_collab, int):
+            if 0 <= raw_collab < len(WRAPPED_COLLAB_STYLES):
+                collab = WRAPPED_COLLAB_STYLES[raw_collab]
+            else:
+                collab = str(raw_collab)
+        else:
+            collab = raw_collab
+
+        # Decode work pace
+        raw_pace = d.get("w", "")
+        if version >= 2 and isinstance(raw_pace, int):
+            if 0 <= raw_pace < len(WRAPPED_WORK_PACES):
+                pace = WRAPPED_WORK_PACES[raw_pace]
+            else:
+                pace = str(raw_pace)
+        else:
+            pace = raw_pace
+
         return cls(
             y=d.get("y", 0),
             n=d.get("n"),
@@ -1357,9 +1469,9 @@ class WrappedStory:
             s=d.get("s", 0),
             m=d.get("m", 0),
             h=d.get("h", 0),
-            t=d.get("t", []),
-            c=d.get("c", ""),
-            w=d.get("w", ""),
+            t=traits,
+            c=collab,
+            w=pace,
             pp=d.get("pp", ""),
             pm=d.get("pm", 0),
             ci=d.get("ci", 0),

@@ -58,7 +58,7 @@ class WrappedStory:
 
 **Verification Criteria**:
 - [ ] `claude-history wrapped --raw` outputs valid JSON matching the schema
-- [ ] `claude-history wrapped` outputs a URL starting with `https://wrapped.claude.codes/YYYY/`
+- [ ] `claude-history wrapped` outputs a URL starting with `https://wrapped-claude-codes.adewale-883.workers.dev/YYYY/`
 - [ ] Year filtering works (sessions outside year are excluded)
 - [ ] Test: encode → decode round-trip preserves all data
 - [ ] Test: sessions spanning year boundary assigned to start year
@@ -109,7 +109,7 @@ A minimal Cloudflare Pages site that renders wrapped URLs.
 **Goal**: Deploy a site that decodes and displays wrapped data.
 
 **Deliverables**:
-1. Cloudflare Pages project at `wrapped.claude.codes`
+1. Cloudflare Pages project at `wrapped-claude-codes.adewale-883.workers.dev`
 2. `/:year/<data>` route handling
 3. Landing page with "Get your own" CTA
 4. Client-side URL decoder (Base64URL → MessagePack → JSON)
@@ -136,8 +136,8 @@ wrapped-website/
 ```
 
 **Verification Criteria**:
-- [ ] `wrapped.claude.codes/` shows landing page with CLI command
-- [ ] `wrapped.claude.codes/2025/<valid-data>` renders the wrapped card
+- [ ] `wrapped-claude-codes.adewale-883.workers.dev/` shows landing page with CLI command
+- [ ] `wrapped-claude-codes.adewale-883.workers.dev/2025/<valid-data>` renders the wrapped card
 - [ ] Invalid year (e.g., 2030) shows error page
 - [ ] Mismatched year (path vs data.y) shows error page
 - [ ] Works on mobile browsers

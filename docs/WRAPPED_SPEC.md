@@ -22,7 +22,7 @@ The experience starts with a CLI command (`claude-history wrapped`) that analyze
 │                                                                             │
 │        │                                                                    │
 │        ▼                                                                    │
-│   https://wrapped.claude.codes/2025/eyJuIjoiQWRld2FsZSI...                  │
+│   https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJuIjoiQWRld2FsZSI...                  │
 │                                                                             │
 │        │                                                                    │
 │        ▼                                                                    │
@@ -42,28 +42,28 @@ The experience starts with a CLI command (`claude-history wrapped`) that analyze
 
 ### Power User (2025)
 ```
-https://wrapped.claude.codes/2025/eyJ5IjoyMDI1LCJwIjo0LCJzIjo3MCwibSI6NTMxNi4uLg
+https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJ5IjoyMDI1LCJwIjo0LCJzIjo3MCwibSI6NTMxNi4uLg
 ```
 
 ### With Display Name
 ```
-https://wrapped.claude.codes/2025/eyJ5IjoyMDI1LCJuIjoiQWRld2FsZSIsInAiOjQsInMiOjcwLi4u
+https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJ5IjoyMDI1LCJuIjoiQWRld2FsZSIsInAiOjQsInMiOjcwLi4u
 ```
 
 ### Future Year (2026)
 ```
-https://wrapped.claude.codes/2026/eyJ5IjoyMDI2LCJwIjoxMiwicyI6MTUwLCJtIjoxMjAwMC4uLg
+https://wrapped-claude-codes.adewale-883.workers.dev/2026/eyJ5IjoyMDI2LCJwIjoxMiwicyI6MTUwLCJtIjoxMjAwMC4uLg
 ```
 
 ### OG Image URL (auto-generated)
 ```
-https://wrapped.claude.codes/og/2025/eyJ5IjoyMDI1LCJwIjo0LC4uLg.png
+https://wrapped-claude-codes.adewale-883.workers.dev/og/2025/eyJ5IjoyMDI1LCJwIjo0LC4uLg.png
 ```
 
 ### URL Structure
 
 ```
-https://wrapped.claude.codes/<year>/<base64url-encoded-data>
+https://wrapped-claude-codes.adewale-883.workers.dev/<year>/<base64url-encoded-data>
         └──────────┬──────────┘ └─┬─┘ └─────────┬─────────┘
                 domain          year    encoded story data (includes year for validation)
 ```
@@ -267,10 +267,10 @@ The Worker decodes the URL data and injects personalized OG tags with the year:
 
 <!-- Open Graph / Facebook / LinkedIn -->
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://wrapped.claude.codes/2025/eyJ..." />
+<meta property="og:url" content="https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJ..." />
 <meta property="og:title" content="Adewale's Claude Code Wrapped 2025" />
 <meta property="og:description" content="5,316 messages across 4 projects in 2025" />
-<meta property="og:image" content="https://wrapped.claude.codes/og/2025/eyJ....png" />
+<meta property="og:image" content="https://wrapped-claude-codes.adewale-883.workers.dev/og/2025/eyJ....png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 
@@ -278,7 +278,7 @@ The Worker decodes the URL data and injects personalized OG tags with the year:
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Adewale's Claude Code Wrapped 2025" />
 <meta name="twitter:description" content="5,316 messages across 4 projects in 2025" />
-<meta name="twitter:image" content="https://wrapped.claude.codes/og/2025/eyJ....png" />
+<meta name="twitter:image" content="https://wrapped-claude-codes.adewale-883.workers.dev/og/2025/eyJ....png" />
 ```
 
 ### OG Tag Generation
@@ -295,7 +295,7 @@ function generateOgTags(year: number, story: WrappedStory): string {
     <title>${title}</title>
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
-    <meta property="og:image" content="https://wrapped.claude.codes/og/${year}/${encodeStory(story)}.png" />
+    <meta property="og:image" content="https://wrapped-claude-codes.adewale-883.workers.dev/og/${year}/${encodeStory(story)}.png" />
   `;
 }
 ```
@@ -638,14 +638,14 @@ claude-history wrapped --raw
 claude-history wrapped --no-copy
 
 # Decode a URL to see what's inside (yours or anyone's)
-claude-history wrapped --decode "https://wrapped.claude.codes/2025/eyJ5IjoyMDI1..."
-claude-history wrapped -d "https://wrapped.claude.codes/2025/eyJ5IjoyMDI1..."
+claude-history wrapped --decode "https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJ5IjoyMDI1..."
+claude-history wrapped -d "https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJ5IjoyMDI1..."
 ```
 
 ### Decode Output
 
 ```bash
-$ claude-history wrapped --decode "https://wrapped.claude.codes/2025/eyJ5IjoyMDI1Li4u"
+$ claude-history wrapped --decode "https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJ5IjoyMDI1Li4u"
 
 🔍 Decoded Wrapped URL
 
@@ -738,7 +738,7 @@ def wrapped(year: int | None, name: str | None, raw: bool, no_copy: bool, decode
 
     # Encode and generate URL
     encoded = encode_wrapped_story(story)
-    url = f"https://wrapped.claude.codes/{year}/{encoded}"
+    url = f"https://wrapped-claude-codes.adewale-883.workers.dev/{year}/{encoded}"
 
     # Display and optionally copy
     display_wrapped_summary(story, url, year)
@@ -799,7 +799,7 @@ def decode_wrapped_url(url: str) -> tuple[WrappedStory, int]:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Share your story:
-https://wrapped.claude.codes/2025/eyJuIjoiQWRld2FsZSI...
+https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJuIjoiQWRld2FsZSI...
 
 📋 Copied to clipboard!
 ```
@@ -817,7 +817,7 @@ https://wrapped.claude.codes/2025/eyJuIjoiQWRld2FsZSI...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Share your story:
-https://wrapped.claude.codes/2024/eyJ5IjoyMDI0LCJwIjoy...
+https://wrapped-claude-codes.adewale-883.workers.dev/2024/eyJ5IjoyMDI0LCJwIjoy...
 
 📋 Copied to clipboard!
 ```
@@ -920,7 +920,7 @@ claude-code-wrapped/
 - [ ] Write tests for encode/decode round-trip
 
 ### Phase 2: Launch Website (Basic)
-- [ ] Set up Cloudflare Pages project at `wrapped.claude.codes`
+- [ ] Set up Cloudflare Pages project at `wrapped-claude-codes.adewale-883.workers.dev`
 - [ ] Implement `/:year/<data>` route handling
 - [ ] Create landing page with year selector
 - [ ] Implement URL decoder (Base64URL -> MessagePack -> JSON)
@@ -963,7 +963,7 @@ claude-code-wrapped/
 | **CLI Command** | `claude-history wrapped --year YYYY` |
 | **Year Handling** | Default current year, parameter for any past year |
 | **Storage** | None - all data in URL (including year for validation) |
-| **URL Format** | `https://wrapped.claude.codes/{year}/{encoded-data}` |
+| **URL Format** | `https://wrapped-claude-codes.adewale-883.workers.dev/{year}/{encoded-data}` |
 | **Privacy** | High - only aggregate stats shared |
 | **Social Cards** | Dynamic OG images via Satori (year in title) |
 | **Cost** | $5/month (Workers Paid for image generation) |

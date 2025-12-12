@@ -116,7 +116,7 @@ app.get('/:year/:data', (c) => {
   }
 
   // Generate OG image URL
-  const ogImageUrl = `https://wrapped.claude.codes/og/${year}/${encodedData}.png`;
+  const ogImageUrl = `https://wrapped-claude-codes.adewale-883.workers.dev/og/${year}/${encodedData}.png`;
 
   return c.html(renderWrappedPage({
     story,

@@ -62,7 +62,7 @@ export async function generateOgImage(story: WrappedStory, year: number): Promis
   ${renderTraits(story.t, 460)}
 
   <!-- Footer -->
-  <text x="600" y="600" fill="#666666" font-family="Inter, sans-serif" font-size="16" text-anchor="middle">wrapped.claude.codes</text>
+  <text x="600" y="600" fill="#666666" font-family="Inter, sans-serif" font-size="16" text-anchor="middle">wrapped-claude-codes.adewale-883.workers.dev</text>
 </svg>`;
 
   // Return as UTF-8 encoded bytes

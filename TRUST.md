@@ -76,7 +76,7 @@ unset http_proxy https_proxy
 
 ### The Exception: Wrapped URLs
 
-The `wrapped` command generates a URL pointing to `wrapped.claude.codes`. However:
+The `wrapped` command generates a URL pointing to `wrapped-claude-codes.adewale-883.workers.dev`. However:
 
 - **The CLI itself makes no network calls**—it just prints a URL
 - **You choose whether to share that URL**
@@ -197,7 +197,7 @@ The `wrapped` command creates a shareable URL. Here's its specific trust model:
 You can decode any Wrapped URL to see exactly what it contains:
 
 ```bash
-claude-history wrapped --decode "https://wrapped.claude.codes/2025/eyJ5..."
+claude-history wrapped --decode "https://wrapped-claude-codes.adewale-883.workers.dev/2025/eyJ5..."
 ```
 
 This shows you the complete data—no hidden fields, no surprises.

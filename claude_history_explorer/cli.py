@@ -1350,7 +1350,7 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
 
     # Generate URL
     encoded = encode_wrapped_story(story)
-    url = f"https://wrapped.claude.codes/{year}/{encoded}"
+    url = f"https://wrapped-claude-codes.adewale-883.workers.dev/{year}/{encoded}"
 
     # Display summary
     _display_wrapped_summary(story, url, year)
