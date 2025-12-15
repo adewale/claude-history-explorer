@@ -64,6 +64,9 @@ __all__ = [
     "ProjectStory",
     "GlobalStory",
     "WrappedStoryV3",
+    "ThreadNode",
+    "ThreadMap",
+    "ThreadMapStats",
     # Path functions
     "get_claude_dir",
     "get_projects_dir",
@@ -103,6 +106,11 @@ __all__ = [
     "rle_encode",
     "rle_decode",
     "rle_encode_if_smaller",
+    # Thread map functions
+    "build_thread_map",
+    "encode_thread_map",
+    "decode_thread_map",
+    "THREAD_MAP_PATTERNS",
 ]
 
 
@@ -2508,3 +2516,514 @@ def generate_wrapped_story_v3(
         tk=token_stats,
         yoy=yoy,
     )
+
+
+# =============================================================================
+# Thread Map - Visualization of session relationships
+# =============================================================================
+
+# Pattern names for compact encoding
+THREAD_MAP_PATTERNS = [
+    "hub-and-spoke",  # 0: Main with 3+ agents
+    "chain",          # 1: Sequential mains <30min apart
+    "parallel",       # 2: Overlapping main sessions
+    "deep",           # 3: Nested agents (depth 2+)
+]
+
+THREAD_MAP_VERSION = 1
+
+
+@dataclass
+class ThreadNode:
+    """A node in the thread map representing a session.
+
+    Attributes:
+        id: Session ID (full or truncated)
+        type: "main" or "agent"
+        start: Session start timestamp
+        end: Session end timestamp (may be None)
+        messages: Total message count
+        slug: Optional session title
+        children: List of agent sessions spawned by this session
+        depth: Nesting level (0 for main sessions)
+    """
+    id: str
+    type: str  # "main" or "agent"
+    start: datetime
+    end: Optional[datetime]
+    messages: int
+    slug: Optional[str]
+    children: List["ThreadNode"] = field(default_factory=list)
+    depth: int = 0
+
+    @property
+    def duration_minutes(self) -> int:
+        """Duration in minutes."""
+        if self.start and self.end:
+            return int((self.end - self.start).total_seconds() / 60)
+        return 0
+
+    @property
+    def short_id(self) -> str:
+        """Truncated ID for display."""
+        return self.id[:8] if len(self.id) > 8 else self.id
+
+    def to_compact(self) -> list:
+        """Convert to compact list format for URL encoding.
+
+        Format: [id, type, start_ts, end_ts, msgs, slug, [children]]
+        """
+        return [
+            self.id[:8],  # Truncated ID
+            0 if self.type == "main" else 1,
+            int(self.start.timestamp()) if self.start else 0,
+            int(self.end.timestamp()) if self.end else 0,
+            self.messages,
+            self.slug or "",
+            [c.to_compact() for c in self.children],
+        ]
+
+    @classmethod
+    def from_compact(cls, data: list, depth: int = 0) -> "ThreadNode":
+        """Create from compact list format."""
+        children = [cls.from_compact(c, depth + 1) for c in data[6]] if data[6] else []
+        return cls(
+            id=data[0],
+            type="main" if data[1] == 0 else "agent",
+            start=datetime.fromtimestamp(data[2]) if data[2] else None,
+            end=datetime.fromtimestamp(data[3]) if data[3] else None,
+            messages=data[4],
+            slug=data[5] if data[5] else None,
+            children=children,
+            depth=depth,
+        )
+
+
+@dataclass
+class ThreadMapStats:
+    """Aggregate statistics for a thread map.
+
+    Attributes:
+        total_sessions: Total number of sessions
+        main_sessions: Number of main sessions
+        agent_sessions: Number of agent sessions
+        max_depth: Deepest nesting level
+        max_concurrent: Peak parallel sessions
+        avg_agents_per_main: Average agents spawned per main session
+        total_messages: Sum of all messages
+        total_hours: Total development time
+    """
+    total_sessions: int
+    main_sessions: int
+    agent_sessions: int
+    max_depth: int
+    max_concurrent: int
+    avg_agents_per_main: float
+    total_messages: int
+    total_hours: float
+
+    def to_compact(self) -> dict:
+        """Convert to compact dict for URL encoding."""
+        return {
+            "ts": self.total_sessions,
+            "ms": self.main_sessions,
+            "as": self.agent_sessions,
+            "md": self.max_depth,
+            "mc": self.max_concurrent,
+            "aa": round(self.avg_agents_per_main, 1),
+            "tm": self.total_messages,
+            "th": round(self.total_hours, 1),
+        }
+
+    @classmethod
+    def from_compact(cls, data: dict) -> "ThreadMapStats":
+        """Create from compact dict."""
+        return cls(
+            total_sessions=data.get("ts", 0),
+            main_sessions=data.get("ms", 0),
+            agent_sessions=data.get("as", 0),
+            max_depth=data.get("md", 0),
+            max_concurrent=data.get("mc", 0),
+            avg_agents_per_main=data.get("aa", 0),
+            total_messages=data.get("tm", 0),
+            total_hours=data.get("th", 0),
+        )
+
+
+@dataclass
+class ThreadMap:
+    """Complete thread map for a project.
+
+    Attributes:
+        project: Project short name
+        path: Full project path
+        roots: Main sessions (tree roots)
+        orphans: Agent sessions without identified parent
+        patterns: Detected patterns (e.g., "hub-and-spoke")
+        stats: Aggregate statistics
+        timespan: (start, end) datetime tuple
+    """
+    project: str
+    path: str
+    roots: List[ThreadNode]
+    orphans: List[ThreadNode]
+    patterns: List[str]
+    stats: ThreadMapStats
+    timespan: tuple[datetime, datetime]
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for URL encoding."""
+        return {
+            "v": THREAD_MAP_VERSION,
+            "p": self.project,
+            "pa": self.path,
+            "r": [r.to_compact() for r in self.roots],
+            "o": [o.to_compact() for o in self.orphans],
+            "pt": [THREAD_MAP_PATTERNS.index(p) for p in self.patterns if p in THREAD_MAP_PATTERNS],
+            "st": self.stats.to_compact(),
+            "ts": [
+                int(self.timespan[0].timestamp()) if self.timespan[0] else 0,
+                int(self.timespan[1].timestamp()) if self.timespan[1] else 0,
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ThreadMap":
+        """Create from dictionary."""
+        roots = [ThreadNode.from_compact(r) for r in data.get("r", [])]
+        orphans = [ThreadNode.from_compact(o) for o in data.get("o", [])]
+        pattern_indices = data.get("pt", [])
+        patterns = [THREAD_MAP_PATTERNS[i] for i in pattern_indices if 0 <= i < len(THREAD_MAP_PATTERNS)]
+        ts = data.get("ts", [0, 0])
+
+        return cls(
+            project=data.get("p", ""),
+            path=data.get("pa", ""),
+            roots=roots,
+            orphans=orphans,
+            patterns=patterns,
+            stats=ThreadMapStats.from_compact(data.get("st", {})),
+            timespan=(
+                datetime.fromtimestamp(ts[0]) if ts[0] else datetime.now(),
+                datetime.fromtimestamp(ts[1]) if ts[1] else datetime.now(),
+            ),
+        )
+
+
+def _find_parent_session(
+    agent: SessionInfo,
+    main_sessions: List[SessionInfo],
+    buffer_minutes: int = 5
+) -> Optional[SessionInfo]:
+    """Find the most likely parent main session for an agent.
+
+    Uses temporal overlap: agent must start during main session's duration
+    (with a small buffer for timing variations).
+
+    Args:
+        agent: The agent session to find a parent for
+        main_sessions: List of main sessions to search
+        buffer_minutes: Grace period after main session ends
+
+    Returns:
+        The most likely parent session, or None if not found
+    """
+    candidates = []
+
+    for main in main_sessions:
+        if not main.start_time:
+            continue
+
+        main_end = main.end_time or main.start_time + timedelta(hours=24)
+        buffered_end = main_end + timedelta(minutes=buffer_minutes)
+
+        # Agent must start after main starts and before main ends (with buffer)
+        if main.start_time <= agent.start_time <= buffered_end:
+            # Score by how close the start times are
+            time_diff = abs((agent.start_time - main.start_time).total_seconds())
+            candidates.append((main, time_diff))
+
+    if not candidates:
+        return None
+
+    # Return the candidate with the closest start time
+    candidates.sort(key=lambda x: x[1])
+    return candidates[0][0]
+
+
+def _detect_patterns(
+    roots: List[ThreadNode],
+    main_sessions: List[SessionInfo]
+) -> List[str]:
+    """Detect thread patterns in the session data.
+
+    Patterns detected:
+    - hub-and-spoke: Main session with 3+ agents
+    - chain: Sequential main sessions <30min apart
+    - parallel: Overlapping main sessions
+    - deep: Nested agents (depth 2+)
+
+    Args:
+        roots: List of root ThreadNodes
+        main_sessions: List of main SessionInfo objects
+
+    Returns:
+        List of detected pattern names
+    """
+    patterns = []
+
+    # Hub-and-spoke: main with 3+ agents
+    for root in roots:
+        if len(root.children) >= 3:
+            patterns.append("hub-and-spoke")
+            break
+
+    # Chain: sequential mains <30min apart
+    if len(main_sessions) >= 2:
+        sorted_mains = sorted(main_sessions, key=lambda x: x.start_time)
+        for i in range(1, len(sorted_mains)):
+            prev = sorted_mains[i - 1]
+            curr = sorted_mains[i]
+            if prev.end_time and curr.start_time:
+                gap = (curr.start_time - prev.end_time).total_seconds() / 60
+                if 0 < gap < 30:
+                    patterns.append("chain")
+                    break
+
+    # Parallel: overlapping mains
+    if len(main_sessions) >= 2:
+        sorted_mains = sorted(main_sessions, key=lambda x: x.start_time)
+        for i in range(len(sorted_mains)):
+            for j in range(i + 1, len(sorted_mains)):
+                m1, m2 = sorted_mains[i], sorted_mains[j]
+                if m1.end_time and m2.start_time:
+                    if m2.start_time < m1.end_time:
+                        patterns.append("parallel")
+                        break
+            if "parallel" in patterns:
+                break
+
+    # Deep: nested agents
+    def check_depth(node: ThreadNode) -> int:
+        if not node.children:
+            return node.depth
+        return max(check_depth(c) for c in node.children)
+
+    for root in roots:
+        if check_depth(root) >= 2:
+            patterns.append("deep")
+            break
+
+    return list(set(patterns))  # Deduplicate
+
+
+def _calculate_max_concurrent(sessions: List[SessionInfo]) -> int:
+    """Calculate maximum number of concurrent sessions.
+
+    Args:
+        sessions: List of all sessions
+
+    Returns:
+        Maximum number of sessions active at the same time
+    """
+    if not sessions:
+        return 0
+
+    events = []
+    for s in sessions:
+        if s.start_time:
+            events.append((s.start_time, 1))  # Session start
+            if s.end_time:
+                events.append((s.end_time, -1))  # Session end
+            else:
+                # Assume 1 hour if no end time
+                events.append((s.start_time + timedelta(hours=1), -1))
+
+    events.sort(key=lambda x: (x[0], -x[1]))  # Sort by time, ends before starts
+
+    max_concurrent = 0
+    current = 0
+    for _, delta in events:
+        current += delta
+        max_concurrent = max(max_concurrent, current)
+
+    return max_concurrent
+
+
+def build_thread_map(project: Project, days: Optional[int] = None) -> ThreadMap:
+    """Build a thread map for a project.
+
+    Parses all sessions, identifies parent-child relationships between
+    main and agent sessions, and detects patterns.
+
+    Args:
+        project: Project to analyze
+        days: Optional limit to last N days (default: all sessions)
+
+    Returns:
+        ThreadMap with session hierarchy and patterns
+
+    Raises:
+        ValueError: If no sessions found
+    """
+    # Parse all sessions
+    all_sessions: List[SessionInfo] = []
+    for session_file in project.session_files:
+        session = parse_session(session_file, project.path)
+        is_agent = session_file.name.startswith("agent-")
+        info = SessionInfo.from_session(session, is_agent)
+        if info is not None:
+            all_sessions.append(info)
+
+    if not all_sessions:
+        raise ValueError(f"No sessions found for project {project.path}")
+
+    # Filter by days if specified
+    if days:
+        cutoff = datetime.now(all_sessions[0].start_time.tzinfo) - timedelta(days=days)
+        all_sessions = [s for s in all_sessions if s.start_time and s.start_time >= cutoff]
+
+    if not all_sessions:
+        raise ValueError(f"No sessions in the last {days} days for project {project.path}")
+
+    # Separate main and agent sessions
+    main_sessions = [s for s in all_sessions if not s.is_agent]
+    agent_sessions = [s for s in all_sessions if s.is_agent]
+
+    # Sort by start time
+    main_sessions.sort(key=lambda x: x.start_time)
+    agent_sessions.sort(key=lambda x: x.start_time)
+
+    # Build parent-child relationships
+    session_to_node: Dict[str, ThreadNode] = {}
+    orphans: List[ThreadNode] = []
+
+    # Create nodes for main sessions
+    roots: List[ThreadNode] = []
+    for main in main_sessions:
+        node = ThreadNode(
+            id=main.session_id,
+            type="main",
+            start=main.start_time,
+            end=main.end_time,
+            messages=main.message_count,
+            slug=main.slug,
+            depth=0,
+        )
+        roots.append(node)
+        session_to_node[main.session_id] = node
+
+    # Assign agents to parents
+    for agent in agent_sessions:
+        parent = _find_parent_session(agent, main_sessions)
+        agent_node = ThreadNode(
+            id=agent.session_id,
+            type="agent",
+            start=agent.start_time,
+            end=agent.end_time,
+            messages=agent.message_count,
+            slug=agent.slug,
+            depth=1,
+        )
+
+        if parent and parent.session_id in session_to_node:
+            parent_node = session_to_node[parent.session_id]
+            parent_node.children.append(agent_node)
+            agent_node.depth = parent_node.depth + 1
+        else:
+            orphans.append(agent_node)
+
+    # Sort children by start time
+    for root in roots:
+        root.children.sort(key=lambda x: x.start if x.start else datetime.min)
+
+    # Detect patterns
+    patterns = _detect_patterns(roots, main_sessions)
+
+    # Calculate stats
+    def count_depth(node: ThreadNode) -> int:
+        if not node.children:
+            return node.depth
+        return max(count_depth(c) for c in node.children)
+
+    max_depth = max((count_depth(r) for r in roots), default=0)
+
+    total_agents = len(agent_sessions)
+    avg_agents = total_agents / len(main_sessions) if main_sessions else 0
+
+    total_messages = sum(s.message_count for s in all_sessions)
+    total_hours = sum(s.duration_minutes for s in all_sessions) / 60
+
+    stats = ThreadMapStats(
+        total_sessions=len(all_sessions),
+        main_sessions=len(main_sessions),
+        agent_sessions=total_agents,
+        max_depth=max_depth,
+        max_concurrent=_calculate_max_concurrent(all_sessions),
+        avg_agents_per_main=avg_agents,
+        total_messages=total_messages,
+        total_hours=total_hours,
+    )
+
+    # Calculate timespan
+    all_starts = [s.start_time for s in all_sessions if s.start_time]
+    all_ends = [s.end_time for s in all_sessions if s.end_time]
+    timespan = (
+        min(all_starts) if all_starts else datetime.now(),
+        max(all_ends) if all_ends else datetime.now(),
+    )
+
+    return ThreadMap(
+        project=project.short_name,
+        path=project.path,
+        roots=roots,
+        orphans=orphans,
+        patterns=patterns,
+        stats=stats,
+        timespan=timespan,
+    )
+
+
+def encode_thread_map(thread_map: ThreadMap) -> str:
+    """Encode a ThreadMap to a URL-safe string.
+
+    Uses MessagePack for compact binary representation, then Base64URL encoding.
+
+    Args:
+        thread_map: ThreadMap to encode
+
+    Returns:
+        URL-safe encoded string
+    """
+    import base64
+    import msgpack
+
+    data = thread_map.to_dict()
+    packed = msgpack.packb(data, use_bin_type=True)
+    encoded = base64.urlsafe_b64encode(packed).rstrip(b"=").decode("ascii")
+    return encoded
+
+
+def decode_thread_map(encoded: str) -> ThreadMap:
+    """Decode a URL-safe string to a ThreadMap.
+
+    Args:
+        encoded: URL-safe encoded string
+
+    Returns:
+        ThreadMap object
+
+    Raises:
+        ValueError: If decoding fails
+    """
+    import base64
+    import msgpack
+
+    try:
+        padding_needed = (4 - len(encoded) % 4) % 4
+        padded = encoded + "=" * padding_needed
+        packed = base64.urlsafe_b64decode(padded)
+        data = msgpack.unpackb(packed, raw=False, strict_map_key=False)
+        return ThreadMap.from_dict(data)
+    except Exception as e:
+        raise ValueError(f"Failed to decode thread map: {e}")

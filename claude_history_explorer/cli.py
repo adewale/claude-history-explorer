@@ -42,11 +42,18 @@ from .history import (
     generate_wrapped_story_v3,
     encode_wrapped_story_v3,
     decode_wrapped_story_v3,
+    build_thread_map,
+    encode_thread_map,
+    decode_thread_map,
+    format_duration,
     ProjectStats,
     GlobalStats,
     ProjectStory,
     GlobalStory,
     WrappedStoryV3,
+    ThreadMap,
+    ThreadNode,
+    THREAD_MAP_PATTERNS,
 )
 
 __all__ = ["main"]
@@ -119,6 +126,15 @@ Examples:
   claude-history wrapped --raw               # Output raw JSON
   claude-history wrapped --decode <url>      # Decode and inspect any Wrapped URL
   claude-history wrapped --no-copy           # Don't copy URL to clipboard
+""",
+    "thread-map": """
+Examples:
+  claude-history thread-map                  # Thread map for most recent project
+  claude-history thread-map -p myproject     # Thread map for specific project
+  claude-history thread-map --days 30        # Limit to last 30 days
+  claude-history thread-map --format json    # Output raw JSON
+  claude-history thread-map --format url     # Generate shareable URL
+  claude-history thread-map --decode <url>   # Decode and display a thread map URL
 """,
 }
 
@@ -1501,6 +1517,219 @@ def _display_wrapped_summary(story: WrappedStoryV3, url: str, year: int) -> None
     # Print URL without Rich formatting to ensure it's not truncated
     # Rich's overflow="ignore" was silently truncating the URL to terminal width
     print(url)
+
+
+@main.command("thread-map")
+@click.option("--project", "-p", default=None, help="Project to visualize (default: most recent)")
+@click.option("--days", "-d", type=int, default=None, help="Limit to last N days")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["ascii", "json", "url"]),
+    default="ascii",
+    help="Output format",
+)
+@click.option("--no-copy", is_flag=True, help="Don't copy URL to clipboard")
+@click.option("--decode", type=str, default=None, help="Decode and display a thread map URL")
+@click.option("--example", is_flag=True, help="Show usage examples")
+def thread_map(project: str, days: int, output_format: str, no_copy: bool, decode: str, example: bool):
+    """Visualize session relationships as a thread map.
+
+    Shows how main sessions spawn agent sub-conversations,
+    detects patterns like hub-and-spoke and chains, and
+    generates a shareable URL for the visualization.
+    """
+    if example:
+        show_examples("thread-map")
+        return
+
+    # Decode mode: inspect an existing URL
+    if decode:
+        _decode_thread_map_url(decode)
+        return
+
+    # Find project
+    if project:
+        proj = find_project(project)
+        if not proj:
+            console.print(f"[red]No project found matching '{project}'[/red]")
+            return
+    else:
+        # Use most recent project
+        all_projects = list_projects()
+        if not all_projects:
+            console.print("[red]No projects found[/red]")
+            return
+        proj = all_projects[0]
+
+    try:
+        tmap = build_thread_map(proj, days)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        return
+
+    if output_format == "json":
+        console.print_json(data=tmap.to_dict())
+        return
+
+    if output_format == "url":
+        encoded = encode_thread_map(tmap)
+        url = f"https://wrapped-claude-codes.adewale-883.workers.dev/thread-map?d={encoded}"
+        console.print()
+        console.print(f"[bold green]🗺️  Thread Map URL generated![/bold green]")
+        console.print()
+        console.print(f"[cyan]{url}[/cyan]", soft_wrap=False, overflow="ignore")
+
+        if not no_copy:
+            try:
+                import pyperclip
+                pyperclip.copy(url)
+                console.print("\n[green]📋 Copied to clipboard![/green]")
+            except Exception:
+                console.print("\n[yellow]⚠️  Could not copy to clipboard[/yellow]")
+        return
+
+    # ASCII format (default)
+    _display_thread_map_ascii(tmap)
+
+
+def _decode_thread_map_url(url_or_data: str) -> None:
+    """Decode and display a Thread Map URL."""
+    import re
+
+    # Extract data from URL
+    match = re.match(r"(?:https?://[^/]+/thread-map\?d=)?([A-Za-z0-9_-]+)", url_or_data)
+    if not match:
+        console.print("[red]Error: Invalid Thread Map URL format[/red]")
+        return
+
+    encoded_data = match.group(1)
+    try:
+        tmap = decode_thread_map(encoded_data)
+    except ValueError as e:
+        console.print(f"[red]Error: Failed to decode URL[/red]")
+        console.print(f"[dim]{e}[/dim]")
+        return
+
+    # Display decoded data
+    console.print("[bold cyan]🔍 Decoded Thread Map URL[/bold cyan]")
+    console.print()
+    _display_thread_map_ascii(tmap)
+
+
+def _display_thread_map_ascii(tmap: ThreadMap) -> None:
+    """Display thread map in ASCII format."""
+    stats = tmap.stats
+    ts = tmap.timespan
+
+    # Header
+    console.print()
+    console.print(f"[bold]Thread Map: {tmap.project}[/bold]")
+    console.print("═" * 60)
+
+    # Timespan and summary
+    start_str = ts[0].strftime("%b %d") if ts[0] else "?"
+    end_str = ts[1].strftime("%b %d, %Y") if ts[1] else "?"
+    days_span = (ts[1] - ts[0]).days + 1 if ts[0] and ts[1] else 0
+
+    console.print(f"Timespan: {start_str} - {end_str} ({days_span} days)")
+    console.print(
+        f"Sessions: {stats.main_sessions} main, {stats.agent_sessions} agents | "
+        f"Messages: {stats.total_messages} | Hours: {stats.total_hours:.1f}"
+    )
+
+    if tmap.patterns:
+        pattern_str = ", ".join(tmap.patterns)
+        console.print(f"Patterns: [yellow]{pattern_str}[/yellow]")
+
+    if stats.max_concurrent > 1:
+        console.print(f"Max concurrent: [cyan]{stats.max_concurrent}[/cyan] sessions")
+
+    console.print("─" * 60)
+    console.print()
+
+    # Render each root session with its children
+    for root in tmap.roots:
+        _render_thread_node(root, is_last=root == tmap.roots[-1])
+        console.print()
+
+    # Orphan agents
+    if tmap.orphans:
+        console.print("[dim]─── Orphan Agents (no identified parent) ───[/dim]")
+        for orphan in tmap.orphans:
+            _render_thread_node(orphan, prefix="  ", is_last=orphan == tmap.orphans[-1])
+        console.print()
+
+    console.print("─" * 60)
+    # Legend
+    console.print("[dim]Legend: ━ duration | ⚡ hub (3+ agents) | → chain | ∥ parallel[/dim]")
+
+
+def _render_thread_node(node: ThreadNode, prefix: str = "", is_last: bool = False) -> None:
+    """Render a single thread node with its children."""
+    # Format timestamp
+    time_str = node.start.strftime("%b %d %H:%M") if node.start else "unknown"
+
+    # Duration bar - scale to max 30 chars
+    duration_mins = node.duration_minutes
+    bar_length = min(30, max(1, duration_mins // 5))  # 5 min = 1 char
+    bar = "━" * bar_length
+
+    # Node type indicator
+    if node.type == "main":
+        type_color = "cyan"
+        type_indicator = ""
+    else:
+        type_color = "blue"
+        type_indicator = "agent-"
+
+    # Slug or ID
+    display_name = node.slug[:25] if node.slug else node.short_id
+    if node.slug and len(node.slug) > 25:
+        display_name += "..."
+
+    # Hub indicator
+    hub_indicator = " ⚡" if len(node.children) >= 3 else ""
+
+    # Main line
+    duration_str = format_duration(duration_mins) if duration_mins else "?"
+    console.print(
+        f"{prefix}[dim][{time_str}][/dim] [{type_color}]{type_indicator}{display_name}[/{type_color}] "
+        f"[dim]{bar}[/dim] ({node.messages} msgs, {duration_str}){hub_indicator}"
+    )
+
+    # Children
+    if node.children:
+        for i, child in enumerate(node.children):
+            is_child_last = i == len(node.children) - 1
+            child_prefix = prefix + ("    " if is_last else "│   ")
+            branch = "└── " if is_child_last else "├── "
+
+            # Child line
+            child_time = child.start.strftime("%H:%M") if child.start else "?"
+            child_duration = child.duration_minutes
+            child_bar_len = min(20, max(1, child_duration // 5))
+            child_bar = "━" * child_bar_len
+            child_duration_str = format_duration(child_duration) if child_duration else "?"
+
+            child_name = child.slug[:20] if child.slug else child.short_id
+            if child.slug and len(child.slug) > 20:
+                child_name += "..."
+
+            depth_indicator = f" [dim](depth {child.depth})[/dim]" if child.depth > 1 else ""
+
+            console.print(
+                f"{child_prefix}{branch}[blue]{child_name}[/blue] "
+                f"[dim]{child_bar}[/dim] ({child.messages} msgs, {child_duration_str}){depth_indicator}"
+            )
+
+            # Recursively render nested children
+            if child.children:
+                nested_prefix = child_prefix + ("    " if is_child_last else "│   ")
+                for j, nested in enumerate(child.children):
+                    is_nested_last = j == len(child.children) - 1
+                    _render_thread_node(nested, nested_prefix, is_nested_last)
 
 
 if __name__ == "__main__":

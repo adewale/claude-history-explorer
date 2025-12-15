@@ -2,15 +2,17 @@
  * Claude Code Wrapped - Cloudflare Worker
  *
  * Routes:
- * - GET /           - Landing page
- * - GET /wrapped?d= - Wrapped page (Print view)
+ * - GET /              - Landing page
+ * - GET /wrapped?d=    - Wrapped page (Print view)
  * - GET /og/:year/:data.png - Open Graph image
+ * - GET /thread-map?d= - Thread Map visualization
  */
 
 import { Hono } from 'hono';
 import { renderLandingPage } from './pages/landing';
 import { renderPrintPage, renderErrorPage } from './pages/print';
-import { decodeWrappedStoryAuto, validateStory, validateStoryV3, isV3Story } from './decoder';
+import { renderThreadMapPage, renderThreadMapErrorPage } from './pages/thread-map';
+import { decodeWrappedStoryAuto, validateStory, validateStoryV3, isV3Story, decodeThreadMap, validateThreadMap } from './decoder';
 import { generateOgImage, getOgImageContentType } from './og';
 
 type Bindings = {
@@ -54,6 +56,34 @@ app.get('/wrapped', (c) => {
   const year = story.y;
 
   return c.html(renderPrintPage({ story, year, encodedData }));
+});
+
+// Thread Map page
+app.get('/thread-map', (c) => {
+  const encodedData = c.req.query('d');
+
+  if (!encodedData) {
+    return c.html(renderThreadMapErrorPage('Missing data parameter. Generate a Thread Map URL using: claude-history thread-map --format url'), 400);
+  }
+
+  // Decode thread map
+  let map;
+  try {
+    map = decodeThreadMap(encodedData);
+  } catch (error) {
+    return c.html(renderThreadMapErrorPage('Invalid Thread Map URL. The data could not be decoded.'), 400);
+  }
+
+  // Validate
+  const validation = validateThreadMap(map);
+  if (!validation.valid) {
+    return c.html(renderThreadMapErrorPage(validation.error || 'Invalid data'), 400);
+  }
+
+  return c.html(renderThreadMapPage({
+    map,
+    encodedData,
+  }));
 });
 
 // OG Image endpoint

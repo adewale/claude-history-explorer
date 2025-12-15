@@ -239,6 +239,50 @@ export interface TokenStats {
 }
 
 // =============================================================================
+// Thread Map Types
+// =============================================================================
+
+// Pattern names - must stay in sync with Python history.py
+const THREAD_MAP_PATTERNS = [
+  "hub-and-spoke",  // 0
+  "chain",          // 1
+  "parallel",       // 2
+  "deep",           // 3
+];
+
+export interface ThreadNode {
+  id: string;
+  type: "main" | "agent";
+  start: number;  // Unix timestamp
+  end: number;    // Unix timestamp
+  messages: number;
+  slug: string;
+  children: ThreadNode[];
+  depth: number;
+}
+
+export interface ThreadMapStats {
+  totalSessions: number;
+  mainSessions: number;
+  agentSessions: number;
+  maxDepth: number;
+  maxConcurrent: number;
+  avgAgentsPerMain: number;
+  totalMessages: number;
+  totalHours: number;
+}
+
+export interface ThreadMap {
+  project: string;
+  path: string;
+  roots: ThreadNode[];
+  orphans: ThreadNode[];
+  patterns: string[];
+  stats: ThreadMapStats;
+  timespan: [number, number];  // Unix timestamps
+}
+
+// =============================================================================
 // V3 Decoding Functions
 // =============================================================================
 
@@ -280,6 +324,23 @@ function decodeProject(arr: any[]): TopProjectV3 {
     d: arr[3] || 0,
     s: arr[4] || 0,
     ar: arr[5] || 0,
+  };
+}
+
+/**
+ * Decode a compact node array to ThreadNode
+ */
+function decodeNode(data: any[], depth: number = 0): ThreadNode {
+  const children = (data[6] || []).map((c: any[]) => decodeNode(c, depth + 1));
+  return {
+    id: data[0] || '',
+    type: data[1] === 0 ? 'main' : 'agent',
+    start: data[2] || 0,
+    end: data[3] || 0,
+    messages: data[4] || 0,
+    slug: data[5] || '',
+    children,
+    depth,
   };
 }
 
@@ -385,6 +446,49 @@ export function decodeWrappedStoryV3(encoded: string): WrappedStoryV3 {
     };
   } catch (error) {
     throw new Error(`Failed to decode V3 wrapped story: ${error}`);
+  }
+}
+
+/**
+ * Decode a ThreadMap from URL-safe encoded string
+ */
+export function decodeThreadMap(encoded: string): ThreadMap {
+  try {
+    const bytes = base64UrlDecode(encoded);
+    const raw = msgpack.decode(bytes);
+
+    const roots = (raw.r || []).map((r: any[]) => decodeNode(r, 0));
+    const orphans = (raw.o || []).map((o: any[]) => decodeNode(o, 0));
+    const patternIndices = raw.pt || [];
+    const patterns = patternIndices
+      .filter((i: number) => i >= 0 && i < THREAD_MAP_PATTERNS.length)
+      .map((i: number) => THREAD_MAP_PATTERNS[i]);
+
+    const st = raw.st || {};
+    const stats: ThreadMapStats = {
+      totalSessions: st.ts || 0,
+      mainSessions: st.ms || 0,
+      agentSessions: st.as || 0,
+      maxDepth: st.md || 0,
+      maxConcurrent: st.mc || 0,
+      avgAgentsPerMain: st.aa || 0,
+      totalMessages: st.tm || 0,
+      totalHours: st.th || 0,
+    };
+
+    const ts = raw.ts || [0, 0];
+
+    return {
+      project: raw.p || '',
+      path: raw.pa || '',
+      roots,
+      orphans,
+      patterns,
+      stats,
+      timespan: [ts[0], ts[1]],
+    };
+  } catch (error) {
+    throw new Error(`Failed to decode thread map: ${error}`);
   }
 }
 
@@ -576,6 +680,16 @@ export function validateStoryV3(story: WrappedStoryV3): { valid: boolean; error?
   }
   if (story.hm && story.hm.length !== 168) {
     return { valid: false, error: `Invalid heatmap size: ${story.hm.length} (expected 168)` };
+=======
+ * Validate that the thread map data is well-formed
+ */
+export function validateThreadMap(map: ThreadMap): { valid: boolean; error?: string } {
+  if (!map.project) {
+    return { valid: false, error: 'Missing project name' };
+  }
+  if (!map.roots || !Array.isArray(map.roots)) {
+    return { valid: false, error: 'Missing or invalid roots' };
+>>>>>>> 15495b9 (Add Thread Map visualization feature)
   }
   return { valid: true };
 }
