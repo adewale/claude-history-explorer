@@ -1002,6 +1002,29 @@ class SessionInfo:
         )
 
 
+def collect_sessions(project: Project) -> List[SessionInfo]:
+    """Collect and parse all sessions from a project into SessionInfo objects.
+
+    This is a common operation used by multiple analysis functions. It parses
+    each session file and converts it to a SessionInfo, filtering out sessions
+    that have no start_time.
+
+    Args:
+        project: Project to collect sessions from
+
+    Returns:
+        List of SessionInfo objects (may be empty if no valid sessions)
+    """
+    sessions: List[SessionInfo] = []
+    for session_file in project.session_files:
+        session = parse_session(session_file, project.path)
+        is_agent = session_file.name.startswith("agent-")
+        info = SessionInfo.from_session(session, is_agent)
+        if info is not None:
+            sessions.append(info)
+    return sessions
+
+
 @dataclass
 class ProjectStory:
     """Narrative analysis of a project's development journey.
@@ -1082,14 +1105,7 @@ def generate_project_story(project: Project) -> ProjectStory:
         >>> story = generate_project_story(project)
         >>> print(f"Personality: {', '.join(story.personality_traits)}")
     """
-    # Collect all sessions
-    sessions: list[SessionInfo] = []
-    for session_file in project.session_files:
-        session = parse_session(session_file, project.path)
-        is_agent = session_file.name.startswith("agent-")
-        info = SessionInfo.from_session(session, is_agent)
-        if info is not None:
-            sessions.append(info)
+    sessions = collect_sessions(project)
 
     if not sessions:
         raise ValueError(f"No sessions found for project {project.path}")
@@ -2522,7 +2538,7 @@ def generate_wrapped_story_v3(
 # Thread Map - Visualization of session relationships
 # =============================================================================
 
-# Pattern names for compact encoding
+# Pattern names for compact encoding - MUST stay in sync with wrapped-website/src/decoder.ts
 THREAD_MAP_PATTERNS = [
     "hub-and-spoke",  # 0: Main with 3+ agents
     "chain",          # 1: Sequential mains <30min apart
@@ -2789,18 +2805,26 @@ def _detect_patterns(
 
     Returns:
         List of detected pattern names
+
+    Performance:
+        - Hub-and-spoke: O(r) where r = number of roots
+        - Chain: O(n log n) for sort + O(n) scan = O(n log n)
+        - Parallel: O(n) using max end time tracking (improved from O(n²))
+        - Deep: O(total nodes) tree traversal
     """
     patterns = []
 
-    # Hub-and-spoke: main with 3+ agents
+    # Hub-and-spoke: main with 3+ agents - O(r)
     for root in roots:
         if len(root.children) >= 3:
             patterns.append("hub-and-spoke")
             break
 
-    # Chain: sequential mains <30min apart
+    # Sort once for both chain and parallel detection - O(n log n)
     if len(main_sessions) >= 2:
         sorted_mains = sorted(main_sessions, key=lambda x: x.start_time)
+
+        # Chain: sequential mains <30min apart - O(n)
         for i in range(1, len(sorted_mains)):
             prev = sorted_mains[i - 1]
             curr = sorted_mains[i]
@@ -2810,20 +2834,19 @@ def _detect_patterns(
                     patterns.append("chain")
                     break
 
-    # Parallel: overlapping mains
-    if len(main_sessions) >= 2:
-        sorted_mains = sorted(main_sessions, key=lambda x: x.start_time)
-        for i in range(len(sorted_mains)):
-            for j in range(i + 1, len(sorted_mains)):
-                m1, m2 = sorted_mains[i], sorted_mains[j]
-                if m1.end_time and m2.start_time:
-                    if m2.start_time < m1.end_time:
-                        patterns.append("parallel")
-                        break
-            if "parallel" in patterns:
+        # Parallel: overlapping mains - O(n) using sweep line approach
+        # Track the maximum end time seen so far; if any session starts
+        # before this max end time, we have an overlap
+        max_end_time = None
+        for session in sorted_mains:
+            if max_end_time and session.start_time and session.start_time < max_end_time:
+                patterns.append("parallel")
                 break
+            if session.end_time:
+                if max_end_time is None or session.end_time > max_end_time:
+                    max_end_time = session.end_time
 
-    # Deep: nested agents
+    # Deep: nested agents - O(total nodes)
     def check_depth(node: ThreadNode) -> int:
         if not node.children:
             return node.depth
@@ -2886,14 +2909,7 @@ def build_thread_map(project: Project, days: Optional[int] = None) -> ThreadMap:
     Raises:
         ValueError: If no sessions found
     """
-    # Parse all sessions
-    all_sessions: List[SessionInfo] = []
-    for session_file in project.session_files:
-        session = parse_session(session_file, project.path)
-        is_agent = session_file.name.startswith("agent-")
-        info = SessionInfo.from_session(session, is_agent)
-        if info is not None:
-            all_sessions.append(info)
+    all_sessions = collect_sessions(project)
 
     if not all_sessions:
         raise ValueError(f"No sessions found for project {project.path}")

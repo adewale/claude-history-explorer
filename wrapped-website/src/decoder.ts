@@ -690,7 +690,11 @@ export function validateStoryV3(story: WrappedStoryV3): { valid: boolean; error?
   }
   if (story.hm && story.hm.length !== 168) {
     return { valid: false, error: `Invalid heatmap size: ${story.hm.length} (expected 168)` };
-=======
+  }
+  return { valid: true };
+}
+
+/**
  * Validate that the thread map data is well-formed
  */
 export function validateThreadMap(map: ThreadMap): { valid: boolean; error?: string } {
@@ -699,7 +703,6 @@ export function validateThreadMap(map: ThreadMap): { valid: boolean; error?: str
   }
   if (!map.roots || !Array.isArray(map.roots)) {
     return { valid: false, error: 'Missing or invalid roots' };
->>>>>>> 15495b9 (Add Thread Map visualization feature)
   }
   return { valid: true };
 }

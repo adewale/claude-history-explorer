@@ -2,49 +2,16 @@
  * Thread Map visualization page
  */
 
-import { ThreadMap, ThreadNode, formatNumber } from '../decoder';
+import { ThreadMap, ThreadNode } from '../decoder';
+import { escapeHtml, formatNumber, formatTimestamp, formatDurationMinutes } from '../utils';
 
 /**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(str: string): string {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-/**
- * Format a unix timestamp to a readable date string
- */
-function formatDate(timestamp: number, format: 'short' | 'long' = 'short'): string {
-  if (!timestamp) return 'N/A';
-  const date = new Date(timestamp * 1000);
-  if (format === 'long') {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-/**
- * Format duration in minutes to readable string
+ * Format duration from timestamps to readable string
  */
 function formatDuration(startTs: number, endTs: number): string {
   if (!startTs || !endTs) return '?';
   const minutes = Math.round((endTs - startTs) / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  return formatDurationMinutes(minutes);
 }
 
 /**
@@ -249,7 +216,7 @@ function generateTimelineSvg(map: ThreadMap): string {
     const tickX = getX(tickTime);
     elements.push(`
       <line x1="${tickX}" y1="${axisY - 4}" x2="${tickX}" y2="${axisY + 4}" class="axis-tick"/>
-      <text x="${tickX}" y="${axisY + 20}" class="axis-label">${formatDate(tickTime)}</text>
+      <text x="${tickX}" y="${axisY + 20}" class="axis-label">${formatTimestamp(tickTime)}</text>
     `);
   }
 
@@ -623,7 +590,7 @@ export function renderThreadMapPage({ map, encodedData }: RenderOptions): string
         <span class="header-icon">🗺️</span>
         <h1 class="header-title">Thread Map: <span class="header-project">${escapeHtml(map.project)}</span></h1>
       </div>
-      <p class="header-meta">${formatDate(map.timespan[0], 'long')} → ${formatDate(map.timespan[1], 'long')} (${days} days)</p>
+      <p class="header-meta">${formatTimestamp(map.timespan[0], 'long')} → ${formatTimestamp(map.timespan[1], 'long')} (${days} days)</p>
     </div>
 
     <!-- Stats Bar -->
