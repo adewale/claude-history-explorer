@@ -80,7 +80,12 @@ function getPatternBadges(patterns: string[]): string {
 function generateTimelineSvg(map: ThreadMap): string {
   const { start, end } = getTimeRange(map);
   const totalDuration = end - start;
-  if (totalDuration <= 0) return '';
+  if (totalDuration <= 0) return '<p class="empty-message">No timeline data available.</p>';
+
+  // Handle empty roots case
+  if (map.roots.length === 0 && map.orphans.length === 0) {
+    return '<p class="empty-message">No sessions found in the data.</p>';
+  }
 
   const width = 800;
   const height = Math.max(400, (map.roots.length + map.orphans.length) * 80 + 100);
@@ -103,7 +108,7 @@ function generateTimelineSvg(map: ThreadMap): string {
   let yPos = padding.top + 30;
 
   // Render each root and its children
-  map.roots.forEach((root, rootIndex) => {
+  map.roots.forEach((root) => {
     const rootX = getX(root.start);
     const rootWidth = getBarWidth(root.start, root.end || root.start + 3600);
     const barHeight = 24;
@@ -136,10 +141,9 @@ function generateTimelineSvg(map: ThreadMap): string {
     yPos += barHeight + 8;
 
     // Child sessions (agents)
-    root.children.forEach((child, childIndex) => {
+    root.children.forEach((child) => {
       const childX = getX(child.start);
       const childWidth = getBarWidth(child.start, child.end || child.start + 1800);
-      const indent = 24;
 
       // Connector line
       elements.push(`
@@ -234,7 +238,7 @@ function generateTimelineSvg(map: ThreadMap): string {
   }
 
   // Time axis
-  const numTicks = Math.min(8, Math.ceil((end - start) / 86400));
+  const numTicks = Math.max(1, Math.min(8, Math.ceil((end - start) / 86400)));
   const tickInterval = totalDuration / numTicks;
   const axisY = yPos + 20;
 
@@ -522,6 +526,13 @@ export function renderThreadMapPage({ map, encodedData }: RenderOptions): string
       fill: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
+    }
+
+    .empty-message {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem 1rem;
     }
 
     .axis-line {

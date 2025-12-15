@@ -344,6 +344,8 @@ function decodeNode(data: any[], depth: number = 0): ThreadNode {
   };
 }
 
+const THREAD_MAP_VERSION = 1;
+
 /**
  * Decode timeline event array to object
  *
@@ -457,6 +459,14 @@ export function decodeThreadMap(encoded: string): ThreadMap {
     const bytes = base64UrlDecode(encoded);
     const raw = msgpack.decode(bytes);
 
+    // Check version compatibility
+    const version = raw.v || 1;
+    if (version > THREAD_MAP_VERSION) {
+      throw new Error(
+        `Unsupported thread map version ${version}. Please refresh the page or try again later.`
+      );
+    }
+
     const roots = (raw.r || []).map((r: any[]) => decodeNode(r, 0));
     const orphans = (raw.o || []).map((o: any[]) => decodeNode(o, 0));
     const patternIndices = raw.pt || [];
@@ -480,7 +490,7 @@ export function decodeThreadMap(encoded: string): ThreadMap {
 
     return {
       project: raw.p || '',
-      path: raw.pa || '',
+      path: raw.pa || '',  // May be empty for privacy
       roots,
       orphans,
       patterns,

@@ -2669,14 +2669,18 @@ class ThreadMap:
     orphans: List[ThreadNode]
     patterns: List[str]
     stats: ThreadMapStats
-    timespan: tuple[datetime, datetime]
+    timespan: Tuple[datetime, datetime]
 
     def to_dict(self) -> dict:
-        """Convert to dictionary for URL encoding."""
+        """Convert to dictionary for URL encoding.
+
+        Note: Full path is intentionally excluded for privacy.
+        Only the project short name is included.
+        """
         return {
             "v": THREAD_MAP_VERSION,
             "p": self.project,
-            "pa": self.path,
+            # "pa" (path) intentionally excluded for privacy
             "r": [r.to_compact() for r in self.roots],
             "o": [o.to_compact() for o in self.orphans],
             "pt": [THREAD_MAP_PATTERNS.index(p) for p in self.patterns if p in THREAD_MAP_PATTERNS],
@@ -2689,7 +2693,19 @@ class ThreadMap:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ThreadMap":
-        """Create from dictionary."""
+        """Create from dictionary.
+
+        Raises:
+            ValueError: If the version is unsupported
+        """
+        # Check version compatibility
+        version = data.get("v", 1)
+        if version > THREAD_MAP_VERSION:
+            raise ValueError(
+                f"Unsupported thread map version {version}. "
+                f"Please update claude-history-explorer to decode this data."
+            )
+
         roots = [ThreadNode.from_compact(r) for r in data.get("r", [])]
         orphans = [ThreadNode.from_compact(o) for o in data.get("o", [])]
         pattern_indices = data.get("pt", [])
@@ -2698,7 +2714,7 @@ class ThreadMap:
 
         return cls(
             project=data.get("p", ""),
-            path=data.get("pa", ""),
+            path=data.get("pa", ""),  # May be empty for privacy
             roots=roots,
             orphans=orphans,
             patterns=patterns,
@@ -2728,6 +2744,10 @@ def _find_parent_session(
     Returns:
         The most likely parent session, or None if not found
     """
+    # Agent must have a start time to find a parent
+    if not agent.start_time:
+        return None
+
     candidates = []
 
     for main in main_sessions:

@@ -53,7 +53,6 @@ from .history import (
     WrappedStoryV3,
     ThreadMap,
     ThreadNode,
-    THREAD_MAP_PATTERNS,
 )
 
 __all__ = ["main"]
@@ -1649,10 +1648,18 @@ def _display_thread_map_ascii(tmap: ThreadMap) -> None:
     console.print("─" * 60)
     console.print()
 
-    # Render each root session with its children
-    for root in tmap.roots:
-        _render_thread_node(root, is_last=root == tmap.roots[-1])
+    # Handle empty roots case
+    if not tmap.roots and not tmap.orphans:
+        console.print("[dim]No sessions found in the specified time range.[/dim]")
         console.print()
+    elif not tmap.roots:
+        console.print("[dim]No main sessions found. Only orphan agents detected.[/dim]")
+        console.print()
+    else:
+        # Render each root session with its children
+        for root in tmap.roots:
+            _render_thread_node(root, is_last=root == tmap.roots[-1])
+            console.print()
 
     # Orphan agents
     if tmap.orphans:
