@@ -42,6 +42,7 @@ export interface WrappedStory {
   s: number;      // sessions
   m: number;      // messages
   h: number;      // hours
+  d: number;      // days active (unique days with sessions)
   t: string[];    // traits (decoded from indices in v2)
   c: string;      // collaboration style (decoded from index in v2)
   w: string;      // work pace (decoded from index in v2)
@@ -130,6 +131,7 @@ export function decodeWrappedStory(encoded: string): WrappedStory {
       s: raw.s || 0,
       m: raw.m || 0,
       h: raw.h || 0,
+      d: raw.d || 0,
       t: traits,
       c: collab,
       w: pace,

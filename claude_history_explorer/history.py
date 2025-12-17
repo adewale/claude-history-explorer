@@ -359,8 +359,7 @@ class Project:
             Project instance with decoded path and session files
         """
         name = dir_path.name
-        # Decode the path: -Users-foo-bar -> /Users/foo/bar
-        decoded_path = "/" + name.lstrip("-").replace("-", "/")
+        decoded_path = cls._decode_project_path(name)
 
         session_files = sorted(
             dir_path.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True
@@ -370,14 +369,83 @@ class Project:
             name=name, path=decoded_path, dir_path=dir_path, session_files=session_files
         )
 
+    @staticmethod
+    def _decode_project_path(encoded_name: str) -> str:
+        """Decode a Claude project directory name to the actual filesystem path.
+
+        Claude Code encodes paths by replacing '/' with '-', but also converts
+        '_' and '-' in folder names to '-'. This creates ambiguity that we
+        resolve by checking which path actually exists on disk.
+
+        Args:
+            encoded_name: Directory name like '-Users-ade-projects-block-browser'
+
+        Returns:
+            Decoded path like '/Users/ade/projects/block_browser'
+        """
+        # Split into components: '-Users-ade-foo-bar' -> ['', 'Users', 'ade', 'foo', 'bar']
+        components = encoded_name.split("-")
+
+        # Start with root
+        current_path = Path("/")
+        i = 1  # Skip empty first component from leading '-'
+
+        while i < len(components):
+            component = components[i]
+            candidate = current_path / component
+
+            if candidate.exists():
+                # This component exists as-is, use it
+                current_path = candidate
+                i += 1
+            else:
+                # Try combining with subsequent components using '_' or '-'
+                found = False
+                # Try combining up to 4 components (reasonable limit for folder names)
+                for j in range(i + 1, min(i + 5, len(components) + 1)):
+                    combined_parts = components[i:j]
+
+                    # Try underscore separator
+                    underscore_name = "_".join(combined_parts)
+                    underscore_candidate = current_path / underscore_name
+                    if underscore_candidate.exists():
+                        current_path = underscore_candidate
+                        i = j
+                        found = True
+                        break
+
+                    # Try hyphen separator
+                    hyphen_name = "-".join(combined_parts)
+                    hyphen_candidate = current_path / hyphen_name
+                    if hyphen_candidate.exists():
+                        current_path = hyphen_candidate
+                        i = j
+                        found = True
+                        break
+
+                if not found:
+                    # Path doesn't exist on disk, fall back to simple slash replacement
+                    # for the remaining components
+                    remaining = "/".join(components[i:])
+                    return str(current_path / remaining)
+
+        return str(current_path)
+
     @property
     def session_count(self) -> int:
         return len(self.session_files)
 
     @property
     def short_name(self) -> str:
-        """Get the short name (last path component) of the project."""
-        return self.path.split("/")[-1]
+        """Get the short name (last path component) of the project, prettified.
+
+        Converts folder names like 'block_browser' or 'my-project' to
+        'Block Browser' or 'My Project' for display.
+        """
+        raw_name = self.path.split("/")[-1]
+        # Replace underscores and hyphens with spaces, then title case
+        prettified = raw_name.replace("_", " ").replace("-", " ")
+        return prettified.title()
 
     @property
     def last_modified(self) -> Optional[datetime]:
@@ -1332,6 +1400,7 @@ class WrappedStory:
         s: Total sessions
         m: Total messages
         h: Total hours of development
+        d: Days active (unique days with sessions)
         t: Personality traits (max 3) - stored as indices in v2
         c: Collaboration style - stored as index in v2
         w: Work pace - stored as index in v2
@@ -1348,6 +1417,7 @@ class WrappedStory:
     s: int = 0  # sessions
     m: int = 0  # messages
     h: float = 0  # hours
+    d: int = 0  # days active
     t: List[str] = field(default_factory=list)  # traits
     c: str = ""  # collaboration style
     w: str = ""  # work pace
@@ -1385,13 +1455,14 @@ class WrappedStory:
             except ValueError:
                 pace_idx = self.w  # Keep as string if not in dict
 
-            d = {
+            result = {
                 "v": WRAPPED_VERSION,  # Version for forward compatibility
                 "y": self.y,
                 "p": self.p,
                 "s": self.s,
                 "m": self.m,
                 "h": round(self.h, 1),
+                "d": self.d,
                 "t": trait_indices,
                 "c": collab_idx,
                 "w": pace_idx,
@@ -1404,12 +1475,13 @@ class WrappedStory:
             }
         else:
             # V1 format with full strings
-            d = {
+            result = {
                 "y": self.y,
                 "p": self.p,
                 "s": self.s,
                 "m": self.m,
                 "h": round(self.h, 1),
+                "d": self.d,
                 "t": self.t,
                 "c": self.c,
                 "w": self.w,
@@ -1421,8 +1493,8 @@ class WrappedStory:
                 "tp": self.tp,
             }
         if self.n:
-            d["n"] = self.n
-        return d
+            result["n"] = self.n
+        return result
 
     @classmethod
     def from_dict(cls, d: dict) -> "WrappedStory":
@@ -1469,6 +1541,7 @@ class WrappedStory:
             s=d.get("s", 0),
             m=d.get("m", 0),
             h=d.get("h", 0),
+            d=d.get("d", 0),
             t=traits,
             c=collab,
             w=pace,
@@ -1709,6 +1782,7 @@ def generate_wrapped_story(year: int, name: Optional[str] = None) -> WrappedStor
         s=total_sessions,
         m=total_messages,
         h=total_hours,
+        d=days_active,
         t=traits,
         c=collab_style,
         w=work_pace,

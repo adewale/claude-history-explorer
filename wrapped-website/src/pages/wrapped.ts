@@ -1689,7 +1689,7 @@ function renderCards(story: WrappedStory, year: number, pageUrl: string): string
         </div>
         <div class="split-viz">
           <div class="viz-circle">
-            <div class="viz-number">${Math.round(story.m / 365)}</div>
+            <div class="viz-number">${Math.round(story.m / (story.d || 365))}</div>
             <div class="viz-label">per day</div>
           </div>
         </div>
