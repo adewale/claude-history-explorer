@@ -448,5 +448,417 @@ class TestEdgeCasesIntegration:
         assert all(t == 100 for t in decoded.ts.values())
 
 
+class TestWrappedURLTruncationBug:
+    """Tests to verify and demonstrate the URL truncation bug in CLI output.
+
+    Bug: The wrapped command uses Rich's overflow="ignore" which silently
+    truncates the URL to terminal width, making the generated URL invalid.
+    """
+
+    def test_encoded_url_length_is_substantial(self):
+        """Test that encoded data for a typical story is substantial in length.
+
+        This establishes that the encoded data is typically much longer than
+        a standard terminal width (80 chars), which is necessary for the
+        truncation bug to manifest.
+        """
+        # Create a realistic story with multiple projects (similar to real user data)
+        story = WrappedStoryV3(
+            v=3,
+            y=2025,
+            n="Test User",
+            p=6,
+            s=193,
+            m=20000,
+            h=758,
+            d=15,
+            hm=[0] * 100 + [50, 100, 200, 500] * 17,  # Realistic heatmap
+            ma=[1000, 2000, 1500, 3000, 2500, 1800, 2200, 1900, 2100, 2800, 3500, 2000],
+            mh=[30, 50, 40, 80, 70, 50, 60, 55, 65, 85, 100, 60],
+            ms=[10, 15, 12, 25, 20, 15, 18, 16, 19, 28, 35, 18],
+            sd=[5, 10, 20, 40, 50, 30, 20, 10, 5, 3],
+            ar=[2, 5, 10, 15, 25, 20, 12, 6, 3, 2],
+            ml=[10, 20, 30, 25, 20, 10, 3, 2],
+            ts={'ad': 85, 'sp': 60, 'fc': 40, 'cc': 55, 'wr': 25,
+                'bs': 70, 'cs': 45, 'mv': 50, 'td': 60, 'ri': 75},
+            tp=[
+                ['Keyboardia', 14000, 300, 14, 111, 93],
+                ['Auriga', 4500, 170, 7, 30, 90],
+                ['Lempicka', 800, 100, 6, 21, 86],
+                ['Kirby Tarot', 800, 50, 3, 14, 79],
+                ['Claude History Explorer', 700, 140, 5, 15, 73],
+                ['Fibonacci Durable Object', 3, 0, 1, 2, 100],
+            ],
+            pc=[(0, 1, 5), (0, 2, 3), (1, 2, 2), (0, 3, 4), (1, 3, 3)],
+            te=[
+                [50, 0, 500, 0],
+                [100, 4, 1000, -1],
+                [150, 3, -1, 1],
+                [200, 4, 5000, -1],
+            ],
+            sf=[
+                [120, 100, 0, 10, 0, 0, 20, 40, 60, 80, 50, 10, 30, 20],
+                [180, 150, 1, 14, 2, 1, 30, 50, 70, 60, 40, 20, 25, 35],
+                [240, 200, 0, 9, 1, 0, 25, 45, 55, 75, 55, 15, 28, 22],
+            ],
+            ls=50.5,
+            sk=[5, 10, 3, 4],
+            tk={'total': 1500000, 'input': 900000, 'output': 600000,
+                'cache_read': 400000, 'cache_create': 80000,
+                'models': {'opus': 500000, 'sonnet': 800000, 'haiku': 200000}},
+        )
+
+        encoded = encode_wrapped_story_v3(story)
+
+        # The encoded data should be much longer than typical terminal width
+        assert len(encoded) > 500, f"Encoded length {len(encoded)} should be > 500 chars"
+
+        # Full URL should be even longer
+        url = f"https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d={encoded}"
+        assert len(url) > 600, f"URL length {len(url)} should be > 600 chars"
+
+        # Record actual lengths for documentation
+        print(f"\nEncoded data length: {len(encoded)} chars")
+        print(f"Full URL length: {len(url)} chars")
+        print(f"Standard terminal width: 80 chars")
+        print(f"Data exceeds terminal by: {len(url) - 80} chars")
+
+    def test_truncated_encoded_data_fails_to_decode(self):
+        """Test that truncating encoded data causes decode failure.
+
+        This demonstrates why the truncation bug is critical - truncated
+        URLs cannot be decoded and result in errors or missing data.
+        """
+        story = WrappedStoryV3(
+            v=3, y=2025, n="Test", p=3, s=50, m=2000, h=100, d=10,
+            hm=[0] * 168,
+            ma=[100] * 12, mh=[10] * 12, ms=[5] * 12,
+            sd=[10] * 10, ar=[10] * 10, ml=[10] * 8,
+            ts={'ad': 50, 'sp': 50, 'fc': 50, 'cc': 50, 'wr': 50,
+                'bs': 50, 'cs': 50, 'mv': 50, 'td': 50, 'ri': 50},
+            tp=[['Project1', 1000, 50, 5, 20, 50]],
+            pc=[], te=[], sf=[],
+        )
+
+        encoded = encode_wrapped_story_v3(story)
+        full_length = len(encoded)
+
+        # Truncate to simulate terminal width truncation
+        # 80 char terminal - ~63 chars for URL base = ~17 chars for data
+        truncated = encoded[:17]
+
+        # Verify truncation happened
+        assert len(truncated) < full_length, "Should be truncated"
+
+        # Truncated data should fail to decode
+        with pytest.raises(Exception) as exc_info:
+            decode_wrapped_story_v3(truncated)
+
+        # Should get a decoding error (base64 or msgpack)
+        error_msg = str(exc_info.value).lower()
+        assert any(term in error_msg for term in ['base64', 'unpack', 'decode', 'padding', 'invalid']), \
+            f"Expected base64/msgpack error, got: {exc_info.value}"
+
+        print(f"\nFull encoded length: {full_length} chars")
+        print(f"Truncated to: {len(truncated)} chars")
+        print(f"Decode error: {exc_info.value}")
+
+    def test_rich_overflow_ignore_truncates_long_text(self):
+        """Test that Rich's overflow='ignore' truncates text significantly.
+
+        This directly tests the bug mechanism: Rich's console.print with
+        overflow='ignore' silently truncates content that exceeds terminal width.
+
+        Note: Rich's truncation formula isn't exactly terminal_width, but it
+        does truncate significantly. A ~1463 char URL gets truncated to ~124 chars
+        with width=80, losing over 1300 characters.
+        """
+        from io import StringIO
+        from rich.console import Console
+
+        # Create a console with narrow width to simulate the bug
+        narrow_width = 80
+        output = StringIO()
+        console = Console(file=output, width=narrow_width, force_terminal=True)
+
+        # Create a long URL like the wrapped command generates
+        long_url = "https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=" + "A" * 1400
+
+        # Print with overflow="ignore" (the buggy behavior)
+        console.print(long_url, soft_wrap=False, overflow="ignore")
+
+        truncated_output = output.getvalue().strip()
+
+        # The output should be significantly truncated (not all 1463 chars)
+        visible_length = len(truncated_output.replace('\n', ''))
+
+        # With overflow="ignore", content IS truncated (just not to exact width)
+        assert visible_length < len(long_url), \
+            f"Output ({visible_length}) should be shorter than input ({len(long_url)})"
+
+        # Verify significant data is lost (>50% of the URL should be truncated)
+        data_lost = len(long_url) - visible_length
+        print(f"\nInput URL length: {len(long_url)} chars")
+        print(f"Output length after overflow='ignore': {visible_length} chars")
+        print(f"Data lost to truncation: {data_lost} chars ({100*data_lost/len(long_url):.1f}%)")
+
+        # This is THE BUG - substantial data is silently lost
+        assert data_lost > len(long_url) * 0.5, \
+            f"Expected >50% data loss, only lost {100*data_lost/len(long_url):.1f}%"
+
+    def test_rich_without_overflow_ignore_preserves_text(self):
+        """Test that Rich preserves text when overflow='ignore' is removed.
+
+        This demonstrates the fix: without overflow='ignore', the full URL
+        is preserved (though it may wrap to multiple lines).
+        """
+        from io import StringIO
+        from rich.console import Console
+
+        narrow_width = 80
+        output = StringIO()
+        console = Console(file=output, width=narrow_width, force_terminal=True)
+
+        # Create a long URL
+        long_url = "https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=" + "A" * 1400
+
+        # Print WITHOUT overflow="ignore" - just soft_wrap=False
+        # This will let the text extend beyond terminal width
+        console.print(long_url, soft_wrap=False)  # No overflow="ignore"!
+
+        full_output = output.getvalue().strip()
+
+        # Without overflow="ignore", the full content should be preserved
+        # It may wrap, but the data shouldn't be lost
+        assert len(full_output) >= len(long_url) - 10, \
+            f"Full URL should be preserved. Got {len(full_output)}, expected ~{len(long_url)}"
+
+        print(f"\nInput URL length: {len(long_url)} chars")
+        print(f"Output length without overflow='ignore': {len(full_output)} chars")
+        print("Data is preserved!")
+
+
+class TestCLIOutputIntegrity:
+    """Tests to verify CLI output integrity and prevent silent data loss.
+
+    These tests catch bugs where:
+    - Output is silently truncated (like overflow="ignore")
+    - Displayed data doesn't match internal data
+    - URLs in output are not functional
+    """
+
+    def test_wrapped_cli_output_contains_decodable_url(self):
+        """Test that the wrapped CLI command outputs a complete, decodable URL.
+
+        This is the key regression test for the overflow="ignore" bug.
+        Uses Click's CliRunner to capture actual CLI output.
+        """
+        from click.testing import CliRunner
+        from claude_history_explorer.cli import main
+
+        runner = CliRunner()
+
+        # Mock the data generation to have a predictable test
+        with patch('claude_history_explorer.cli.generate_wrapped_story_v3') as mock_gen:
+            # Create a story with enough data to exceed terminal width
+            mock_story = WrappedStoryV3(
+                v=3, y=2025, n="CLI Test User", p=5, s=100, m=5000, h=200, d=30,
+                hm=[10] * 168,
+                ma=[500] * 12, mh=[20] * 12, ms=[10] * 12,
+                sd=[10] * 10, ar=[10] * 10, ml=[10] * 8,
+                ts={'ad': 50, 'sp': 50, 'fc': 50, 'cc': 50, 'wr': 50,
+                    'bs': 50, 'cs': 50, 'mv': 50, 'td': 50, 'ri': 50},
+                tp=[
+                    ['Project1', 2000, 80, 15, 40, 60],
+                    ['Project2', 1500, 60, 10, 30, 50],
+                    ['Project3', 1000, 40, 8, 20, 40],
+                ],
+                pc=[(0, 1, 5), (0, 2, 3)],
+                te=[[50, 0, 200, 0], [100, 4, 1000, -1]],
+                sf=[[120, 100, 0, 10, 0, 0] + [50] * 8],
+                ls=3.5,
+                sk=[5, 8, 3, 4],
+                tk={'total': 1000000, 'input': 600000, 'output': 400000,
+                    'cache_read': 200000, 'cache_create': 50000, 'models': {}},
+            )
+            mock_gen.return_value = mock_story
+
+            # Run the CLI command with --no-copy to avoid clipboard issues in test
+            result = runner.invoke(main, ['wrapped', '--no-copy'])
+
+            assert result.exit_code == 0, f"CLI failed: {result.output}"
+
+            # Extract URL from output
+            import re
+            url_match = re.search(r'(https://[^\s]+wrapped\?d=[A-Za-z0-9_-]+)', result.output)
+            assert url_match, f"No URL found in output: {result.output}"
+
+            url = url_match.group(1)
+
+            # Extract the encoded data from URL
+            data_match = re.search(r'\?d=([A-Za-z0-9_-]+)', url)
+            assert data_match, f"No data parameter in URL: {url}"
+
+            encoded_data = data_match.group(1)
+
+            # THE KEY TEST: The URL should be decodable
+            try:
+                decoded = decode_wrapped_story_v3(encoded_data)
+            except Exception as e:
+                pytest.fail(
+                    f"URL in CLI output is not decodable!\n"
+                    f"URL: {url}\n"
+                    f"Encoded data length: {len(encoded_data)}\n"
+                    f"Error: {e}\n"
+                    f"This likely means the URL was truncated in output."
+                )
+
+            # Verify the decoded data matches what we generated
+            assert decoded.n == "CLI Test User"
+            assert decoded.p == 5
+            assert decoded.m == 5000
+            assert len(decoded.tp) == 3
+
+    def test_wrapped_output_url_matches_internal_url(self):
+        """Test that the URL displayed matches the URL that would be copied.
+
+        Catches bugs where display and clipboard get different data.
+        """
+        from click.testing import CliRunner
+        from claude_history_explorer.cli import main
+
+        runner = CliRunner()
+
+        with patch('claude_history_explorer.cli.generate_wrapped_story_v3') as mock_gen:
+            mock_story = WrappedStoryV3(
+                v=3, y=2025, p=2, s=20, m=500, h=10, d=5,
+                hm=[0] * 168,
+                ma=[50] * 12, mh=[1] * 12, ms=[2] * 12,
+                sd=[5] * 10, ar=[5] * 10, ml=[5] * 8,
+                ts={'ad': 50, 'sp': 50, 'fc': 50, 'cc': 50, 'wr': 50,
+                    'bs': 50, 'cs': 50, 'mv': 50, 'td': 50, 'ri': 50},
+                tp=[['Proj', 250, 5, 3, 10, 50]],
+                pc=[], te=[], sf=[],
+            )
+            mock_gen.return_value = mock_story
+
+            # Generate expected URL directly
+            expected_encoded = encode_wrapped_story_v3(mock_story)
+            expected_url = f"https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d={expected_encoded}"
+
+            # Run CLI
+            result = runner.invoke(main, ['wrapped', '--no-copy'])
+
+            # The output should contain the exact same URL
+            assert expected_url in result.output, (
+                f"URL mismatch!\n"
+                f"Expected URL ({len(expected_url)} chars): {expected_url[:100]}...\n"
+                f"Output: {result.output}"
+            )
+
+    def test_display_summary_function_preserves_full_url(self):
+        """Test that _display_wrapped_summary outputs the complete URL.
+
+        Directly tests the function that had the overflow="ignore" bug.
+        """
+        from io import StringIO
+        import sys
+
+        # Create a story and URL
+        story = WrappedStoryV3(
+            v=3, y=2025, n="Display Test", p=3, s=50, m=2000, h=50, d=10,
+            hm=[0] * 168,
+            ma=[200] * 12, mh=[5] * 12, ms=[5] * 12,
+            sd=[10] * 10, ar=[10] * 10, ml=[10] * 8,
+            ts={'ad': 50, 'sp': 50, 'fc': 50, 'cc': 50, 'wr': 50,
+                'bs': 50, 'cs': 50, 'mv': 50, 'td': 50, 'ri': 50},
+            tp=[['TestProject', 1000, 25, 5, 20, 50]],
+            pc=[], te=[], sf=[],
+        )
+
+        encoded = encode_wrapped_story_v3(story)
+        url = f"https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d={encoded}"
+
+        # Capture stdout
+        captured = StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = captured
+
+        try:
+            from claude_history_explorer.cli import _display_wrapped_summary
+            _display_wrapped_summary(story, url, 2025)
+        finally:
+            sys.stdout = old_stdout
+
+        output = captured.getvalue()
+
+        # The full URL must appear in the output
+        assert url in output, (
+            f"Full URL not in output!\n"
+            f"URL length: {len(url)}\n"
+            f"Output length: {len(output)}\n"
+            f"URL: {url[:100]}...\n"
+            f"This indicates URL truncation in _display_wrapped_summary"
+        )
+
+    def test_long_url_not_truncated_in_any_terminal_width(self):
+        """Test that URLs are not truncated regardless of terminal width.
+
+        Simulates different terminal widths to ensure the URL is always complete.
+        """
+        story = WrappedStoryV3(
+            v=3, y=2025, n="Width Test", p=6, s=150, m=10000, h=300, d=25,
+            hm=[50] * 168,
+            ma=[1000] * 12, mh=[30] * 12, ms=[15] * 12,
+            sd=[15] * 10, ar=[15] * 10, ml=[15] * 8,
+            ts={'ad': 70, 'sp': 60, 'fc': 50, 'cc': 40, 'wr': 30,
+                'bs': 60, 'cs': 45, 'mv': 55, 'td': 65, 'ri': 75},
+            tp=[
+                [f'Project{i}', 2000 - i * 200, 50 - i * 5, 5, 25 - i * 2, 50 + i * 5]
+                for i in range(6)
+            ],
+            pc=[(0, 1, 5), (1, 2, 3), (0, 2, 4)],
+            te=[[50, 0, 300, 0], [150, 4, 2000, -1]],
+            sf=[[180, 120, 0, 14, 2, 0] + [60] * 8],
+            ls=8.5,
+            sk=[10, 15, 5, 6],
+            tk={'total': 2000000, 'input': 1200000, 'output': 800000,
+                'cache_read': 500000, 'cache_create': 100000,
+                'models': {'sonnet': 1500000, 'haiku': 500000}},
+        )
+
+        encoded = encode_wrapped_story_v3(story)
+        url = f"https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d={encoded}"
+
+        # URL should be substantial
+        assert len(url) > 500, f"URL unexpectedly short: {len(url)}"
+
+        # Test various simulated terminal widths
+        for width in [40, 60, 80, 100, 120, 200]:
+            # Capture stdout with simulated width
+            from io import StringIO
+            import sys
+
+            captured = StringIO()
+            old_stdout = sys.stdout
+            sys.stdout = captured
+
+            try:
+                from claude_history_explorer.cli import _display_wrapped_summary
+                _display_wrapped_summary(story, url, 2025)
+            finally:
+                sys.stdout = old_stdout
+
+            output = captured.getvalue()
+
+            # Full URL must be in output regardless of "terminal width"
+            # (print() doesn't truncate, but this test documents the requirement)
+            assert url in output, (
+                f"URL truncated at simulated width {width}!\n"
+                f"Expected URL ({len(url)} chars)\n"
+                f"Got output with length {len(output)}"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

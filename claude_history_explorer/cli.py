@@ -1498,8 +1498,9 @@ def _display_wrapped_summary(story: WrappedStoryV3, url: str, year: int) -> None
     console.print("━" * 50)
     console.print()
     console.print("[bold]Share your story:[/bold]")
-    # Use soft_wrap=False to prevent line breaks in the URL
-    console.print(f"[cyan]{url}[/cyan]", soft_wrap=False, overflow="ignore")
+    # Print URL without Rich formatting to ensure it's not truncated
+    # Rich's overflow="ignore" was silently truncating the URL to terminal width
+    print(url)
 
 
 if __name__ == "__main__":
