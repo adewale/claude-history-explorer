@@ -1662,7 +1662,70 @@ function renderSessionFingerprints({
 - **Desktop**: Arrow keys, click dots, optional auto-advance
 - **Keyboard**: Numbers 1-0 jump to cards
 
-### 4.5 Touch Interactions
+### 4.5 Card Playback Controls
+
+The card flow supports pause/play functionality for users who want to study visualizations.
+
+**Control States:**
+| State | Icon | Behavior |
+|-------|------|----------|
+| Playing | ▐▐ (pause) | Auto-advance every 5s, tap to pause |
+| Paused | ▶ (play) | Manual navigation only, tap to resume |
+
+**Pause Triggers:**
+- Tap pause button (bottom center, near dots)
+- Any swipe gesture (user taking control)
+- Keyboard navigation (←/→ arrows)
+- Touch/click on visualization (inspecting detail)
+
+**Resume Triggers:**
+- Tap play button
+- Press Space key
+- 30s idle timeout (optional, configurable)
+
+**Visual Feedback:**
+```
+Paused state:
+┌─────────────────────────┐
+│                         │
+│   [Card Content]        │
+│                         │
+│                         │
+│   ▶  ● ○ ○ ○ ○ ○       │
+│   ↑ Play button         │
+└─────────────────────────┘
+
+Playing state:
+┌─────────────────────────┐
+│                         │
+│   [Card Content]        │
+│                         │
+│        ═══════▶ 3s      │  ← Progress bar (optional)
+│   ▐▐ ● ○ ○ ○ ○ ○       │
+│   ↑ Pause button        │
+└─────────────────────────┘
+```
+
+**Implementation:**
+```typescript
+interface CardFlowState {
+  currentIndex: number;
+  isPlaying: boolean;
+  autoAdvanceDelay: number;  // ms, default 5000
+  idleResumeTimeout: number; // ms, default 30000, 0 = disabled
+}
+
+function togglePlayback(state: CardFlowState): CardFlowState {
+  return { ...state, isPlaying: !state.isPlaying };
+}
+
+function handleUserInteraction(state: CardFlowState): CardFlowState {
+  // Pause on any user navigation
+  return { ...state, isPlaying: false };
+}
+```
+
+### 4.6 Touch Interactions
 
 | Gesture | Element | Action |
 |---------|---------|--------|
@@ -1849,7 +1912,180 @@ function renderSessionFingerprints({
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.9 CSS Variables for Theming
+### 4.9 Bento Box Layout (Dense 1-Pager)
+
+Inspired by Apple's product page layouts, the Bento Box view presents all visualizations in a dense, information-rich grid that rewards close inspection. This is the **Tufte-optimized** view: maximum data-ink ratio, minimal navigation overhead.
+
+**Design Principles:**
+- Every pixel earns its place
+- No animation, no auto-advance—static contemplation
+- Information hierarchy through size, not sequence
+- Accessible via `?view=bento` URL parameter or toggle button
+
+**Grid Structure (12-column base):**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│  CLAUDE CODE WRAPPED 2025                                    [Cards] [Bento] [Print] │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  ┌────────────────────────────────────┐  ┌────────────────────────────────────────┐ │
+│  │ ████  5,316                        │  │ ACTIVITY HEATMAP                       │ │
+│  │ ████  messages                     │  │ ┌──────────────────────────────────┐   │ │
+│  │ ████                               │  │ │ M ░░▓▓██▓▓░░░░░░░░░░░░░░        │   │ │
+│  │ ████  312 hours · 70 sessions      │  │ │ T ░░▓▓████▓▓░░░░░░░░░░░░        │   │ │
+│  │ ████  4 projects · 45 days         │  │ │ W ░░░▓████▓░░░░░░░░░░░░░        │   │ │
+│  │                                    │  │ │ T ░░▓▓██▓▓░░░░░░░░░░░░░░        │   │ │
+│  │  "A Deep Diver"                    │  │ │ F ░░░▓▓▓░░░░░░░░░░░░░░░░        │   │ │
+│  │                                    │  │ │ S ░░░░░░░░░░░░░░░░░░░░░░        │   │ │
+│  └────────────────────────────────────┘  │ │ S ░░░░░░░░░░░░░░░░░░░░░░        │   │ │
+│                                          │ └──────────────────────────────────┘   │ │
+│  ┌────────────────────────────────────┐  │ Peak: Tuesday 10am                     │ │
+│  │ TIMELINE + KEY MOMENTS             │  └────────────────────────────────────────┘ │
+│  │ ★        ◆            ▲    ●───○   │                                             │
+│  │ █▃▅▇████▇▆▅▄▃▂▁▂▃▄▅▆▇████▇▆▅▄▃▂▁  │  ┌────────────────────────────────────────┐ │
+│  │ J  F  M  A  M  J  J  A  S  O  N  D │  │ TRAIT PROFILE                          │ │
+│  │                                    │  │        Delegation                       │ │
+│  │ 🔥 Peak: Mar 15 (142 msgs)         │  │           ╱╲                            │ │
+│  │ 🏆 Milestone: 1K msgs (Feb 3)      │  │      Deep╱  ╲Focus                      │ │
+│  │ 🚀 7-day streak (Apr 1-7)          │  │   Work ╱    ╲                           │ │
+│  └────────────────────────────────────┘  │       ╲      ╱                          │ │
+│                                          │ Burst  ╲____╱  Regularity               │ │
+│  ┌─────────────────┐ ┌─────────────────┐ │        Intensity                        │ │
+│  │ SESSION LENGTH  │ │ AGENT USAGE     │ │                                         │ │
+│  │ ▁▂▅▇█▅▂▁░░      │ │ ▁▂▅▇██▇▅▂▁      │ │ ad:73 sp:81 fc:45 cc:89 bs:62 ri:56   │ │
+│  │ <15m····>48h    │ │ 0%·········100% │ └────────────────────────────────────────┘ │
+│  └─────────────────┘ └─────────────────┘                                            │
+│                                                                                      │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┤
+│  │ PROJECTS (by messages)                                                           │
+│  │ ┌───────────────────────────────┬─────────────────────┬─────────────┬──────────┐│
+│  │ │                               │                     │             │          ││
+│  │ │    Keyboardia                 │    Auriga           │ Lempicka    │ CLI-tools││
+│  │ │    2,341 msgs · 156h          │    1,456 · 89h      │ 823 · 41h   │ 412 · 22h││
+│  │ │                               │                     │             │          ││
+│  │ └───────────────────────────────┴─────────────────────┴─────────────┴──────────┘│
+│  └──────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  ┌────────────────────────────────────┐  ┌────────────────────────────────────────┐ │
+│  │ PROJECT CO-OCCURRENCE              │  │ TOP SESSIONS                           │ │
+│  │                                    │  │                                        │ │
+│  │        Keyboardia                  │  │ [▓▓░░][░▓▓░][▓░░▓][░▓░▓][▓▓▓░]       │ │
+│  │           ╱╲                       │  │  abc1   def2  ghi3   jkl4  mno5        │ │
+│  │    12d╱    ╲8d                     │  │                                        │ │
+│  │      ╱        ╲                    │  │ [░░▓▓][▓░▓░][░▓▓▓][▓░░░][░░░▓]       │ │
+│  │ Auriga────────Lempicka             │  │  pqr6   stu7  vwx8   yza9  bcd0        │ │
+│  │        5d                          │  │                                        │ │
+│  └────────────────────────────────────┘  └────────────────────────────────────────┘ │
+│                                                                                      │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┤
+│  │ wrapped-claude-codes.adewale-883.workers.dev · All data encoded in URL · No server│
+│  └──────────────────────────────────────────────────────────────────────────────────┤
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Bento Box CSS Grid:**
+```css
+.bento-grid {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  /* 12-column base grid */
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: auto;
+
+  /* Named areas for flexible positioning */
+  grid-template-areas:
+    "hero   hero   hero   hero   heatmap heatmap heatmap heatmap heatmap heatmap heatmap heatmap"
+    "timeline timeline timeline timeline timeline timeline timeline traits traits traits traits traits"
+    "sess   sess   sess   agent  agent  agent  traits traits traits traits traits traits"
+    "treemap treemap treemap treemap treemap treemap treemap treemap treemap treemap treemap treemap"
+    "cooc   cooc   cooc   cooc   cooc   cooc   fingers fingers fingers fingers fingers fingers"
+    "footer footer footer footer footer footer footer footer footer footer footer footer";
+}
+
+.bento-hero { grid-area: hero; }
+.bento-heatmap { grid-area: heatmap; }
+.bento-timeline { grid-area: timeline; }
+.bento-traits { grid-area: traits; }
+.bento-sessions { grid-area: sess; }
+.bento-agent { grid-area: agent; }
+.bento-treemap { grid-area: treemap; }
+.bento-cooccurrence { grid-area: cooc; }
+.bento-fingerprints { grid-area: fingers; }
+.bento-footer { grid-area: footer; }
+
+/* Dense styling */
+.bento-grid .bento-cell {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.bento-cell h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+```
+
+**Responsive Bento (Tablet):**
+```css
+@media (max-width: 1024px) {
+  .bento-grid {
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-areas:
+      "hero   hero   hero   heatmap heatmap heatmap"
+      "timeline timeline timeline timeline timeline timeline"
+      "traits traits traits traits traits traits"
+      "sess   sess   sess   agent  agent  agent"
+      "treemap treemap treemap treemap treemap treemap"
+      "cooc   cooc   cooc   fingers fingers fingers";
+  }
+}
+```
+
+**Responsive Bento (Mobile):**
+On mobile (< 768px), Bento collapses to a scrollable single-column layout, maintaining density but allowing vertical scroll:
+
+```css
+@media (max-width: 767px) {
+  .bento-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bento-cell {
+    width: 100%;
+  }
+}
+```
+
+**URL Parameter:**
+```
+/wrapped?d=...&view=bento    → Bento box layout
+/wrapped?d=...&view=cards    → Card flow (default)
+/wrapped?d=...&view=print    → Print-optimized
+```
+
+**Toggle Button:**
+Desktop header includes a view toggle:
+```html
+<div class="view-toggle">
+  <button class="active" data-view="cards">Cards</button>
+  <button data-view="bento">Bento</button>
+  <button data-view="print">Print</button>
+</div>
+```
+
+### 4.10 CSS Variables for Theming
 
 ```css
 :root {
@@ -1946,11 +2182,19 @@ function renderSessionFingerprints({
 - [ ] Create `Timeline` component with event markers
 - [ ] Create `SessionFingerprints` component with scroll
 - [ ] Implement card flow navigation (swipe, keys, dots)
+- [ ] Implement card pause/play controls with progress bar
+- [ ] Add pause triggers (swipe, keyboard nav, viz interaction)
+- [ ] Add idle resume timeout (configurable)
 - [ ] Create responsive card layouts for all breakpoints
 - [ ] Create dashboard layout for desktop
+- [ ] Create Bento Box dense 1-pager layout
+- [ ] Implement 12-column CSS Grid for Bento layout
+- [ ] Add responsive Bento for tablet (6-column)
+- [ ] Add responsive Bento for mobile (single-column scroll)
 - [ ] Create print stylesheet
 - [ ] Add "Download as PDF" button (browser print)
-- [ ] Add view toggle (cards ↔ dashboard) on desktop
+- [ ] Add view toggle (cards ↔ bento ↔ print) on desktop
+- [ ] Support `?view=bento` URL parameter
 
 ### 5.3 Testing & Verification
 
@@ -1965,6 +2209,9 @@ function renderSessionFingerprints({
 - [ ] Visual regression tests for all components at all breakpoints
 - [ ] Test print layout at 100%, 75%, 50% browser zoom
 - [ ] Test card navigation: swipe, keyboard, dots
+- [ ] Test card pause/play: manual pause, auto-pause on interaction, idle resume
+- [ ] Test Bento layout at all breakpoints (desktop, tablet, mobile)
+- [ ] Test view toggle persistence and URL parameter
 - [ ] Test on: iPhone SE, iPhone 14, iPad, 1080p desktop, 1440p desktop
 - [ ] Accessibility: screen reader, keyboard-only, reduced motion
 
