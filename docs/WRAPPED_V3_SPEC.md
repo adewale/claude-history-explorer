@@ -67,7 +67,7 @@ interface WrappedStoryV3 {
   // Limited to top 12 projects by message count; remainder grouped as implicit "Other"
   // Wire format: [name, messages, hours, days, sessions, agent_ratio]
   tp: Array<{                    // Top projects (max 12)
-    n: string;                   // Name (truncated to 20 chars)
+    n: string;                   // Name (truncated to 50 chars)
     m: number;                   // Messages
     h: number;                   // Hours (integer)
     d: number;                   // Days active
@@ -153,7 +153,7 @@ These limits ensure URL size stays under 2KB:
 | `pc` (co-occurrence) | 20 edges | Keep highest-weight edges |
 | `te` (events) | 25 | Prioritize: peak > milestones > streaks > gaps > new_project |
 | `sf` (fingerprints) | 20 | Keep highest significance score |
-| Project names | 20 chars | Truncate with ellipsis |
+| Project names | 50 chars | Truncate with ellipsis |
 | Display name | 30 chars | Truncate |
 
 ---
@@ -2234,26 +2234,32 @@ Desktop header includes a view toggle:
 
 ---
 
-## Phase 6: Migration Strategy
+## Phase 6: Migration (Completed)
 
-1. **Week 1**: V3 behind `--experimental-v3` flag
-   - Both V2 and V3 decoders in website
-   - V3 URLs use `v: 3` in payload for detection
+**Status: V3 is now the only supported version.**
 
-2. **Week 2**: V3 as default
-   - `claude-history wrapped` generates V3
-   - `--legacy` flag generates V2
-   - Website auto-detects version
+V1 and V2 formats have been fully removed from both the Python encoder and TypeScript decoder.
+Legacy URLs will show an error message prompting users to regenerate their Wrapped.
 
-3. **Week 4**: V2 deprecated
-   - Remove `--legacy` flag
-   - V2 decoder remains for old URLs
-   - Documentation updated
+### URL Format
 
-4. **URL Compatibility**:
-   - Same URL structure: `/{year}/{encoded}`
-   - Version in payload determines decoder
-   - Old V2 URLs continue to work indefinitely
+The V3 URL format uses a query parameter:
+
+```
+https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d={encoded}
+```
+
+Optional view parameter:
+- `?view=bento` (default) - Interactive dashboard
+- `?view=print` - Print-friendly single page
+
+### Breaking Changes from V2
+
+- URL structure changed from `/{year}/{encoded}` to `/wrapped?d={encoded}`
+- V1/V2 encoded data will not decode (error message shown)
+- Project name limit increased from 20 to 50 characters
+- All trait scores are now integers 0-100 (not floats)
+- Story mode view removed (only Bento and Print views remain)
 
 ---
 

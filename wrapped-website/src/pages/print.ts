@@ -3,7 +3,7 @@
  * Tufte-inspired with high information density
  */
 
-import { WrappedStory, WrappedStoryV3, formatNumber, isV3Story, getTraitDescription, TokenStats } from '../decoder';
+import { WrappedStoryV3, formatNumber, getTraitDescription, TokenStats } from '../decoder';
 
 function escapeHtml(str: string): string {
   if (!str) return '';
@@ -81,15 +81,14 @@ function renderSparkline(data: number[]): string {
 }
 
 interface RenderOptions {
-  story: WrappedStory | WrappedStoryV3;
+  story: WrappedStoryV3;
   year: number;
   encodedData: string;
 }
 
 export function renderPrintPage({ story, year, encodedData }: RenderOptions): string {
   const displayName = story.n || 'Developer';
-  const monthlyActivity = isV3Story(story) ? story.ma : story.a;
-  const isV3 = isV3Story(story);
+  const monthlyActivity = story.ma;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -390,12 +389,10 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
         </div>
       </div>
 
-      ${isV3 ? `
       <div class="section">
         <div class="section-title">Weekly Rhythm</div>
-        ${renderHeatmapSvg((story as WrappedStoryV3).hm)}
+        ${renderHeatmapSvg(story.hm)}
       </div>
-      ` : ''}
 
       <div class="section">
         <div class="section-title">Top Projects</div>
@@ -412,7 +409,6 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     </div>
 
     <div>
-      ${isV3 ? `
       <div class="section">
         <div class="section-title">Coding Style</div>
         <div class="trait-list">
@@ -423,7 +419,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
             ['bs', 'Burst'],
             ['ri', 'Intensity'],
           ].map(([key, label]) => {
-            const value = ((story as WrappedStoryV3).ts as any)[key] || 50;
+            const value = (story.ts as any)[key] || 50;
             return `
               <div class="trait-row">
                 <span class="trait-name">${label}</span>
@@ -434,37 +430,36 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
           }).join('')}
         </div>
       </div>
-      ` : ''}
 
-      ${isV3 && (story as WrappedStoryV3).tk?.total > 0 ? `
+      ${story.tk?.total > 0 ? `
       <div class="section">
         <div class="section-title">Token Usage</div>
         <table class="token-table">
-          <tr><td>Total</td><td>${formatTokens((story as WrappedStoryV3).tk.total)}</td></tr>
-          <tr><td>Input</td><td>${formatTokens((story as WrappedStoryV3).tk.input)}</td></tr>
-          <tr><td>Output</td><td>${formatTokens((story as WrappedStoryV3).tk.output)}</td></tr>
-          ${(story as WrappedStoryV3).tk.cache_read > 0 ? `<tr><td>Cache Read</td><td>${formatTokens((story as WrappedStoryV3).tk.cache_read)}</td></tr>` : ''}
-          ${Object.entries((story as WrappedStoryV3).tk.models || {}).slice(0, 3).map(([model, count]) => `
+          <tr><td>Total</td><td>${formatTokens(story.tk.total)}</td></tr>
+          <tr><td>Input</td><td>${formatTokens(story.tk.input)}</td></tr>
+          <tr><td>Output</td><td>${formatTokens(story.tk.output)}</td></tr>
+          ${story.tk.cache_read > 0 ? `<tr><td>Cache Read</td><td>${formatTokens(story.tk.cache_read)}</td></tr>` : ''}
+          ${Object.entries(story.tk.models || {}).slice(0, 3).map(([model, count]) => `
             <tr><td>${getModelDisplayName(model)}</td><td>${formatTokens(count as number)}</td></tr>
           `).join('')}
         </table>
       </div>
       ` : ''}
 
-      ${isV3 && (story as WrappedStoryV3).sk?.[0] > 0 ? `
+      ${story.sk?.[0] > 0 ? `
       <div class="section">
         <div class="section-title">Streaks</div>
-        <div class="streak-row"><span>Total Streaks</span><span>${(story as WrappedStoryV3).sk[0]}</span></div>
-        <div class="streak-row"><span>Longest</span><span>${(story as WrappedStoryV3).sk[1]} days</span></div>
-        <div class="streak-row"><span>Current</span><span>${(story as WrappedStoryV3).sk[2]} days</span></div>
-        <div class="streak-row"><span>Average</span><span>${(story as WrappedStoryV3).sk[3]} days</span></div>
+        <div class="streak-row"><span>Total Streaks</span><span>${story.sk[0]}</span></div>
+        <div class="streak-row"><span>Longest</span><span>${story.sk[1]} days</span></div>
+        <div class="streak-row"><span>Current</span><span>${story.sk[2]} days</span></div>
+        <div class="streak-row"><span>Average</span><span>${story.sk[3]} days</span></div>
       </div>
       ` : ''}
 
       <div class="section">
         <div class="section-title">Session Stats</div>
         <div class="streak-row"><span>Total Sessions</span><span>${story.s}</span></div>
-        <div class="streak-row"><span>Longest Session</span><span>${isV3 ? (story as WrappedStoryV3).ls.toFixed(1) : (story as WrappedStory).ls?.toFixed(1) || '0'}h</span></div>
+        <div class="streak-row"><span>Longest Session</span><span>${story.ls.toFixed(1)}h</span></div>
         <div class="streak-row"><span>Avg per Day</span><span>${(story.h / (story.d || 1)).toFixed(1)}h</span></div>
       </div>
     </div>

@@ -10,10 +10,10 @@ import { WrappedStory, WrappedStoryV3, formatNumber, generateSparkline, isV3Stor
 /**
  * Generate an OG image as SVG (social platforms will render it)
  */
-export async function generateOgImage(story: WrappedStory | WrappedStoryV3, year: number): Promise<Uint8Array> {
+export async function generateOgImage(story: WrappedStoryV3, year: number): Promise<Uint8Array> {
   const displayName = story.n || 'Someone';
-  // Handle V2 (story.a) vs V3 (story.ma) monthly activity
-  const monthlyActivity = isV3Story(story) ? story.ma : story.a;
+  // V3 uses story.ma for monthly activity
+  const monthlyActivity = story.ma;
   const sparkline = generateSparkline(monthlyActivity || []);
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
@@ -61,9 +61,7 @@ export async function generateOgImage(story: WrappedStory | WrappedStoryV3, year
   <text x="600" y="420" fill="#666666" font-family="Inter, sans-serif" font-size="12" text-anchor="middle" letter-spacing="28">J F M A M J J A S O N D</text>
 
   <!-- Traits -->
-  ${isV3Story(story)
-    ? renderTraitsV3(story.ts, 460)
-    : renderTraits(story.t, 460)}
+  ${renderTraitsV3(story.ts, 460)}
 
   <!-- Footer -->
   <text x="600" y="600" fill="#666666" font-family="Inter, sans-serif" font-size="16" text-anchor="middle">wrapped-claude-codes.adewale-883.workers.dev</text>
@@ -80,23 +78,6 @@ function escapeXml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
-}
-
-function renderTraits(traits: string[], y: number): string {
-  if (!traits || traits.length === 0) return '';
-
-  const totalWidth = traits.reduce((sum, t) => sum + t.length * 10 + 32, 0) + (traits.length - 1) * 12;
-  let x = 600 - totalWidth / 2;
-
-  return traits.map(trait => {
-    const width = trait.length * 10 + 32;
-    const result = `
-      <rect x="${x}" y="${y}" width="${width}" height="36" rx="18" fill="#1a1a1a" stroke="#333333" stroke-width="1"/>
-      <text x="${x + width / 2}" y="${y + 24}" fill="#ffffff" font-family="Inter, sans-serif" font-size="16" text-anchor="middle">${escapeXml(trait)}</text>
-    `;
-    x += width + 12;
-    return result;
-  }).join('');
 }
 
 import { TraitScores } from './decoder';

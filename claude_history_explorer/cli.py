@@ -39,14 +39,14 @@ from .history import (
     calculate_global_stats,
     generate_project_story,
     generate_global_story,
-    generate_wrapped_story,
-    encode_wrapped_story,
-    decode_wrapped_story,
+    generate_wrapped_story_v3,
+    encode_wrapped_story_v3,
+    decode_wrapped_story_v3,
     ProjectStats,
     GlobalStats,
     ProjectStory,
     GlobalStory,
-    WrappedStory,
+    WrappedStoryV3,
 )
 
 __all__ = ["main"]
@@ -1327,8 +1327,8 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
     if now.month == 1 and now.day <= 7 and year == now.year:
         # Check if previous year has more data
         try:
-            prev_story = generate_wrapped_story(year - 1, name)
-            curr_story = generate_wrapped_story(year, name)
+            prev_story = generate_wrapped_story_v3(year - 1, name)
+            curr_story = generate_wrapped_story_v3(year, name)
             if prev_story.s > curr_story.s * 10:
                 console.print(
                     f"[yellow]ℹ️  It's early {year} and you have much more activity in {year - 1}.[/yellow]"
@@ -1339,7 +1339,7 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
             pass  # Ignore if either year has no data
 
     try:
-        story = generate_wrapped_story(year, name)
+        story = generate_wrapped_story_v3(year, name)
     except ValueError as e:
         console.print(f"[red]Error: {e}[/red]")
         return
@@ -1349,8 +1349,8 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
         return
 
     # Generate URL
-    encoded = encode_wrapped_story(story)
-    url = f"https://wrapped-claude-codes.adewale-883.workers.dev/{year}/{encoded}"
+    encoded = encode_wrapped_story_v3(story)
+    url = f"https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d={encoded}"
 
     # Display summary
     _display_wrapped_summary(story, url, year)
@@ -1366,39 +1366,31 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
 
 
 def _decode_wrapped_url(url_or_data: str) -> None:
-    """Decode and display a Wrapped URL."""
+    """Decode and display a Wrapped V3 URL."""
     import re
 
-    # Extract year and data from URL
-    match = re.match(r"(?:https?://[^/]+/)?(\d{4})/([A-Za-z0-9_-]+)", url_or_data)
+    # Extract data from URL (V3 format: /wrapped?d=...)
+    match = re.match(r"(?:https?://[^/]+)?/wrapped\?d=([A-Za-z0-9_-]+)", url_or_data)
     if not match:
-        # Try as raw encoded data
-        try:
-            story = decode_wrapped_story(url_or_data)
-            url_year = story.y
-        except ValueError as e:
-            console.print(f"[red]Error: Invalid Wrapped URL format[/red]")
-            console.print(f"[dim]{e}[/dim]")
-            return
+        # Try old URL format (/year/data) or raw encoded data
+        old_match = re.match(r"(?:https?://[^/]+/)?(\d{4})/([A-Za-z0-9_-]+)", url_or_data)
+        if old_match:
+            encoded_data = old_match.group(2)
+        else:
+            # Try as raw encoded data
+            encoded_data = url_or_data
     else:
-        url_year = int(match.group(1))
-        encoded_data = match.group(2)
-        try:
-            story = decode_wrapped_story(encoded_data)
-        except ValueError as e:
-            console.print(f"[red]Error: Failed to decode URL[/red]")
-            console.print(f"[dim]{e}[/dim]")
-            return
+        encoded_data = match.group(1)
 
-    # Validate year matches
-    if story.y != url_year:
-        console.print(
-            f"[yellow]⚠️  Warning: URL year ({url_year}) doesn't match data year ({story.y})[/yellow]"
-        )
-        console.print()
+    try:
+        story = decode_wrapped_story_v3(encoded_data)
+    except ValueError as e:
+        console.print(f"[red]Error: Failed to decode Wrapped URL[/red]")
+        console.print(f"[dim]{e}[/dim]")
+        return
 
-    # Display decoded data
-    console.print("[bold cyan]🔍 Decoded Wrapped URL[/bold cyan]")
+    # Display decoded V3 data
+    console.print("[bold cyan]🔍 Decoded Wrapped URL (V3)[/bold cyan]")
     console.print()
     console.print("━" * 50)
     console.print()
@@ -1410,24 +1402,27 @@ def _decode_wrapped_url(url_or_data: str) -> None:
     console.print(f"  Projects:     {story.p}")
     console.print(f"  Sessions:     {story.s}")
     console.print(f"  Messages:     {story.m:,}")
-    console.print(f"  Hours:        {story.h:.0f}")
-    console.print()
-    console.print("[bold]Personality:[/bold]")
-    console.print(f"  Traits:       {', '.join(story.t)}")
-    console.print(f"  Work Pace:    {story.w}")
-    console.print(f"  Style:        {story.c}")
-    console.print()
-    console.print("[bold]Highlights:[/bold]")
-    console.print(f"  Peak Project: {story.pp} ({story.pm:,} messages)")
-    console.print(f"  Longest:      {story.ls:.1f} hours")
-    if story.ci > 1:
-        console.print(f"  Max Parallel: {story.ci} instances")
+    console.print(f"  Hours:        {story.h}")
+    console.print(f"  Days Active:  {story.d}")
     console.print()
 
+    # Trait scores
+    if story.ts:
+        console.print("[bold]Coding Style (0-100):[/bold]")
+        trait_names = {
+            'ad': 'Delegation', 'sp': 'Deep Work', 'fc': 'Focus',
+            'cc': 'Regularity', 'wr': 'Weekend', 'bs': 'Burst',
+            'cs': 'Switching', 'mv': 'Verbose', 'td': 'Tools', 'ri': 'Intensity'
+        }
+        for key, name in trait_names.items():
+            if key in story.ts:
+                console.print(f"  {name:12} {story.ts[key]:3}")
+        console.print()
+
     # Monthly activity sparkline
-    if story.a and any(story.a):
+    if story.ma and any(story.ma):
         try:
-            sparkline_list = sparklines(story.a)
+            sparkline_list = sparklines(story.ma)
             if sparkline_list:
                 console.print("[bold]Monthly Activity:[/bold]")
                 console.print(f"  {sparkline_list[0]}")
@@ -1436,11 +1431,22 @@ def _decode_wrapped_url(url_or_data: str) -> None:
         except (ValueError, TypeError):
             pass
 
-    # Top projects
+    # Top projects (V3 format: [name, messages, hours, days, sessions, agent_ratio])
     if story.tp:
         console.print("[bold]Top Projects:[/bold]")
         for i, proj in enumerate(story.tp, 1):
-            console.print(f"  {i}. {proj['n']:15} {proj['m']:,} msgs, {proj['d']} days")
+            name = proj[0] if isinstance(proj, list) else proj.get('n', 'Unknown')
+            msgs = proj[1] if isinstance(proj, list) else proj.get('m', 0)
+            days = proj[3] if isinstance(proj, list) else proj.get('d', 0)
+            console.print(f"  {i}. {name:20} {msgs:,} msgs, {days} days")
+        console.print()
+
+    # Streaks
+    if story.sk and len(story.sk) >= 4 and story.sk[0] > 0:
+        console.print("[bold]Streaks:[/bold]")
+        console.print(f"  Total:    {story.sk[0]}")
+        console.print(f"  Longest:  {story.sk[1]} days")
+        console.print(f"  Current:  {story.sk[2]} days")
         console.print()
 
     console.print("━" * 50)
@@ -1449,24 +1455,39 @@ def _decode_wrapped_url(url_or_data: str) -> None:
     console.print("[dim]  No conversation content, code, or file paths.[/dim]")
 
 
-def _display_wrapped_summary(story: WrappedStory, url: str, year: int) -> None:
-    """Display wrapped summary with rich formatting."""
+def _display_wrapped_summary(story: WrappedStoryV3, url: str, year: int) -> None:
+    """Display wrapped V3 summary with rich formatting."""
     console.print()
     console.print(f"[bold green]🎁 Your Claude Code Wrapped {year} is ready![/bold green]")
     console.print()
     console.print("━" * 50)
     console.print()
     console.print(f"[bold]📊[/bold] {story.p} projects | {story.s} sessions | {story.m:,} messages")
-    console.print(f"[bold]⏱️[/bold]  {story.h:.0f} hours of development")
-    console.print(f"[bold]🎭[/bold] {', '.join(story.t)}")
-    if story.ci > 1:
-        console.print(f"[bold]🔀[/bold] Used up to {story.ci} Claude instances in parallel")
+    console.print(f"[bold]⏱️[/bold]  {story.h} hours of development | {story.d} days active")
+
+    # Show top trait descriptions based on scores
+    trait_descs = []
+    trait_map = {
+        'ad': ('Hands-on', 'Delegates heavily'),
+        'sp': ('Quick sessions', 'Marathon sessions'),
+        'fc': ('Multi-project', 'Laser focused'),
+        'ri': ('Light sessions', 'Intense sessions'),
+    }
+    for key, (low, high) in trait_map.items():
+        if key in story.ts:
+            score = story.ts[key]
+            if score < 33:
+                trait_descs.append(low)
+            elif score > 67:
+                trait_descs.append(high)
+    if trait_descs:
+        console.print(f"[bold]🎭[/bold] {', '.join(trait_descs[:3])}")
     console.print()
 
     # Monthly activity sparkline
-    if story.a and any(story.a):
+    if story.ma and any(story.ma):
         try:
-            sparkline_list = sparklines(story.a)
+            sparkline_list = sparklines(story.ma)
             if sparkline_list:
                 console.print(f"[bold]📈[/bold] {sparkline_list[0]}")
                 console.print("   J F M A M J J A S O N D")

@@ -2,7 +2,7 @@
  * Bento view - Dense grid layout showing all stats at once
  */
 
-import { WrappedStory, WrappedStoryV3, formatNumber, isV3Story, getTraitDescription, TokenStats } from '../decoder';
+import { WrappedStoryV3, formatNumber, getTraitDescription, TokenStats } from '../decoder';
 
 function escapeHtml(str: string): string {
   if (!str) return '';
@@ -80,15 +80,14 @@ function renderSparkline(data: number[]): string {
 }
 
 interface RenderOptions {
-  story: WrappedStory | WrappedStoryV3;
+  story: WrappedStoryV3;
   year: number;
   encodedData: string;
 }
 
 export function renderBentoPage({ story, year, encodedData }: RenderOptions): string {
   const displayName = story.n || 'Developer';
-  const monthlyActivity = isV3Story(story) ? story.ma : story.a;
-  const isV3 = isV3Story(story);
+  const monthlyActivity = story.ma;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -379,7 +378,7 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
     <!-- Longest Session -->
     <div class="bento-card span-3">
       <div class="card-label">Longest Session</div>
-      <div class="card-value small">${isV3 ? (story as WrappedStoryV3).ls.toFixed(1) : (story as WrappedStory).ls?.toFixed(1) || '0'}h</div>
+      <div class="card-value small">${story.ls.toFixed(1)}h</div>
     </div>
 
     <!-- Monthly Activity -->
@@ -394,15 +393,13 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
       </div>
     </div>
 
-    <!-- Heatmap (V3 only) -->
-    ${isV3 ? `
+    <!-- Heatmap -->
     <div class="bento-card span-6">
       <div class="card-label">Activity Heatmap</div>
       <div style="margin-top: 0.5rem;">
-        ${renderHeatmapSvg((story as WrappedStoryV3).hm)}
+        ${renderHeatmapSvg(story.hm)}
       </div>
     </div>
-    ` : ''}
 
     <!-- Top Projects -->
     <div class="bento-card span-4">
@@ -417,14 +414,12 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
       </div>
     </div>
 
-    <!-- Traits (V3 only) -->
-    ${isV3 ? `
+    <!-- Traits -->
     <div class="bento-card span-4">
       <div class="card-label">Coding Style</div>
       <div style="margin-top: 0.5rem;">
         ${['ad', 'sp', 'fc', 'bs', 'ri'].map(t => {
-          const ts = (story as WrappedStoryV3).ts;
-          const value = (ts as any)[t] || 50;
+          const value = (story.ts as any)[t] || 50;
           const labels: Record<string, string> = { ad: 'Delegation', sp: 'Deep Work', fc: 'Focus', bs: 'Burst', ri: 'Intensity' };
           return `
             <div class="trait-row">
@@ -436,22 +431,21 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
         }).join('')}
       </div>
     </div>
-    ` : ''}
 
-    <!-- Token Stats (V3 only) -->
-    ${isV3 && (story as WrappedStoryV3).tk?.total > 0 ? `
+    <!-- Token Stats -->
+    ${story.tk?.total > 0 ? `
     <div class="bento-card span-4">
       <div class="card-label">Token Usage</div>
-      <div class="card-value small" style="margin-bottom: 0.5rem;">${formatTokens((story as WrappedStoryV3).tk.total)}</div>
+      <div class="card-value small" style="margin-bottom: 0.5rem;">${formatTokens(story.tk.total)}</div>
       <div class="token-row">
         <span class="token-type">Input</span>
-        <span class="token-count">${formatTokens((story as WrappedStoryV3).tk.input)}</span>
+        <span class="token-count">${formatTokens(story.tk.input)}</span>
       </div>
       <div class="token-row">
         <span class="token-type">Output</span>
-        <span class="token-count">${formatTokens((story as WrappedStoryV3).tk.output)}</span>
+        <span class="token-count">${formatTokens(story.tk.output)}</span>
       </div>
-      ${Object.entries((story as WrappedStoryV3).tk.models || {}).slice(0, 3).map(([model, count]) => `
+      ${Object.entries(story.tk.models || {}).slice(0, 3).map(([model, count]) => `
         <div class="token-row">
           <span class="token-type">${getModelDisplayName(model)}</span>
           <span class="token-count">${formatTokens(count as number)}</span>
@@ -460,25 +454,25 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
     </div>
     ` : ''}
 
-    <!-- Streaks (V3 only) -->
-    ${isV3 && (story as WrappedStoryV3).sk?.[0] > 0 ? `
+    <!-- Streaks -->
+    ${story.sk?.[0] > 0 ? `
     <div class="bento-card span-4">
       <div class="card-label">Streaks</div>
       <div class="streak-grid">
         <div class="streak-item">
-          <div class="streak-value">${(story as WrappedStoryV3).sk[0]}</div>
+          <div class="streak-value">${story.sk[0]}</div>
           <div class="streak-label">Total</div>
         </div>
         <div class="streak-item">
-          <div class="streak-value">${(story as WrappedStoryV3).sk[1]}</div>
+          <div class="streak-value">${story.sk[1]}</div>
           <div class="streak-label">Longest</div>
         </div>
         <div class="streak-item">
-          <div class="streak-value">${(story as WrappedStoryV3).sk[2]}</div>
+          <div class="streak-value">${story.sk[2]}</div>
           <div class="streak-label">Current</div>
         </div>
         <div class="streak-item">
-          <div class="streak-value">${(story as WrappedStoryV3).sk[3]}</div>
+          <div class="streak-value">${story.sk[3]}</div>
           <div class="streak-label">Avg Days</div>
         </div>
       </div>

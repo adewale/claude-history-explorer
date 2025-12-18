@@ -2,7 +2,7 @@
  * Decoder for Wrapped story data.
  * Decodes MessagePack + Base64URL encoded data from URLs.
  *
- * Supports v1 (strings), v2 (indices), and v3 (Tufte edition) formats.
+ * Only V3 (Tufte edition) format is supported.
  */
 
 import msgpack from 'msgpack-lite';
@@ -37,59 +37,6 @@ import {
   DAYS_SHORT,
 } from './constants';
 
-// Dictionaries for v2 index decoding - MUST stay in sync with Python history.py
-const WRAPPED_TRAITS = [
-  "Agent-driven",      // 0
-  "Collaborative",     // 1
-  "Hands-on",          // 2
-  "Deep-work focused", // 3
-  "Steady-paced",      // 4
-  "Quick-iterative",   // 5
-  "High-intensity",    // 6
-  "Moderately active", // 7
-  "Deliberate",        // 8
-];
-
-const WRAPPED_COLLAB_STYLES = [
-  "Heavy delegation",  // 0
-  "Balanced",          // 1
-  "Hands-on",          // 2
-  "Agent-only",        // 3
-];
-
-const WRAPPED_WORK_PACES = [
-  "Rapid-fire",        // 0
-  "Steady",            // 1
-  "Deliberate",        // 2
-  "Methodical",        // 3
-];
-
-export interface WrappedStory {
-  v?: number;     // version (2 for indexed format)
-  y: number;      // year
-  n?: string;     // display name
-  p: number;      // projects
-  s: number;      // sessions
-  m: number;      // messages
-  h: number;      // hours
-  d: number;      // days active (unique days with sessions)
-  t: string[];    // traits (decoded from indices in v2)
-  c: string;      // collaboration style (decoded from index in v2)
-  w: string;      // work pace (decoded from index in v2)
-  pp: string;     // peak project name
-  pm: number;     // peak project messages
-  ci: number;     // max concurrent instances
-  ls: number;     // longest session hours
-  a: number[];    // monthly activity (12 values)
-  tp: TopProject[]; // top 3 projects
-}
-
-export interface TopProject {
-  n: string;  // name
-  m: number;  // messages
-  d: number;  // days
-}
-
 /**
  * Decode Base64URL string (without padding) to Uint8Array
  */
@@ -111,86 +58,11 @@ function base64UrlDecode(str: string): Uint8Array {
 }
 
 /**
- * Decode a wrapped story from URL-safe encoded string.
- * Handles both v1 (strings) and v2 (indices) formats.
+ * Validate that the story data is well-formed (V3 format)
+ * @deprecated Use validateStoryV3 instead
  */
-export function decodeWrappedStory(encoded: string): WrappedStory {
-  try {
-    const bytes = base64UrlDecode(encoded);
-    const raw = msgpack.decode(bytes);
-
-    // Check version and decode indices if v2
-    const version = raw.v || 1;
-
-    let traits: string[];
-    let collab: string;
-    let pace: string;
-
-    if (version >= 2) {
-      // V2: decode indices to strings
-      traits = (raw.t || []).map((t: number | string) => {
-        if (typeof t === 'number' && t >= 0 && t < WRAPPED_TRAITS.length) {
-          return WRAPPED_TRAITS[t];
-        }
-        return String(t);
-      });
-
-      if (typeof raw.c === 'number' && raw.c >= 0 && raw.c < WRAPPED_COLLAB_STYLES.length) {
-        collab = WRAPPED_COLLAB_STYLES[raw.c];
-      } else {
-        collab = String(raw.c || '');
-      }
-
-      if (typeof raw.w === 'number' && raw.w >= 0 && raw.w < WRAPPED_WORK_PACES.length) {
-        pace = WRAPPED_WORK_PACES[raw.w];
-      } else {
-        pace = String(raw.w || '');
-      }
-    } else {
-      // V1: already strings
-      traits = raw.t || [];
-      collab = raw.c || '';
-      pace = raw.w || '';
-    }
-
-    return {
-      v: version,
-      y: raw.y,
-      n: raw.n,
-      p: raw.p || 0,
-      s: raw.s || 0,
-      m: raw.m || 0,
-      h: raw.h || 0,
-      d: raw.d || 0,
-      t: traits,
-      c: collab,
-      w: pace,
-      pp: raw.pp || '',
-      pm: raw.pm || 0,
-      ci: raw.ci || 0,
-      ls: raw.ls || 0,
-      a: raw.a || [],
-      tp: raw.tp || [],
-    };
-  } catch (error) {
-    throw new Error(`Failed to decode wrapped story: ${error}`);
-  }
-}
-
-/**
- * Validate that the story data is well-formed
- */
-export function validateStory(story: WrappedStory): { valid: boolean; error?: string } {
-  if (!story.y || typeof story.y !== 'number') {
-    return { valid: false, error: 'Missing or invalid year' };
-  }
-  if (story.y < 2024 || story.y > new Date().getFullYear() + 1) {
-    return { valid: false, error: `Invalid year: ${story.y}` };
-  }
-  if (typeof story.m !== 'number' || story.m < 0) {
-    return { valid: false, error: 'Missing or invalid message count' };
-  }
-  return { valid: true };
+export function validateStory(story: WrappedStoryV3): { valid: boolean; error?: string } {
+  return validateStoryV3(story);
 }
 
 /**
@@ -352,6 +224,10 @@ export interface WrappedStoryV3 {
   yoy?: YearOverYear;
 }
 
+// Legacy type alias for backwards compatibility
+// All new code should use WrappedStoryV3 directly
+export type WrappedStory = WrappedStoryV3;
+
 // Token usage statistics
 export interface TokenStats {
   total: number;
@@ -480,28 +356,31 @@ export function decodeWrappedStoryV3(encoded: string): WrappedStoryV3 {
 }
 
 /**
- * Detect version and decode appropriate format
+ * Decode wrapped story (V3 format only)
+ * Legacy V1/V2 formats are no longer supported.
  */
-export function decodeWrappedStoryAuto(encoded: string): WrappedStory | WrappedStoryV3 {
+export function decodeWrappedStoryAuto(encoded: string): WrappedStoryV3 {
   try {
     const bytes = base64UrlDecode(encoded);
     const raw = msgpack.decode(bytes);
     const version = raw.v || 1;
 
-    if (version >= 3) {
-      return decodeWrappedStoryV3(encoded);
+    if (version < 3) {
+      throw new Error(`Legacy V${version} format is no longer supported. Please regenerate your Wrapped URL.`);
     }
-    return decodeWrappedStory(encoded);
+    return decodeWrappedStoryV3(encoded);
   } catch (error) {
     throw new Error(`Failed to decode wrapped story: ${error}`);
   }
 }
 
 /**
- * Check if a story is V3 format
+ * Check if a story is V3 format.
+ * Since only V3 is now supported, this always returns true.
+ * Kept for backwards compatibility with existing code.
  */
-export function isV3Story(story: WrappedStory | WrappedStoryV3): story is WrappedStoryV3 {
-  return story.v === 3;
+export function isV3Story(story: WrappedStoryV3): story is WrappedStoryV3 {
+  return true;
 }
 
 /**
