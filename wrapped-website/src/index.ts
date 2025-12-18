@@ -3,15 +3,14 @@
  *
  * Routes:
  * - GET /           - Landing page
- * - GET /:year/:data - Wrapped story page
+ * - GET /wrapped?d= - Wrapped page (Bento default, Print optional)
  * - GET /og/:year/:data.png - Open Graph image
  */
 
 import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import { renderLandingPage } from './pages/landing';
-import { renderWrappedPage, renderErrorPage } from './pages/wrapped';
-import { renderBentoPage } from './pages/bento';
+import { renderBentoPage, renderErrorPage } from './pages/bento';
 import { renderPrintPage } from './pages/print';
 import { decodeWrappedStoryAuto, validateStory, validateStoryV3, isV3Story } from './decoder';
 import { generateOgImage, getOgImageContentType } from './og';
@@ -57,24 +56,13 @@ app.get('/wrapped', (c) => {
 
   const year = story.y;
 
-  // Route to appropriate view
-  if (view === 'bento') {
-    return c.html(renderBentoPage({ story, year, encodedData }));
-  }
-
+  // Route to appropriate view (default: Bento)
   if (view === 'print') {
     return c.html(renderPrintPage({ story, year, encodedData }));
   }
 
-  // Default: story view
-  const ogImageUrl = `https://wrapped-claude-codes.adewale-883.workers.dev/og/${year}/${encodedData}.png`;
-
-  return c.html(renderWrappedPage({
-    story,
-    year,
-    encodedData,
-    ogImageUrl,
-  }));
+  // Default: Bento view
+  return c.html(renderBentoPage({ story, year, encodedData }));
 });
 
 // OG Image endpoint
@@ -129,7 +117,7 @@ app.get('/og/:year/:data', async (c) => {
   }
 });
 
-// Wrapped story page
+// Legacy route - redirect to /wrapped with query param
 app.get('/:year/:data', (c) => {
   const year = parseInt(c.req.param('year'));
   const encodedData = c.req.param('data');
@@ -140,37 +128,8 @@ app.get('/:year/:data', (c) => {
     return c.html(renderErrorPage(`Invalid year. Claude Code Wrapped is available for 2024-${currentYear}.`), 400);
   }
 
-  // Decode story (auto-detects version)
-  let story;
-  try {
-    story = decodeWrappedStoryAuto(encodedData);
-  } catch (error) {
-    return c.html(renderErrorPage('Invalid Wrapped URL. The data could not be decoded.'), 400);
-  }
-
-  // Validate story based on version
-  const validation = isV3Story(story) ? validateStoryV3(story) : validateStory(story);
-  if (!validation.valid) {
-    return c.html(renderErrorPage(validation.error || 'Invalid data'), 400);
-  }
-
-  // Validate year matches data
-  if (story.y !== year) {
-    return c.html(
-      renderErrorPage(`Year mismatch: URL says ${year} but data contains ${story.y}.`),
-      400
-    );
-  }
-
-  // Generate OG image URL
-  const ogImageUrl = `https://wrapped-claude-codes.adewale-883.workers.dev/og/${year}/${encodedData}.png`;
-
-  return c.html(renderWrappedPage({
-    story,
-    year,
-    encodedData,
-    ogImageUrl,
-  }));
+  // Redirect to new URL format
+  return c.redirect(`/wrapped?d=${encodedData}`);
 });
 
 // 404 handler

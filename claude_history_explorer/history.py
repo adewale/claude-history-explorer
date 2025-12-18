@@ -1891,7 +1891,7 @@ MAX_PROJECTS = 12
 MAX_COOCCURRENCE_EDGES = 20
 MAX_TIMELINE_EVENTS = 25  # Increased to use URL headroom
 MAX_SESSION_FINGERPRINTS = 20  # Increased to use URL headroom
-MAX_PROJECT_NAME_LENGTH = 20
+MAX_PROJECT_NAME_LENGTH = 50
 MAX_DISPLAY_NAME_LENGTH = 30
 
 # Heatmap quantization scale (0-15 for compact encoding)

@@ -173,7 +173,7 @@ export const MAX_TIMELINE_EVENTS = 25;
 export const MAX_SESSION_FINGERPRINTS = 20;
 
 /** Maximum length for project names */
-export const MAX_PROJECT_NAME_LENGTH = 20;
+export const MAX_PROJECT_NAME_LENGTH = 50;
 
 /** Maximum length for display name */
 export const MAX_DISPLAY_NAME_LENGTH = 30;

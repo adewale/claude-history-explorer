@@ -317,6 +317,37 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
       color: var(--text-light);
       text-align: center;
     }
+
+    /* Mobile responsiveness */
+    @media (max-width: 600px) {
+      body {
+        padding: 1rem;
+        font-size: 10pt;
+      }
+
+      .header h1 {
+        font-size: 1.25rem;
+      }
+
+      .summary {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+      }
+
+      .summary-value {
+        font-size: 1.5rem;
+      }
+
+      .two-col {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      .trait-name {
+        width: 70px;
+        font-size: 0.8rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -324,8 +355,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     <h1>Claude Code Wrapped ${year}</h1>
     <div class="subtitle">${escapeHtml(displayName)}'s Year in Review</div>
     <div class="view-links no-print">
-      <a href="?d=${encodedData}">Story</a>
-      <a href="?view=bento&d=${encodedData}">Bento</a>
+      <a href="?d=${encodedData}">Bento</a>
       <a href="?view=print&d=${encodedData}" class="active">Print</a>
     </div>
   </div>
@@ -388,9 +418,9 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
         <div class="trait-list">
           ${[
             ['ad', 'Delegation'],
-            ['sp', 'Session Depth'],
+            ['sp', 'Deep Work'],
             ['fc', 'Focus'],
-            ['bs', 'Work Style'],
+            ['bs', 'Burst'],
             ['ri', 'Intensity'],
           ].map(([key, label]) => {
             const value = ((story as WrappedStoryV3).ts as any)[key] || 50;

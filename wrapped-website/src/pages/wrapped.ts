@@ -118,17 +118,17 @@ function escapeHtml(str: string): string {
 function generateSvgSparkline(data: number[]): string {
   if (!data || data.length === 0) return '';
 
-  const width = 320;
-  const height = 60;
+  const width = 420;
+  const height = 80;
   const padding = 4;
   const max = Math.max(...data, 1);
 
-  const barWidth = (width - padding * 2) / data.length - 2;
+  const barWidth = (width - padding * 2) / data.length - 3;
   const bars = data.map((val, i) => {
-    const barHeight = Math.max((val / max) * (height - padding * 2), 2);
+    const barHeight = Math.max((val / max) * (height - padding * 2), 3);
     const x = padding + i * ((width - padding * 2) / data.length);
     const y = height - padding - barHeight;
-    return `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="2" fill="url(#sparkGradient)" class="spark-bar" style="animation-delay: ${i * 50}ms"/>`;
+    return `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="3" fill="url(#sparkGradient)" class="spark-bar" style="animation-delay: ${i * 50}ms"/>`;
   }).join('');
 
   return `<svg viewBox="0 0 ${width} ${height}" class="sparkline-svg">
@@ -387,8 +387,8 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .card-content {
-      max-width: 600px;
-      width: 90%;
+      max-width: 800px;
+      width: 95%;
       text-align: center;
     }
 
@@ -429,10 +429,10 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     /* Card Type: Split (data on left, viz on right) */
     .card-split .card-content {
-      max-width: 700px;
+      max-width: 900px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 3rem;
+      gap: 4rem;
       text-align: left;
     }
 
@@ -449,10 +449,10 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .viz-circle {
-      width: 180px;
-      height: 180px;
+      width: 220px;
+      height: 220px;
       border-radius: 50%;
-      border: 4px solid var(--accent);
+      border: 5px solid var(--accent);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -461,13 +461,13 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .viz-number {
       font-family: var(--font-display);
-      font-size: 3rem;
+      font-size: 4rem;
       font-weight: 700;
       color: var(--accent);
     }
 
     .viz-label {
-      font-size: 0.85rem;
+      font-size: 1rem;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -566,21 +566,21 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     /* Card Type: Grid (projects) */
     .card-grid .card-content {
-      max-width: 700px;
+      max-width: 900px;
     }
 
     .project-cards {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 0.75rem;
-      margin-top: 1.5rem;
+      gap: 1rem;
+      margin-top: 2rem;
     }
 
     .project-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
+      border-radius: 16px;
+      padding: 1.75rem;
       text-align: center;
       opacity: 0;
       transform: scale(0.9);
@@ -596,33 +596,33 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .project-card-rank {
       font-family: var(--font-display);
-      font-size: 1.5rem;
+      font-size: 2rem;
       font-weight: 700;
       color: var(--accent);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.75rem;
     }
 
     .project-card-name {
       font-weight: 600;
-      font-size: 0.95rem;
-      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+      margin-bottom: 0.75rem;
       word-break: break-word;
       line-height: 1.2;
     }
 
     .project-card-stat {
-      font-size: 0.75rem;
+      font-size: 0.9rem;
       color: var(--text-muted);
     }
 
     /* Card Type: Polaroid (summary) */
     .card-polaroid .card-content {
-      max-width: 350px;
+      max-width: 420px;
     }
 
     .polaroid-frame {
       background: #fafafa;
-      padding: 1rem 1rem 3rem;
+      padding: 1.25rem 1.25rem 3.5rem;
       border-radius: 4px;
       box-shadow: 0 10px 40px rgba(0,0,0,0.4);
       transform: rotate(-2deg);
@@ -630,13 +630,13 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .polaroid-inner {
       background: var(--bg-dark);
-      padding: 1.5rem;
+      padding: 2rem;
       aspect-ratio: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 0.75rem;
+      gap: 1rem;
     }
 
     .polaroid-stat {
@@ -645,13 +645,13 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .polaroid-stat-value {
       font-family: var(--font-display);
-      font-size: 1.75rem;
+      font-size: 2.25rem;
       font-weight: 700;
       color: var(--accent);
     }
 
     .polaroid-stat-label {
-      font-size: 0.7rem;
+      font-size: 0.85rem;
       color: var(--text-muted);
       text-transform: uppercase;
     }
@@ -728,29 +728,29 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     /* V3 Trait Bars Card */
     .trait-bars {
       width: 100%;
-      max-width: 450px;
-      margin: 1.5rem auto 0;
+      max-width: 550px;
+      margin: 2rem auto 0;
     }
 
     .trait-bar-row {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.75rem;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
     }
 
     .trait-bar-label {
-      width: 80px;
-      font-size: 0.8rem;
+      width: 100px;
+      font-size: 0.95rem;
       color: var(--text-secondary);
       text-align: right;
     }
 
     .trait-bar-container {
       flex: 1;
-      height: 8px;
+      height: 12px;
       background: var(--bg-card);
-      border-radius: 4px;
+      border-radius: 6px;
       position: relative;
       overflow: visible;
     }
@@ -758,23 +758,23 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     .trait-bar-fill {
       height: 100%;
       background: linear-gradient(90deg, var(--accent), var(--accent-light));
-      border-radius: 4px;
+      border-radius: 6px;
       transition: width 0.5s ease-out;
     }
 
     .trait-bar-marker {
       position: absolute;
-      top: -3px;
-      width: 4px;
-      height: 14px;
+      top: -4px;
+      width: 5px;
+      height: 20px;
       background: var(--accent-light);
       border-radius: 2px;
       transform: translateX(-50%);
     }
 
     .trait-bar-value {
-      width: 24px;
-      font-size: 0.75rem;
+      width: 30px;
+      font-size: 0.9rem;
       color: var(--accent);
       text-align: left;
     }
@@ -783,15 +783,15 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-      margin-top: 1.5rem;
+      gap: 1.25rem;
+      margin-top: 2rem;
     }
 
     .stat-item {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem;
+      border-radius: 16px;
+      padding: 1.5rem;
       text-align: center;
     }
 
@@ -807,7 +807,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .stat-value {
       font-family: var(--font-display);
-      font-size: 2rem;
+      font-size: 2.5rem;
       font-weight: 700;
       color: var(--accent);
     }
@@ -817,7 +817,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .stat-label {
-      font-size: 0.75rem;
+      font-size: 0.9rem;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -826,17 +826,17 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     /* Token Stats */
     .token-stats {
-      margin-top: 1rem;
+      margin-top: 1.5rem;
       text-align: center;
     }
 
     .token-total {
-      margin-bottom: 1.5rem;
+      margin-bottom: 2rem;
     }
 
     .token-value {
       font-family: var(--font-display);
-      font-size: 3rem;
+      font-size: 4rem;
       font-weight: 700;
       background: linear-gradient(135deg, var(--accent), var(--accent-light));
       -webkit-background-clip: text;
@@ -845,7 +845,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .token-label {
-      font-size: 0.9rem;
+      font-size: 1rem;
       color: var(--text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -920,19 +920,19 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 1rem;
+      gap: 1.5rem;
     }
 
     .session-big-number {
       font-family: var(--font-display);
-      font-size: 5rem;
+      font-size: 6rem;
       font-weight: 700;
       color: var(--accent);
       line-height: 1;
     }
 
     .session-unit {
-      font-size: 1.5rem;
+      font-size: 2rem;
       color: var(--text-secondary);
       margin-left: 0.25rem;
     }
@@ -998,7 +998,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
       .card-split .card-content {
         grid-template-columns: 1fr;
-        gap: 1.5rem;
+        gap: 2rem;
         text-align: center;
       }
 
@@ -1012,19 +1012,70 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
       .project-cards {
         grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      .project-card {
+        padding: 1.5rem;
+      }
+
+      .project-card-rank {
+        font-size: 1.75rem;
+      }
+
+      .project-card-name {
+        font-size: 1rem;
       }
 
       .viz-circle {
-        width: 150px;
-        height: 150px;
+        width: 180px;
+        height: 180px;
       }
 
       .viz-number {
-        font-size: 2.5rem;
+        font-size: 3rem;
       }
 
       .big-number {
-        font-size: 3.5rem;
+        font-size: 4.5rem;
+      }
+
+      .big-number-label {
+        font-size: 1.5rem;
+      }
+
+      .card-title {
+        font-size: 2rem;
+      }
+
+      .card-subtitle {
+        font-size: 1.1rem;
+      }
+
+      .sparkline-svg {
+        max-width: 95%;
+        height: 70px;
+      }
+
+      .sparkline-labels {
+        max-width: 95%;
+      }
+
+      .polaroid-stat-value {
+        font-size: 1.75rem;
+      }
+
+      .stat-value {
+        font-size: 2rem;
+      }
+
+      .token-value {
+        font-size: 3rem;
+      }
+
+      .trait-bar-label {
+        width: 80px;
+        font-size: 0.85rem;
       }
 
       .view-toggle {
@@ -1081,7 +1132,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     /* Card Styles */
     .card-emoji {
-      font-size: 4rem;
+      font-size: 5rem;
       margin-bottom: 1.5rem;
       opacity: 0;
       transform: scale(0) rotate(-10deg);
@@ -1093,7 +1144,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .card-title {
       font-family: var(--font-display);
-      font-size: 2rem;
+      font-size: 2.5rem;
       font-weight: 700;
       margin-bottom: 1rem;
       line-height: 1.2;
@@ -1106,7 +1157,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .card-subtitle {
-      font-size: 1.1rem;
+      font-size: 1.25rem;
       color: var(--text-secondary);
       margin-bottom: 2rem;
       opacity: 0;
@@ -1118,7 +1169,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .big-number {
       font-family: var(--font-display);
-      font-size: 5rem;
+      font-size: 6rem;
       font-weight: 700;
       background: linear-gradient(135deg, var(--accent), var(--accent-light));
       -webkit-background-clip: text;
@@ -1134,7 +1185,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .big-number-label {
-      font-size: 1.5rem;
+      font-size: 1.75rem;
       color: var(--text-secondary);
       opacity: 0;
     }
@@ -1176,8 +1227,8 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .sparkline-svg {
       width: 100%;
-      max-width: 320px;
-      height: 60px;
+      max-width: 420px;
+      height: 80px;
       margin: 0 auto;
       display: block;
     }
@@ -1200,10 +1251,10 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       display: flex;
       justify-content: space-between;
       color: var(--text-muted);
-      font-size: 0.7rem;
+      font-size: 0.85rem;
       padding: 0.5rem 0.25rem 0;
       font-family: var(--font-display);
-      max-width: 320px;
+      max-width: 420px;
       margin: 0 auto;
     }
 

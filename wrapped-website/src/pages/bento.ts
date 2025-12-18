@@ -125,8 +125,10 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
 
     .header {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
+      gap: 0.75rem;
       margin-bottom: 1rem;
       padding-bottom: 1rem;
       border-bottom: 1px solid var(--border);
@@ -165,6 +167,17 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
       background: var(--accent);
       color: var(--bg-dark);
       border-color: var(--accent);
+    }
+
+    @media (max-width: 480px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .header h1 {
+        font-size: 1rem;
+      }
     }
 
     .bento-grid {
@@ -336,8 +349,7 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
   <div class="header">
     <h1><span class="year">${year}</span> ${escapeHtml(displayName)}'s Claude Code Wrapped</h1>
     <div class="view-links">
-      <a href="?d=${encodedData}">Story</a>
-      <a href="?view=bento&d=${encodedData}" class="active">Bento</a>
+      <a href="?d=${encodedData}" class="active">Bento</a>
       <a href="?view=print&d=${encodedData}">Print</a>
     </div>
   </div>
@@ -413,7 +425,7 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
         ${['ad', 'sp', 'fc', 'bs', 'ri'].map(t => {
           const ts = (story as WrappedStoryV3).ts;
           const value = (ts as any)[t] || 50;
-          const labels: Record<string, string> = { ad: 'Delegation', sp: 'Depth', fc: 'Focus', bs: 'Burst', ri: 'Intensity' };
+          const labels: Record<string, string> = { ad: 'Delegation', sp: 'Deep Work', fc: 'Focus', bs: 'Burst', ri: 'Intensity' };
           return `
             <div class="trait-row">
               <span class="trait-label">${labels[t]}</span>
@@ -472,6 +484,48 @@ export function renderBentoPage({ story, year, encodedData }: RenderOptions): st
       </div>
     </div>
     ` : ''}
+  </div>
+</body>
+</html>`;
+}
+
+export function renderErrorPage(error: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error - Claude Code Wrapped</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Source Sans 3', -apple-system, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+    .error-container { max-width: 400px; }
+    .error-emoji { font-size: 4rem; margin-bottom: 1rem; }
+    h1 { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; margin-bottom: 0.5rem; }
+    p { color: #a0a0a0; margin-bottom: 2rem; }
+    a { color: #d4a574; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="error-container">
+    <div class="error-emoji">😕</div>
+    <h1>Something went wrong</h1>
+    <p>${escapeHtml(error)}</p>
+    <a href="/">← Back to home</a>
   </div>
 </body>
 </html>`;
