@@ -2,7 +2,7 @@
  * Wrapped story page HTML
  */
 
-import { WrappedStory, formatNumber, getMessageDescriptor } from '../decoder';
+import { WrappedStory, WrappedStoryV3, formatNumber, getMessageDescriptor, isV3Story, TRAIT_LABELS, getTraitDescription } from '../decoder';
 
 /**
  * Generate a tangible comparison for message count
@@ -56,12 +56,25 @@ function getPeakMonth(activity: number[]): { name: string; value: number } {
 /**
  * Determine user archetype based on their traits and style
  */
-function getArchetype(story: WrappedStory): string {
+function getArchetype(story: WrappedStory | WrappedStoryV3): string {
+  if (isV3Story(story)) {
+    // V3: Use trait scores (0-100 integers)
+    const ts = story.ts;
+    if (ts.ad > 70) return 'Delegation Architect';
+    if (ts.sp > 70) return 'Deep Work Specialist';
+    if (ts.ri > 70) return 'Speed Demon';
+    if (ts.ad > 40 && ts.ad < 60) return 'Pair Programming Pro';
+    if (ts.ad < 30) return 'Hands-on Hacker';
+    if (ts.bs < 30) return 'Steady Builder';
+    if (ts.bs > 70) return 'Rapid Prototyper';
+    return 'Code Craftsman';
+  }
+
+  // V1/V2: Use string traits
   const traits = story.t || [];
   const collab = story.c || '';
   const pace = story.w || '';
 
-  // Determine archetype based on traits and collaboration style
   if (traits.includes('Agent-driven') || collab === 'Heavy delegation') {
     return 'Delegation Architect';
   }
@@ -130,7 +143,7 @@ function generateSvgSparkline(data: number[]): string {
 }
 
 interface RenderOptions {
-  story: WrappedStory;
+  story: WrappedStory | WrappedStoryV3;
   year: number;
   encodedData: string;
   ogImageUrl: string;
@@ -654,6 +667,117 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .polaroid-year {
       font-weight: bold;
+    }
+
+    /* V3 Heatmap Card */
+    .card-heatmap .card-content {
+      max-width: 420px;
+    }
+
+    .heatmap-svg {
+      margin: 1rem auto;
+    }
+
+    .heatmap-title {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-top: 1rem;
+    }
+
+    /* V3 Timeline Events Card */
+    .timeline-events {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      text-align: left;
+    }
+
+    .timeline-event {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-card);
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .event-icon {
+      font-size: 1.2rem;
+    }
+
+    .event-label {
+      flex: 1;
+      color: var(--text-primary);
+    }
+
+    .event-date {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .event-project {
+      color: var(--accent);
+      font-size: 0.8rem;
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* V3 Trait Bars Card */
+    .trait-bars {
+      width: 100%;
+      max-width: 300px;
+      margin: 1.5rem auto 0;
+    }
+
+    .trait-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .trait-bar-label {
+      width: 80px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-align: right;
+    }
+
+    .trait-bar-container {
+      flex: 1;
+      height: 8px;
+      background: var(--bg-card);
+      border-radius: 4px;
+      position: relative;
+      overflow: visible;
+    }
+
+    .trait-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-light));
+      border-radius: 4px;
+      transition: width 0.5s ease-out;
+    }
+
+    .trait-bar-marker {
+      position: absolute;
+      top: -3px;
+      width: 4px;
+      height: 14px;
+      background: var(--accent-light);
+      border-radius: 2px;
+      transform: translateX(-50%);
+    }
+
+    .trait-bar-value {
+      width: 24px;
+      font-size: 0.75rem;
+      color: var(--accent);
+      text-align: left;
     }
 
     @media (max-width: 640px) {
@@ -1661,10 +1785,187 @@ function generateProgressSegments(count: number): string {
   ).join('');
 }
 
-function renderCards(story: WrappedStory, year: number, pageUrl: string): string {
+// V3 Visualization helpers
+function renderHeatmapSvg(hm: number[]): string {
+  if (!hm || hm.length !== 168) return '';
+
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const cellSize = 12;
+  const gap = 2;
+  const labelWidth = 30;
+  const width = labelWidth + 24 * (cellSize + gap);
+  const height = 7 * (cellSize + gap) + 20;
+
+  let cells = '';
+  for (let d = 0; d < 7; d++) {
+    // Day label
+    cells += `<text x="0" y="${d * (cellSize + gap) + cellSize - 2}" fill="#666" font-size="10" font-family="sans-serif">${days[d]}</text>`;
+    for (let h = 0; h < 24; h++) {
+      const value = hm[d * 24 + h] || 0;
+      const opacity = value / 15; // Values are 0-15
+      const x = labelWidth + h * (cellSize + gap);
+      const y = d * (cellSize + gap);
+      cells += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="var(--accent)" opacity="${Math.max(0.1, opacity)}"/>`;
+    }
+  }
+
+  // Hour labels (every 6 hours)
+  const hourLabels = [0, 6, 12, 18].map(h =>
+    `<text x="${labelWidth + h * (cellSize + gap) + cellSize/2}" y="${height - 5}" fill="#666" font-size="9" text-anchor="middle">${h}:00</text>`
+  ).join('');
+
+  return `<svg viewBox="0 0 ${width} ${height}" class="heatmap-svg" style="width: 100%; max-width: 380px;">
+    ${cells}
+    ${hourLabels}
+  </svg>`;
+}
+
+function renderTimelineEvents(te: any[], tp: any[]): string {
+  if (!te || te.length === 0) return '<p style="color: var(--text-muted)">No notable events</p>';
+
+  const eventIcons: Record<number, string> = {
+    0: '🔥', // peak_day
+    1: '🚀', // streak_start
+    2: '✅', // streak_end
+    3: '🆕', // new_project
+    4: '🏆', // milestone
+    5: '😴', // gap_start
+    6: '💪', // gap_end
+  };
+
+  const eventLabels: Record<number, string> = {
+    0: 'Peak day',
+    1: 'Streak started',
+    2: 'Streak ended',
+    3: 'New project',
+    4: 'Milestone',
+    5: 'Break started',
+    6: 'Back at it',
+  };
+
+  // Show top 5 most interesting events
+  // te is array of TimelineEvent objects: { d: day, t: type, v?: value, p?: project_idx }
+  const events = te.slice(0, 5).map((e: any) => {
+    const day = e.d;
+    const type = e.t;
+    const value = e.v;
+    const projIdx = e.p;
+    const icon = eventIcons[type] || '📌';
+    const label = eventLabels[type] || 'Event';
+    const projectName = projIdx !== undefined && projIdx >= 0 && tp[projIdx] ? tp[projIdx].n : '';
+    const valueStr = value !== undefined && value > 0 ? ` (${value})` : '';
+    const monthDay = dayToMonthDay(day);
+
+    return `<div class="timeline-event">
+      <span class="event-icon">${icon}</span>
+      <span class="event-label">${label}${valueStr}</span>
+      <span class="event-date">${monthDay}</span>
+      ${projectName ? `<span class="event-project">${projectName}</span>` : ''}
+    </div>`;
+  }).join('');
+
+  return events;
+}
+
+function dayToMonthDay(dayOfYear: number): string {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let remaining = dayOfYear;
+  for (let i = 0; i < 12; i++) {
+    if (remaining <= daysInMonth[i]) {
+      return `${months[i]} ${remaining}`;
+    }
+    remaining -= daysInMonth[i];
+  }
+  return `Dec ${remaining}`;
+}
+
+function renderTraitBars(ts: any): string {
+  const traits = [
+    { key: 'ad', label: 'Delegation', low: 'Hands-on', high: 'Delegates' },
+    { key: 'sp', label: 'Session Depth', low: 'Quick', high: 'Marathon' },
+    { key: 'fc', label: 'Focus', low: 'Multi-project', high: 'Laser' },
+    { key: 'bs', label: 'Work Style', low: 'Steady', high: 'Burst' },
+    { key: 'ri', label: 'Intensity', low: 'Light', high: 'Intense' },
+  ];
+
+  return traits.map(t => {
+    const value = ts[t.key] || 50;
+    return `<div class="trait-bar-row">
+      <div class="trait-bar-label">${t.label}</div>
+      <div class="trait-bar-container">
+        <div class="trait-bar-fill" style="width: ${value}%"></div>
+        <div class="trait-bar-marker" style="left: ${value}%"></div>
+      </div>
+      <div class="trait-bar-value">${value}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderHighlightCard(story: WrappedStory | WrappedStoryV3): string {
+  if (isV3Story(story)) {
+    // V3: Show top project hours
+    const topProjectHours = story.tp[0]?.h || 0;
+    return `<div class="card card-split">
+      <div class="card-content">
+        <div class="split-viz">
+          <div class="viz-circle">
+            <div class="viz-number">🎯</div>
+            <div class="viz-label">focused</div>
+          </div>
+        </div>
+        <div class="split-data">
+          <div class="big-number">${topProjectHours}</div>
+          <div class="big-number-label">hours on top project</div>
+          <p class="comparison-text" style="margin-top: 1rem">Deep work champion</p>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // V2: Show concurrent instances or longest session
+  const v2Story = story as WrappedStory;
+  if (v2Story.ci > 1) {
+    return `<div class="card card-split">
+      <div class="card-content">
+        <div class="split-data">
+          <div class="big-number">${v2Story.ci}</div>
+          <div class="big-number-label">parallel instances</div>
+          <p class="comparison-text" style="margin-top: 1rem">Multitasking master!</p>
+        </div>
+        <div class="split-viz">
+          <div class="viz-circle">
+            <div class="viz-number">⚡</div>
+            <div class="viz-label">power user</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="card card-split">
+    <div class="card-content">
+      <div class="split-viz">
+        <div class="viz-circle">
+          <div class="viz-number">🧘</div>
+          <div class="viz-label">focused</div>
+        </div>
+      </div>
+      <div class="split-data">
+        <div class="big-number">${v2Story.ls?.toFixed(1) || '0'}</div>
+        <div class="big-number-label">hour longest session</div>
+        <p class="comparison-text" style="margin-top: 1rem">Deep work champion</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderCards(story: WrappedStory | WrappedStoryV3, year: number, pageUrl: string): string {
   const displayName = story.n || 'You';
-  const sparkline = generateSvgSparkline(story.a);
-  const peakMonth = getPeakMonth(story.a);
+  // Handle V2 (story.a) vs V3 (story.ma) monthly activity
+  const monthlyActivity = isV3Story(story) ? story.ma : story.a;
+  const sparkline = generateSvgSparkline(monthlyActivity || []);
+  const peakMonth = getPeakMonth(monthlyActivity || []);
   const archetype = getArchetype(story);
 
   const cards = [
@@ -1731,15 +2032,55 @@ function renderCards(story: WrappedStory, year: number, pageUrl: string): string
       </div>
     </div>`,
 
+    // V3 Card: Heatmap - When you code
+    ...(isV3Story(story) ? [`<div class="card card-heatmap">
+      <div class="card-content">
+        <h2 class="card-title">When You Code</h2>
+        <p class="card-subtitle" style="margin-bottom: 1rem">Your weekly rhythm</p>
+        ${renderHeatmapSvg(story.hm)}
+        <p class="heatmap-title">Activity by day and hour</p>
+      </div>
+    </div>`] : []),
+
+    // V3 Card: Key Moments - Timeline events
+    ...(isV3Story(story) && story.te.length > 0 ? [`<div class="card card-events">
+      <div class="card-content">
+        <h2 class="card-title">Key Moments</h2>
+        <p class="card-subtitle">Your milestones this year</p>
+        <div class="timeline-events">
+          ${renderTimelineEvents(story.te, story.tp)}
+        </div>
+      </div>
+    </div>`] : []),
+
+    // V3 Card: Your DNA - Trait bars
+    ...(isV3Story(story) ? [`<div class="card card-traits">
+      <div class="card-content">
+        <h2 class="card-title">Your Coding DNA</h2>
+        <p class="card-subtitle">How you work with Claude</p>
+        <div class="trait-bars">
+          ${renderTraitBars(story.ts)}
+        </div>
+      </div>
+    </div>`] : []),
+
     // Card 5: Personality - Archetype reveal with traits
     `<div class="card card-radar">
       <div class="card-content">
         <p class="card-subtitle" style="margin-bottom: 0.5rem">You are a</p>
         <h2 class="card-title" style="margin-bottom: 0">${archetype}</h2>
-        <div class="archetype-badge">${story.c} • ${story.w}</div>
-        <div class="traits-list" style="margin-top: 2rem">
-          ${story.t.map(trait => `<span class="trait-badge">${escapeHtml(trait)}</span>`).join('')}
-        </div>
+        ${isV3Story(story)
+          ? `<div class="traits-list" style="margin-top: 2rem">
+              ${['ad', 'sp', 'fc', 'ri'].map(t => {
+                const score = (story.ts as any)[t] || 50;
+                return `<span class="trait-badge">${getTraitDescription(t, score)}</span>`;
+              }).join('')}
+            </div>`
+          : `<div class="archetype-badge">${story.c} • ${story.w}</div>
+            <div class="traits-list" style="margin-top: 2rem">
+              ${story.t.map(trait => `<span class="trait-badge">${escapeHtml(trait)}</span>`).join('')}
+            </div>`
+        }
       </div>
     </div>`,
 
@@ -1748,7 +2089,7 @@ function renderCards(story: WrappedStory, year: number, pageUrl: string): string
       <div class="card-content">
         <h2 class="card-title">Your Top Projects</h2>
         <div class="project-cards">
-          ${story.tp.slice(0, 3).map((proj, i) => `
+          ${story.tp.slice(0, 3).map((proj: any, i: number) => `
             <div class="project-card">
               <div class="project-card-rank">#${i + 1}</div>
               <div class="project-card-name" title="${escapeHtml(proj.n)}">${escapeHtml(proj.n)}</div>
@@ -1761,35 +2102,7 @@ function renderCards(story: WrappedStory, year: number, pageUrl: string): string
     </div>`,
 
     // Card 7: Highlight stat
-    story.ci > 1 ? `<div class="card card-split">
-      <div class="card-content">
-        <div class="split-data">
-          <div class="big-number">${story.ci}</div>
-          <div class="big-number-label">parallel instances</div>
-          <p class="comparison-text" style="margin-top: 1rem">Multitasking master!</p>
-        </div>
-        <div class="split-viz">
-          <div class="viz-circle">
-            <div class="viz-number">⚡</div>
-            <div class="viz-label">power user</div>
-          </div>
-        </div>
-      </div>
-    </div>` : `<div class="card card-split">
-      <div class="card-content">
-        <div class="split-viz">
-          <div class="viz-circle">
-            <div class="viz-number">🧘</div>
-            <div class="viz-label">focused</div>
-          </div>
-        </div>
-        <div class="split-data">
-          <div class="big-number">${story.ls.toFixed(1)}</div>
-          <div class="big-number-label">hour longest session</div>
-          <p class="comparison-text" style="margin-top: 1rem">Deep work champion</p>
-        </div>
-      </div>
-    </div>`,
+    renderHighlightCard(story),
 
     // Card 8: Polaroid summary
     `<div class="card card-polaroid">

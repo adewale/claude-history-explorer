@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import { renderLandingPage } from './pages/landing';
 import { renderWrappedPage, renderErrorPage } from './pages/wrapped';
-import { decodeWrappedStory, validateStory } from './decoder';
+import { decodeWrappedStoryAuto, validateStory, validateStoryV3, isV3Story } from './decoder';
 import { generateOgImage, getOgImageContentType } from './og';
 
 type Bindings = {
@@ -30,6 +30,41 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Wrapped page with query parameter (supports /wrapped?d=encodedData)
+app.get('/wrapped', (c) => {
+  const encodedData = c.req.query('d');
+
+  if (!encodedData) {
+    return c.html(renderErrorPage('Missing data parameter. URL should include ?d=encodedData'), 400);
+  }
+
+  // Decode story (auto-detects version)
+  let story;
+  try {
+    story = decodeWrappedStoryAuto(encodedData);
+  } catch (error) {
+    return c.html(renderErrorPage('Invalid Wrapped URL. The data could not be decoded.'), 400);
+  }
+
+  // Validate story based on version
+  const validation = isV3Story(story) ? validateStoryV3(story) : validateStory(story);
+  if (!validation.valid) {
+    return c.html(renderErrorPage(validation.error || 'Invalid data'), 400);
+  }
+
+  const year = story.y;
+
+  // Generate OG image URL
+  const ogImageUrl = `https://wrapped-claude-codes.adewale-883.workers.dev/og/${year}/${encodedData}.png`;
+
+  return c.html(renderWrappedPage({
+    story,
+    year,
+    encodedData,
+    ogImageUrl,
+  }));
+});
+
 // OG Image endpoint
 app.get('/og/:year/:data', async (c) => {
   const year = parseInt(c.req.param('year'));
@@ -41,10 +76,10 @@ app.get('/og/:year/:data', async (c) => {
     return c.text('Invalid year', 400);
   }
 
-  // Decode story
+  // Decode story (auto-detects version)
   let story;
   try {
-    story = decodeWrappedStory(encodedData);
+    story = decodeWrappedStoryAuto(encodedData);
   } catch (error) {
     return c.text('Invalid data', 400);
   }
@@ -93,16 +128,16 @@ app.get('/:year/:data', (c) => {
     return c.html(renderErrorPage(`Invalid year. Claude Code Wrapped is available for 2024-${currentYear}.`), 400);
   }
 
-  // Decode story
+  // Decode story (auto-detects version)
   let story;
   try {
-    story = decodeWrappedStory(encodedData);
+    story = decodeWrappedStoryAuto(encodedData);
   } catch (error) {
     return c.html(renderErrorPage('Invalid Wrapped URL. The data could not be decoded.'), 400);
   }
 
-  // Validate story
-  const validation = validateStory(story);
+  // Validate story based on version
+  const validation = isV3Story(story) ? validateStoryV3(story) : validateStory(story);
   if (!validation.valid) {
     return c.html(renderErrorPage(validation.error || 'Invalid data'), 400);
   }

@@ -5,14 +5,16 @@
  * The SVG is returned as a PNG-compatible format that social platforms can render.
  */
 
-import { WrappedStory, formatNumber, generateSparkline } from './decoder';
+import { WrappedStory, WrappedStoryV3, formatNumber, generateSparkline, isV3Story, getTraitDescription } from './decoder';
 
 /**
  * Generate an OG image as SVG (social platforms will render it)
  */
-export async function generateOgImage(story: WrappedStory, year: number): Promise<Uint8Array> {
+export async function generateOgImage(story: WrappedStory | WrappedStoryV3, year: number): Promise<Uint8Array> {
   const displayName = story.n || 'Someone';
-  const sparkline = generateSparkline(story.a);
+  // Handle V2 (story.a) vs V3 (story.ma) monthly activity
+  const monthlyActivity = isV3Story(story) ? story.ma : story.a;
+  const sparkline = generateSparkline(monthlyActivity || []);
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
@@ -59,7 +61,9 @@ export async function generateOgImage(story: WrappedStory, year: number): Promis
   <text x="600" y="420" fill="#666666" font-family="Inter, sans-serif" font-size="12" text-anchor="middle" letter-spacing="28">J F M A M J J A S O N D</text>
 
   <!-- Traits -->
-  ${renderTraits(story.t, 460)}
+  ${isV3Story(story)
+    ? renderTraitsV3(story.ts, 460)
+    : renderTraits(story.t, 460)}
 
   <!-- Footer -->
   <text x="600" y="600" fill="#666666" font-family="Inter, sans-serif" font-size="16" text-anchor="middle">wrapped-claude-codes.adewale-883.workers.dev</text>
@@ -80,6 +84,27 @@ function escapeXml(str: string): string {
 
 function renderTraits(traits: string[], y: number): string {
   if (!traits || traits.length === 0) return '';
+
+  const totalWidth = traits.reduce((sum, t) => sum + t.length * 10 + 32, 0) + (traits.length - 1) * 12;
+  let x = 600 - totalWidth / 2;
+
+  return traits.map(trait => {
+    const width = trait.length * 10 + 32;
+    const result = `
+      <rect x="${x}" y="${y}" width="${width}" height="36" rx="18" fill="#1a1a1a" stroke="#333333" stroke-width="1"/>
+      <text x="${x + width / 2}" y="${y + 24}" fill="#ffffff" font-family="Inter, sans-serif" font-size="16" text-anchor="middle">${escapeXml(trait)}</text>
+    `;
+    x += width + 12;
+    return result;
+  }).join('');
+}
+
+import { TraitScores } from './decoder';
+
+function renderTraitsV3(ts: TraitScores, y: number): string {
+  // Pick 4 key traits for the OG image
+  const traitKeys = ['ad', 'sp', 'fc', 'ri'] as const;
+  const traits = traitKeys.map(k => getTraitDescription(k, ts[k]));
 
   const totalWidth = traits.reduce((sum, t) => sum + t.length * 10 + 32, 0) + (traits.length - 1) * 12;
   let x = 600 - totalWidth / 2;
