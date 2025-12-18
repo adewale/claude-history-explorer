@@ -2,7 +2,7 @@
  * Wrapped story page HTML
  */
 
-import { WrappedStory, WrappedStoryV3, formatNumber, getMessageDescriptor, isV3Story, TRAIT_LABELS, getTraitDescription } from '../decoder';
+import { WrappedStory, WrappedStoryV3, formatNumber, formatNumberCompact, getMessageDescriptor, isV3Story, TRAIT_LABELS, getTraitDescription, TokenStats } from '../decoder';
 
 /**
  * Generate a tangible comparison for message count
@@ -780,6 +780,193 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       text-align: left;
     }
 
+    /* Stats Grid (for streaks, etc) */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .stat-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-item.highlight {
+      border-color: var(--accent);
+      background: rgba(212, 165, 116, 0.1);
+    }
+
+    .stat-item.current {
+      border-color: var(--success);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-item.current .stat-value {
+      color: var(--success);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 0.25rem;
+    }
+
+    /* Token Stats */
+    .token-stats {
+      margin-top: 1rem;
+      text-align: center;
+    }
+
+    .token-total {
+      margin-bottom: 1.5rem;
+    }
+
+    .token-value {
+      font-family: var(--font-display);
+      font-size: 3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .token-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .token-breakdown {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .token-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .token-row:last-child {
+      border-bottom: none;
+    }
+
+    .token-row.cache {
+      color: var(--success);
+    }
+
+    .token-type {
+      color: var(--text-secondary);
+    }
+
+    .token-count {
+      font-family: var(--font-display);
+      font-weight: 600;
+    }
+
+    .model-breakdown {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+
+    .model-header {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+      text-align: left;
+    }
+
+    .model-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.4rem 0;
+    }
+
+    .model-name {
+      color: var(--text-secondary);
+    }
+
+    .model-count {
+      font-family: var(--font-display);
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* Longest Session Card */
+    .session-highlight {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .session-big-number {
+      font-family: var(--font-display);
+      font-size: 5rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .session-unit {
+      font-size: 1.5rem;
+      color: var(--text-secondary);
+      margin-left: 0.25rem;
+    }
+
+    /* View toggle buttons */
+    .view-toggle {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .view-btn {
+      padding: 0.5rem 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .view-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-primary);
+    }
+
+    .view-btn.active {
+      background: var(--accent);
+      color: var(--bg-dark);
+      border-color: var(--accent);
+    }
+
     @media (max-width: 640px) {
       .card-split .card-content {
         grid-template-columns: 1fr;
@@ -1334,10 +1521,8 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
   <div class="grain-layer" id="grainLayer"><canvas></canvas></div>
 
   <div class="story-container">
-    <!-- Progress Bar -->
-    <div class="progress-bar" id="progress">
-      ${generateProgressSegments(8)}
-    </div>
+    <!-- Progress Bar - segments generated by JS based on card count -->
+    <div class="progress-bar" id="progress"></div>
 
     <!-- Cards -->
     <div class="cards-viewport" id="viewport">
@@ -1630,9 +1815,22 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     // ============================================
 
     let currentCard = 0;
-    const totalCards = 8;
+    let totalCards = 0;
     let autoAdvanceTimer = null;
     let confettiTriggered = false;
+
+    // Initialize progress bar based on actual card count
+    function initProgress() {
+      const cards = document.querySelectorAll('.card');
+      totalCards = cards.length;
+      const progressBar = document.getElementById('progress');
+      progressBar.innerHTML = Array(totalCards).fill(0).map(() =>
+        '<div class="progress-segment"><div class="progress-fill"></div></div>'
+      ).join('');
+    }
+
+    // Call on load
+    initProgress();
 
     function updateCard() {
       const cards = document.querySelectorAll('.card');
@@ -1902,22 +2100,120 @@ function renderTraitBars(ts: any): string {
   }).join('');
 }
 
+/**
+ * Format token count with appropriate units
+ */
+function formatTokens(tokens: number): string {
+  if (tokens >= 1000000000) return (tokens / 1000000000).toFixed(1) + 'B';
+  if (tokens >= 1000000) return (tokens / 1000000).toFixed(1) + 'M';
+  if (tokens >= 1000) return (tokens / 1000).toFixed(1) + 'K';
+  return tokens.toString();
+}
+
+/**
+ * Get model display name (shorter version)
+ */
+function getModelDisplayName(model: string): string {
+  if (model.includes('opus')) return 'Opus';
+  if (model.includes('sonnet')) return 'Sonnet';
+  if (model.includes('haiku')) return 'Haiku';
+  return model.split('-')[0] || model;
+}
+
+/**
+ * Render streak stats card content
+ */
+function renderStreakStats(sk: number[]): string {
+  if (!sk || sk.length < 4) return '';
+  const [count, longest, current, avg] = sk;
+
+  return `
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value">${count}</div>
+        <div class="stat-label">streaks</div>
+      </div>
+      <div class="stat-item highlight">
+        <div class="stat-value">${longest}</div>
+        <div class="stat-label">day longest</div>
+      </div>
+      ${current > 0 ? `
+      <div class="stat-item current">
+        <div class="stat-value">${current}</div>
+        <div class="stat-label">day current</div>
+      </div>` : ''}
+      <div class="stat-item">
+        <div class="stat-value">${avg}</div>
+        <div class="stat-label">day avg</div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Render token stats card content
+ */
+function renderTokenStats(tk: TokenStats): string {
+  if (!tk || !tk.total) return '';
+
+  const modelEntries = Object.entries(tk.models || {}).sort((a, b) => b[1] - a[1]);
+  const topModels = modelEntries.slice(0, 3);
+
+  return `
+    <div class="token-stats">
+      <div class="token-total">
+        <div class="token-value">${formatTokens(tk.total)}</div>
+        <div class="token-label">total tokens</div>
+      </div>
+      <div class="token-breakdown">
+        <div class="token-row">
+          <span class="token-type">Input</span>
+          <span class="token-count">${formatTokens(tk.input)}</span>
+        </div>
+        <div class="token-row">
+          <span class="token-type">Output</span>
+          <span class="token-count">${formatTokens(tk.output)}</span>
+        </div>
+        ${tk.cache_read > 0 ? `
+        <div class="token-row cache">
+          <span class="token-type">Cache Read</span>
+          <span class="token-count">${formatTokens(tk.cache_read)}</span>
+        </div>` : ''}
+      </div>
+      ${topModels.length > 0 ? `
+      <div class="model-breakdown">
+        <div class="model-header">By Model</div>
+        ${topModels.map(([model, count]) => `
+          <div class="model-row">
+            <span class="model-name">${getModelDisplayName(model)}</span>
+            <span class="model-count">${formatTokens(count)}</span>
+          </div>
+        `).join('')}
+      </div>` : ''}
+    </div>
+  `;
+}
+
 function renderHighlightCard(story: WrappedStory | WrappedStoryV3): string {
   if (isV3Story(story)) {
-    // V3: Show top project hours
-    const topProjectHours = story.tp[0]?.h || 0;
+    // V3: Show longest session
+    const longestSession = story.ls || 0;
+    const hours = Math.floor(longestSession);
+    const minutes = Math.round((longestSession - hours) * 60);
+    const displayTime = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
     return `<div class="card card-split">
       <div class="card-content">
         <div class="split-viz">
           <div class="viz-circle">
-            <div class="viz-number">🎯</div>
-            <div class="viz-label">focused</div>
+            <div class="viz-number">🧘</div>
+            <div class="viz-label">deep work</div>
           </div>
         </div>
         <div class="split-data">
-          <div class="big-number">${topProjectHours}</div>
-          <div class="big-number-label">hours on top project</div>
-          <p class="comparison-text" style="margin-top: 1rem">Deep work champion</p>
+          <div class="big-number">${displayTime}</div>
+          <div class="big-number-label">longest session</div>
+          <p class="comparison-text" style="margin-top: 1rem">Your marathon coding session</p>
         </div>
       </div>
     </div>`;
@@ -2101,10 +2397,29 @@ function renderCards(story: WrappedStory | WrappedStoryV3, year: number, pageUrl
       </div>
     </div>`,
 
-    // Card 7: Highlight stat
+    // Card 7: Highlight stat (longest session)
     renderHighlightCard(story),
 
-    // Card 8: Polaroid summary
+    // V3 Card: Streaks
+    ...(isV3Story(story) && story.sk && story.sk[0] > 0 ? [`<div class="card">
+      <div class="card-content">
+        <div class="card-emoji">🔥</div>
+        <h2 class="card-title">Your Streaks</h2>
+        <p class="card-subtitle">Consecutive days of coding</p>
+        ${renderStreakStats(story.sk)}
+      </div>
+    </div>`] : []),
+
+    // V3 Card: Token Usage
+    ...(isV3Story(story) && story.tk && story.tk.total > 0 ? [`<div class="card">
+      <div class="card-content">
+        <h2 class="card-title">Token Usage</h2>
+        <p class="card-subtitle">Your AI compute footprint</p>
+        ${renderTokenStats(story.tk)}
+      </div>
+    </div>`] : []),
+
+    // Final Card: Polaroid summary
     `<div class="card card-polaroid">
       <div class="card-content">
         <div class="polaroid-frame">

@@ -339,8 +339,27 @@ export interface WrappedStoryV3 {
   // Session fingerprints
   sf: SessionFingerprint[];
 
+  // Longest session (hours)
+  ls: number;
+
+  // Streak stats: [count, longest_days, current_days, avg_days]
+  sk: number[];
+
+  // Token stats
+  tk: TokenStats;
+
   // Year-over-year (optional)
   yoy?: YearOverYear;
+}
+
+// Token usage statistics
+export interface TokenStats {
+  total: number;
+  input: number;
+  output: number;
+  cache_read: number;
+  cache_create: number;
+  models: Record<string, number>;  // model name -> total tokens
 }
 
 // =============================================================================
@@ -450,6 +469,9 @@ export function decodeWrappedStoryV3(encoded: string): WrappedStoryV3 {
       pc: raw.pc || [],
       te,
       sf,
+      ls: raw.ls || 0,
+      sk: raw.sk || [0, 0, 0, 0],
+      tk: raw.tk || { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
       yoy: raw.yoy,
     };
   } catch (error) {

@@ -33,10 +33,10 @@ import json
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from bisect import bisect_right
-from typing import Callable, Iterator, Optional, Dict, List, Set, Tuple
+from typing import Any, Callable, Iterator, Optional, Dict, List, Set, Tuple
 
 from .constants import (
     MESSAGE_RATE_HIGH,
@@ -216,6 +216,44 @@ def get_projects_dir() -> Path:
 
 
 @dataclass
+class TokenUsage:
+    """Token usage statistics for an assistant message.
+
+    Attributes:
+        input_tokens: Tokens in the input/prompt
+        output_tokens: Tokens in the response
+        cache_creation_tokens: Tokens used to create cache
+        cache_read_tokens: Tokens read from cache
+        model: Model identifier (e.g., "claude-opus-4-5-20251101")
+    """
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
+    model: str = ""
+
+    @property
+    def total_tokens(self) -> int:
+        """Total tokens (input + output)."""
+        return self.input_tokens + self.output_tokens
+
+    @classmethod
+    def from_message_data(cls, message_data: dict) -> Optional["TokenUsage"]:
+        """Extract token usage from assistant message data."""
+        usage = message_data.get("usage", {})
+        if not usage:
+            return None
+
+        return cls(
+            input_tokens=usage.get("input_tokens", 0),
+            output_tokens=usage.get("output_tokens", 0),
+            cache_creation_tokens=usage.get("cache_creation_input_tokens", 0),
+            cache_read_tokens=usage.get("cache_read_input_tokens", 0),
+            model=message_data.get("model", ""),
+        )
+
+
+@dataclass
 class Message:
     """A single message in a conversation.
 
@@ -224,6 +262,7 @@ class Message:
         content: The text content of the message
         timestamp: When the message was sent (may be None)
         tool_uses: List of tools used by assistant (name and input)
+        token_usage: Token usage stats (assistant messages only)
 
     Example:
         >>> msg = Message(role="user", content="Hello")
@@ -235,6 +274,7 @@ class Message:
     content: str
     timestamp: Optional[datetime] = None
     tool_uses: list = field(default_factory=list)
+    token_usage: Optional[TokenUsage] = None
 
     @classmethod
     def from_json(cls, data: dict) -> Optional["Message"]:
@@ -297,7 +337,12 @@ class Message:
         if not content and not tool_uses:
             return None
 
-        return cls(role=role, content=content, timestamp=timestamp, tool_uses=tool_uses)
+        # Extract token usage for assistant messages
+        token_usage = None
+        if role == "assistant":
+            token_usage = TokenUsage.from_message_data(message_data)
+
+        return cls(role=role, content=content, timestamp=timestamp, tool_uses=tool_uses, token_usage=token_usage)
 
 
 @dataclass
@@ -2502,6 +2547,15 @@ class WrappedStoryV3:
     # Session fingerprints (compact arrays: [duration, messages, is_agent, hour, weekday, pi, fp0..7])
     sf: List[List] = field(default_factory=list)
 
+    # Longest session (hours, float for precision)
+    ls: float = 0.0
+
+    # Streak stats: [count, longest_days, current_days, avg_days]
+    sk: List[int] = field(default_factory=list)
+
+    # Token stats: {total, input, output, cache_read, cache_create, models: {model: tokens}}
+    tk: Dict[str, Any] = field(default_factory=dict)
+
     # Year-over-year comparison
     yoy: Optional[Dict[str, int]] = None
 
@@ -2527,6 +2581,9 @@ class WrappedStoryV3:
             'pc': self.pc,
             'te': self.te,
             'sf': self.sf,
+            'ls': round(self.ls, 1),  # Round to 1 decimal for compactness
+            'sk': self.sk,
+            'tk': self.tk,
         }
         if self.n:
             result['n'] = self.n
@@ -2558,6 +2615,9 @@ class WrappedStoryV3:
             pc=[tuple(x) for x in d.get('pc', [])],
             te=d.get('te', []),
             sf=d.get('sf', []),
+            ls=d.get('ls', 0.0),
+            sk=d.get('sk', []),
+            tk=d.get('tk', {}),
             yoy=d.get('yoy'),
         )
 
@@ -2621,6 +2681,69 @@ def decode_wrapped_story_v3(encoded: str) -> WrappedStoryV3:
     return WrappedStoryV3.from_dict(data)
 
 
+def compute_streak_stats(active_dates: Set[date], year: int) -> List[int]:
+    """Compute streak statistics from active dates.
+
+    A streak is 2+ consecutive days of activity.
+
+    Args:
+        active_dates: Set of dates with activity
+        year: The year being analyzed
+
+    Returns:
+        List of [streak_count, longest_streak, current_streak, avg_streak_days]
+        All values are integers for compact encoding.
+    """
+    if not active_dates:
+        return [0, 0, 0, 0]
+
+    # Sort dates
+    sorted_dates = sorted(active_dates)
+
+    # Find all streaks
+    streaks: List[int] = []
+    current_streak_length = 1
+
+    for i in range(1, len(sorted_dates)):
+        diff = (sorted_dates[i] - sorted_dates[i-1]).days
+        if diff == 1:
+            # Consecutive day
+            current_streak_length += 1
+        else:
+            # Gap - save streak if >= 2 days
+            if current_streak_length >= 2:
+                streaks.append(current_streak_length)
+            current_streak_length = 1
+
+    # Don't forget the last streak
+    if current_streak_length >= 2:
+        streaks.append(current_streak_length)
+
+    # Compute stats
+    streak_count = len(streaks)
+    longest_streak = max(streaks) if streaks else 0
+    avg_streak = round(sum(streaks) / len(streaks)) if streaks else 0
+
+    # Check if there's a current active streak (streak that includes today or end of year)
+    current_streak = 0
+    today = date.today()
+    year_end = date(year, 12, 31)
+    reference_date = min(today, year_end)
+
+    if sorted_dates:
+        # Count backwards from most recent date
+        streak_end = sorted_dates[-1]
+        if (reference_date - streak_end).days <= 1:  # Active recently
+            current_streak = 1
+            for i in range(len(sorted_dates) - 2, -1, -1):
+                if (sorted_dates[i+1] - sorted_dates[i]).days == 1:
+                    current_streak += 1
+                else:
+                    break
+
+    return [streak_count, longest_streak, current_streak, avg_streak]
+
+
 def generate_wrapped_story_v3(
     year: int,
     name: Optional[str] = None,
@@ -2647,9 +2770,19 @@ def generate_wrapped_story_v3(
     project_sessions: Dict[str, List[SessionInfoV3]] = defaultdict(list)
     session_file_map: Dict[str, Path] = {}  # For fingerprint computation
 
-    # Also collect message lengths and tools for the target year
+    # Also collect message lengths, tools, and token usage for the target year
     all_message_lengths: List[int] = []
     all_unique_tools: Set[str] = set()
+
+    # Token tracking
+    token_stats: Dict[str, Any] = {
+        'total': 0,
+        'input': 0,
+        'output': 0,
+        'cache_read': 0,
+        'cache_create': 0,
+        'models': defaultdict(int),  # model -> total tokens
+    }
 
     for project in list_projects():
         for session_file in project.session_files:
@@ -2663,7 +2796,7 @@ def generate_wrapped_story_v3(
                 project_sessions[project.short_name].append(info)
                 session_file_map[session.session_id] = session_file
 
-                # Collect message lengths and tools if in target year
+                # Collect message lengths, tools, and tokens if in target year
                 if info.start_time and info.start_time.year == year:
                     for msg in session.messages:
                         if msg.content:
@@ -2672,6 +2805,18 @@ def generate_wrapped_story_v3(
                             tool_name = tool_use.get("name", "")
                             if tool_name:
                                 all_unique_tools.add(tool_name)
+                        # Aggregate token usage from assistant messages
+                        if msg.token_usage:
+                            tu = msg.token_usage
+                            token_stats['input'] += tu.input_tokens
+                            token_stats['output'] += tu.output_tokens
+                            token_stats['cache_read'] += tu.cache_read_tokens
+                            token_stats['cache_create'] += tu.cache_creation_tokens
+                            token_stats['total'] += tu.total_tokens
+                            if tu.model:
+                                # Simplify model name for display
+                                model_short = tu.model.split('-')[1] if '-' in tu.model else tu.model
+                                token_stats['models'][model_short] += tu.total_tokens
 
     # Filter to requested year
     year_sessions = [s for s in all_sessions if s.start_time and s.start_time.year == year]
@@ -2770,6 +2915,16 @@ def generate_wrapped_story_v3(
         project_names
     )
 
+    # Longest session
+    session_durations = [s.duration_minutes / 60 for s in year_sessions if s.duration_minutes > 0]
+    longest_session = max(session_durations) if session_durations else 0.0
+
+    # Streak stats: [count, longest_days, current_days, avg_days]
+    streak_stats = compute_streak_stats(active_dates, year)
+
+    # Convert token models dict to regular dict for serialization
+    token_stats['models'] = dict(token_stats['models'])
+
     # Year-over-year
     yoy = None
     if previous_year_data:
@@ -2802,5 +2957,8 @@ def generate_wrapped_story_v3(
         pc=cooccurrence,
         te=events,
         sf=fingerprints,
+        ls=longest_session,
+        sk=streak_stats,
+        tk=token_stats,
         yoy=yoy,
     )
