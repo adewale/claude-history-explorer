@@ -387,19 +387,19 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .card-content {
-      max-width: 400px;
-      width: 100%;
+      max-width: 600px;
+      width: 90%;
       text-align: center;
     }
 
     /* Card Type: Hero (full-bleed intro) */
     .card-hero {
       justify-content: flex-end;
-      padding-bottom: 15vh;
+      padding-bottom: 10vh;
     }
 
     .card-hero .card-content {
-      max-width: 600px;
+      max-width: 800px;
     }
 
     .hero-year {
@@ -429,10 +429,10 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     /* Card Type: Split (data on left, viz on right) */
     .card-split .card-content {
-      max-width: 500px;
+      max-width: 700px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 2rem;
+      gap: 3rem;
       text-align: left;
     }
 
@@ -449,10 +449,10 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .viz-circle {
-      width: 140px;
-      height: 140px;
+      width: 180px;
+      height: 180px;
       border-radius: 50%;
-      border: 3px solid var(--accent);
+      border: 4px solid var(--accent);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -461,13 +461,13 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .viz-number {
       font-family: var(--font-display);
-      font-size: 2.5rem;
+      font-size: 3rem;
       font-weight: 700;
       color: var(--accent);
     }
 
     .viz-label {
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -512,7 +512,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     /* Card Type: Radar (personality) */
     .card-radar .card-content {
-      max-width: 450px;
+      max-width: 650px;
     }
 
     .radar-container {
@@ -566,7 +566,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     /* Card Type: Grid (projects) */
     .card-grid .card-content {
-      max-width: 500px;
+      max-width: 700px;
     }
 
     .project-cards {
@@ -580,7 +580,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 1rem;
+      padding: 1.25rem;
       text-align: center;
       opacity: 0;
       transform: scale(0.9);
@@ -604,11 +604,10 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .project-card-name {
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       margin-bottom: 0.5rem;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      word-break: break-word;
+      line-height: 1.2;
     }
 
     .project-card-stat {
@@ -671,7 +670,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     /* V3 Heatmap Card */
     .card-heatmap .card-content {
-      max-width: 420px;
+      max-width: 600px;
     }
 
     .heatmap-svg {
@@ -729,7 +728,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     /* V3 Trait Bars Card */
     .trait-bars {
       width: 100%;
-      max-width: 300px;
+      max-width: 450px;
       margin: 1.5rem auto 0;
     }
 
@@ -942,7 +941,6 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     .view-toggle {
       display: flex;
       gap: 0.5rem;
-      margin-top: 1rem;
     }
 
     .view-btn {
@@ -954,6 +952,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       font-size: 0.8rem;
       cursor: pointer;
       transition: all 0.2s;
+      text-decoration: none;
     }
 
     .view-btn:hover {
@@ -967,7 +966,36 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       border-color: var(--accent);
     }
 
+    /* Pause button */
+    .pause-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 0.5rem;
+      font-size: 1.2rem;
+      transition: color 0.2s;
+    }
+
+    .pause-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .pause-btn.paused {
+      color: var(--accent);
+    }
+
+    /* Hide elements on last card */
+    .on-last-card .skip-btn,
+    .on-last-card #nextBtn {
+      display: none;
+    }
+
     @media (max-width: 640px) {
+      .card-content {
+        width: 95%;
+      }
+
       .card-split .card-content {
         grid-template-columns: 1fr;
         gap: 1.5rem;
@@ -987,12 +1015,67 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       }
 
       .viz-circle {
-        width: 120px;
-        height: 120px;
+        width: 150px;
+        height: 150px;
       }
 
       .viz-number {
-        font-size: 2rem;
+        font-size: 2.5rem;
+      }
+
+      .big-number {
+        font-size: 3.5rem;
+      }
+
+      .view-toggle {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+    }
+
+    /* Landscape mobile */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .card {
+        padding: 1rem;
+      }
+
+      .card-content {
+        max-width: 90%;
+      }
+
+      .card-split .card-content {
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+      }
+
+      .big-number {
+        font-size: 3rem;
+      }
+
+      .viz-circle {
+        width: 100px;
+        height: 100px;
+      }
+
+      .viz-number {
+        font-size: 1.75rem;
+      }
+
+      .hero-year {
+        font-size: 4rem;
+        top: 5%;
+      }
+
+      .card-hero {
+        padding-bottom: 5vh;
+      }
+
+      .progress-bar {
+        padding: 8px;
+      }
+
+      .nav-controls {
+        padding: 0.5rem 1rem;
       }
     }
 
@@ -1035,7 +1118,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
 
     .big-number {
       font-family: var(--font-display);
-      font-size: 4rem;
+      font-size: 5rem;
       font-weight: 700;
       background: linear-gradient(135deg, var(--accent), var(--accent-light));
       -webkit-background-clip: text;
@@ -1051,7 +1134,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     }
 
     .big-number-label {
-      font-size: 1.25rem;
+      font-size: 1.5rem;
       color: var(--text-secondary);
       opacity: 0;
     }
@@ -1530,10 +1613,17 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     </div>
 
     <!-- Navigation -->
-    <div class="nav-controls">
+    <div class="nav-controls" id="navControls">
       <button class="nav-btn" id="prevBtn" onclick="prevCard()" disabled>← Back</button>
       <div class="nav-center">
-        <button class="skip-btn" onclick="skipToSummary()">Skip to summary</button>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <button class="pause-btn" id="pauseBtn" onclick="togglePause()" title="Pause/Play">⏸</button>
+          <button class="skip-btn" onclick="skipToSummary()">Skip to summary</button>
+        </div>
+        <div class="view-toggle">
+          <a href="?view=bento&d=${encodedData}" class="view-btn" title="Bento grid view">📊 Bento</a>
+          <a href="?view=print&d=${encodedData}" class="view-btn" title="Print-friendly view">🖨️ Print</a>
+        </div>
         <a href="javascript:void(0)" class="privacy-link" onclick="showPrivacyInfo()">🔒 Data in URL only</a>
       </div>
       <button class="nav-btn" id="nextBtn" onclick="nextCard()">Next →</button>
@@ -1818,6 +1908,7 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
     let totalCards = 0;
     let autoAdvanceTimer = null;
     let confettiTriggered = false;
+    let isPaused = false;
 
     // Initialize progress bar based on actual card count
     function initProgress() {
@@ -1827,6 +1918,32 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       progressBar.innerHTML = Array(totalCards).fill(0).map(() =>
         '<div class="progress-segment"><div class="progress-fill"></div></div>'
       ).join('');
+    }
+
+    // Toggle pause state
+    function togglePause() {
+      isPaused = !isPaused;
+      const pauseBtn = document.getElementById('pauseBtn');
+      if (isPaused) {
+        pauseBtn.textContent = '▶';
+        pauseBtn.classList.add('paused');
+        clearTimeout(autoAdvanceTimer);
+        // Pause progress bar animation
+        document.querySelectorAll('.progress-fill').forEach(el => {
+          el.style.animationPlayState = 'paused';
+        });
+      } else {
+        pauseBtn.textContent = '⏸';
+        pauseBtn.classList.remove('paused');
+        // Resume progress bar animation
+        document.querySelectorAll('.progress-fill').forEach(el => {
+          el.style.animationPlayState = 'running';
+        });
+        // Restart auto-advance
+        if (currentCard < totalCards - 1) {
+          autoAdvanceTimer = setTimeout(() => nextCard(), 5000);
+        }
+      }
     }
 
     // Call on load
@@ -1862,7 +1979,14 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
       });
 
       document.getElementById('prevBtn').disabled = currentCard === 0;
-      document.getElementById('nextBtn').textContent = currentCard === totalCards - 1 ? 'Done' : 'Next →';
+
+      // Handle last card - hide skip and next buttons
+      const navControls = document.getElementById('navControls');
+      if (currentCard === totalCards - 1) {
+        navControls.classList.add('on-last-card');
+      } else {
+        navControls.classList.remove('on-last-card');
+      }
 
       // Update ambient glow position
       AmbientSystem.updateGlow(currentCard);
@@ -1873,9 +1997,9 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
         triggerConfetti();
       }
 
-      // Auto-advance (except last card)
+      // Auto-advance (except last card, and not if paused)
       clearTimeout(autoAdvanceTimer);
-      if (currentCard < totalCards - 1) {
+      if (currentCard < totalCards - 1 && !isPaused) {
         autoAdvanceTimer = setTimeout(() => nextCard(), 5000);
       }
     }
