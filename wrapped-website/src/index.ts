@@ -11,6 +11,8 @@ import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import { renderLandingPage } from './pages/landing';
 import { renderWrappedPage, renderErrorPage } from './pages/wrapped';
+import { renderBentoPage } from './pages/bento';
+import { renderPrintPage } from './pages/print';
 import { decodeWrappedStoryAuto, validateStory, validateStoryV3, isV3Story } from './decoder';
 import { generateOgImage, getOgImageContentType } from './og';
 
@@ -30,9 +32,10 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Wrapped page with query parameter (supports /wrapped?d=encodedData)
+// Wrapped page with query parameter (supports /wrapped?d=encodedData&view=bento|print)
 app.get('/wrapped', (c) => {
   const encodedData = c.req.query('d');
+  const view = c.req.query('view');
 
   if (!encodedData) {
     return c.html(renderErrorPage('Missing data parameter. URL should include ?d=encodedData'), 400);
@@ -54,7 +57,16 @@ app.get('/wrapped', (c) => {
 
   const year = story.y;
 
-  // Generate OG image URL
+  // Route to appropriate view
+  if (view === 'bento') {
+    return c.html(renderBentoPage({ story, year, encodedData }));
+  }
+
+  if (view === 'print') {
+    return c.html(renderPrintPage({ story, year, encodedData }));
+  }
+
+  // Default: story view
   const ogImageUrl = `https://wrapped-claude-codes.adewale-883.workers.dev/og/${year}/${encodedData}.png`;
 
   return c.html(renderWrappedPage({

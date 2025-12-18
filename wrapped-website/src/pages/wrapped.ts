@@ -1621,8 +1621,8 @@ export function renderWrappedPage({ story, year, encodedData, ogImageUrl }: Rend
           <button class="skip-btn" onclick="skipToSummary()">Skip to summary</button>
         </div>
         <div class="view-toggle">
-          <a href="?view=bento&d=${encodedData}" class="view-btn" title="Bento grid view">📊 Bento</a>
-          <a href="?view=print&d=${encodedData}" class="view-btn" title="Print-friendly view">🖨️ Print</a>
+          <a href="?view=bento&d=${encodedData}" class="view-btn" title="Bento grid view">Bento</a>
+          <a href="?view=print&d=${encodedData}" class="view-btn" title="Print-friendly view">Print</a>
         </div>
         <a href="javascript:void(0)" class="privacy-link" onclick="showPrivacyInfo()">🔒 Data in URL only</a>
       </div>
