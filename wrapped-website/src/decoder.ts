@@ -7,52 +7,35 @@
 
 import msgpack from 'msgpack-lite';
 
-// =============================================================================
-// V3 Constants
-// =============================================================================
+// Re-export shared constants for backwards compatibility
+export {
+  EVENT_TYPES,
+  EventType,
+  TRAIT_LABELS,
+  MOBILE_TRAITS,
+  ALL_TRAITS,
+  SESSION_DURATION_LABELS,
+  AGENT_RATIO_LABELS,
+  HEATMAP_QUANT_SCALE,
+  TRAIT_LOW_THRESHOLD,
+  TRAIT_HIGH_THRESHOLD,
+  TRAIT_LOW_DESCRIPTIONS,
+  TRAIT_HIGH_DESCRIPTIONS,
+} from './constants';
 
-// Event type indices for V3 timeline
-export const EVENT_TYPES = [
-  'peak_day',      // 0
-  'streak_start',  // 1
-  'streak_end',    // 2
-  'new_project',   // 3
-  'milestone',     // 4
-  'gap_start',     // 5
-  'gap_end',       // 6
-] as const;
-
-export type EventType = typeof EVENT_TYPES[number];
-
-// Trait labels for display
-export const TRAIT_LABELS: Record<string, string> = {
-  ad: 'Delegation',
-  sp: 'Deep Work',
-  fc: 'Focus',
-  cc: 'Regularity',
-  wr: 'Weekend',
-  bs: 'Burst',
-  cs: 'Switching',
-  mv: 'Verbose',
-  td: 'Tools',
-  ri: 'Intensity',
-};
-
-// 6 key traits for mobile displays
-export const MOBILE_TRAITS = ['ad', 'sp', 'fc', 'cc', 'bs', 'ri'];
-
-// All 10 traits for desktop displays
-export const ALL_TRAITS = ['ad', 'sp', 'fc', 'cc', 'wr', 'bs', 'cs', 'mv', 'td', 'ri'];
-
-// Session duration bucket labels
-export const SESSION_DURATION_LABELS = [
-  '<15m', '15-30m', '30m-1h', '1-2h', '2-4h', '4-8h', '8-12h', '12-24h', '24-48h', '>48h'
-];
-
-// Agent ratio bucket labels
-export const AGENT_RATIO_LABELS = [
-  '0-10%', '10-20%', '20-30%', '30-40%', '40-50%', '50-60%', '60-70%', '70-80%', '80-90%', '90-100%'
-];
+import {
+  EVENT_TYPES,
+  type EventType,
+  TRAIT_LOW_THRESHOLD,
+  TRAIT_HIGH_THRESHOLD,
+  TRAIT_LOW_DESCRIPTIONS,
+  TRAIT_HIGH_DESCRIPTIONS,
+  HEATMAP_SIZE,
+  HEATMAP_DAYS,
+  HEATMAP_HOURS,
+  MONTHS_SHORT,
+  DAYS_SHORT,
+} from './constants';
 
 // Dictionaries for v2 index decoding - MUST stay in sync with Python history.py
 const WRAPPED_TRAITS = [
@@ -542,34 +525,13 @@ export function formatDuration(minutes: number): string {
  * Get trait description for a score (0-100 integer scale)
  */
 export function getTraitDescription(trait: string, score: number): string {
-  const low: Record<string, string> = {
-    ad: 'Hands-on',
-    sp: 'Quick sessions',
-    fc: 'Multi-project',
-    cc: 'Variable schedule',
-    wr: 'Weekday focus',
-    bs: 'Steady pace',
-    cs: 'Stays focused',
-    mv: 'Concise',
-    td: 'Core tools',
-    ri: 'Light sessions',
-  };
-  const high: Record<string, string> = {
-    ad: 'Delegates heavily',
-    sp: 'Marathon sessions',
-    fc: 'Laser focused',
-    cc: 'Regular schedule',
-    wr: 'Weekend warrior',
-    bs: 'Burst worker',
-    cs: 'Context switcher',
-    mv: 'Detailed',
-    td: 'Tool explorer',
-    ri: 'Intense sessions',
-  };
-
-  // Score is 0-100 integer, thresholds at 33 and 67
-  if (score < 33) return low[trait] || 'Low';
-  if (score > 67) return high[trait] || 'High';
+  // Uses shared constants from constants.ts
+  if (score < TRAIT_LOW_THRESHOLD) {
+    return TRAIT_LOW_DESCRIPTIONS[trait as keyof typeof TRAIT_LOW_DESCRIPTIONS] || 'Low';
+  }
+  if (score > TRAIT_HIGH_THRESHOLD) {
+    return TRAIT_HIGH_DESCRIPTIONS[trait as keyof typeof TRAIT_HIGH_DESCRIPTIONS] || 'High';
+  }
   return 'Balanced';
 }
 
@@ -577,17 +539,16 @@ export function getTraitDescription(trait: string, score: number): string {
  * Convert day of year to month name
  */
 export function dayOfYearToMonth(dayOfYear: number): string {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const date = new Date(2024, 0, dayOfYear);
-  return months[date.getMonth()];
+  return MONTHS_SHORT[date.getMonth()];
 }
 
 /**
  * Get heatmap value for a specific day and hour
  */
 export function getHeatmapValue(heatmap: number[], day: number, hour: number): number {
-  if (day < 0 || day > 6 || hour < 0 || hour > 23) return 0;
-  return heatmap[day * 24 + hour] || 0;
+  if (day < 0 || day >= HEATMAP_DAYS || hour < 0 || hour >= HEATMAP_HOURS) return 0;
+  return heatmap[day * HEATMAP_HOURS + hour] || 0;
 }
 
 /**

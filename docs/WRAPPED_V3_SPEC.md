@@ -47,32 +47,32 @@ interface WrappedStoryV3 {
   ml: number[];                  // Message length distribution: 8 buckets (chars)
                                  // [<50, 50-100, 100-200, 200-500, 500-1k, 1-2k, 2-5k, >5k]
 
-  // === CONTINUOUS TRAIT SCORES (0.00-1.00) ===
-  // Normalized behavioral dimensions (NOT percentiles - self-relative scores)
+  // === TRAIT SCORES (0-100 integers) ===
+  // Quantized behavioral dimensions. Using integers for compact msgpack encoding
+  // (1 byte vs 9 bytes for floats). Display as percentages or map to descriptors.
   ts: {
-    ad: number;                  // Agent delegation tendency (0=hands-on, 1=heavy delegation)
-    sp: number;                  // Session depth preference (0=quick, 1=marathon)
-    fc: number;                  // Focus concentration (0=scattered, 1=single-project)
-    cc: number;                  // Circadian consistency (0=chaotic, 1=regular schedule)
-    wr: number;                  // Weekend ratio (0=weekday-only, 1=weekend-heavy)
-    bs: number;                  // Burst vs steady (0=steady, 1=burst-oriented)
-    cs: number;                  // Context-switching frequency (0=stays focused, 1=switches often)
-    mv: number;                  // Message verbosity (0=terse, 1=verbose)
-    td: number;                  // Tool diversity (0=minimal tools, 1=many tools)
-    ri: number;                  // Response intensity (0=light sessions, 1=intense)
+    ad: number;                  // Agent delegation tendency (0=hands-on, 100=heavy delegation)
+    sp: number;                  // Session depth preference (0=quick, 100=marathon)
+    fc: number;                  // Focus concentration (0=scattered, 100=single-project)
+    cc: number;                  // Circadian consistency (0=chaotic, 100=regular schedule)
+    wr: number;                  // Weekend ratio (0=weekday-only, 100=weekend-heavy)
+    bs: number;                  // Burst vs steady (0=steady, 100=burst-oriented)
+    cs: number;                  // Context-switching frequency (0=stays focused, 100=switches often)
+    mv: number;                  // Message verbosity (0=terse, 100=verbose)
+    td: number;                  // Tool diversity (0=minimal tools, 100=many tools)
+    ri: number;                  // Response intensity (0=light sessions, 100=intense)
   };
 
   // === PROJECT DATA ===
   // Limited to top 12 projects by message count; remainder grouped as implicit "Other"
+  // Wire format: [name, messages, hours, days, sessions, agent_ratio]
   tp: Array<{                    // Top projects (max 12)
     n: string;                   // Name (truncated to 20 chars)
     m: number;                   // Messages
-    h: number;                   // Hours
+    h: number;                   // Hours (integer)
     d: number;                   // Days active
     s: number;                   // Sessions
     ar: number;                  // Agent ratio (0-100)
-    fd: number;                  // First day (day of year, 1-366)
-    ld: number;                  // Last day (day of year, 1-366)
   }>;
 
   // === PROJECT CO-OCCURRENCE (for graph) ===
@@ -81,7 +81,8 @@ interface WrappedStoryV3 {
                                         // Only pairs with co_occurrence > 0
 
   // === TIMELINE EVENTS ===
-  // Limited to 15 most significant events
+  // Limited to 25 most significant events (increased from original 15 to use URL headroom)
+  // Wire format: [day, type, value, project_idx] (-1 for missing optional values)
   te: Array<{
     d: number;                   // Day of year (1-366)
     t: number;                   // Event type index (see EVENT_TYPES)
@@ -90,15 +91,16 @@ interface WrappedStoryV3 {
   }>;
 
   // === SESSION FINGERPRINTS (subset for visualization) ===
-  sf: Array<{                    // Top 10 most significant sessions
-    id: string;                  // Session ID (first 6 chars)
+  // Limited to 20 most significant sessions (increased from original 10 to use URL headroom)
+  // Wire format: [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
+  sf: Array<{                    // Top 20 most significant sessions
     d: number;                   // Duration minutes
     m: number;                   // Message count
-    a: boolean;                  // Is agent session
+    a: boolean;                  // Is agent session (wire: 1/0)
     h: number;                   // Start hour (0-23)
-    w: number;                   // Day of week (0-6)
+    w: number;                   // Day of week (0-6, 0=Monday)
     pi: number;                  // Project index (into tp array)
-    fp: number[];                // Fingerprint: 8 values encoding session "shape"
+    fp: number[];                // Fingerprint: 8 integers 0-100 encoding session "shape"
                                  // [msg_rate_q1, msg_rate_q2, msg_rate_q3, msg_rate_q4,
                                  //  tool_density, error_rate, edit_ratio, thinking_ratio]
   }>;
@@ -130,16 +132,16 @@ const EVENT_TYPES = [
 | Field | Typical Size | Max Size | Notes |
 |-------|--------------|----------|-------|
 | Core fields (v,y,n,p,s,m,h,d) | ~30 bytes | ~50 bytes | |
-| Heatmap (168 values, RLE) | ~80 bytes | ~200 bytes | RLE compresses sparse data |
+| Heatmap (168 values, RLE) | ~80 bytes | ~200 bytes | RLE compresses sparse data, quantized 0-15 |
 | Monthly arrays (3×12) | ~50 bytes | ~60 bytes | Small integers |
 | Distributions (3 arrays) | ~40 bytes | ~50 bytes | 10+10+8 bucket counts |
-| Trait scores (10 floats) | ~50 bytes | ~60 bytes | 2 decimal precision |
-| Projects (max 12) | ~400 bytes | ~600 bytes | ~50 bytes each |
+| Trait scores (10 ints) | ~15 bytes | ~20 bytes | 0-100 integers (1 byte each) |
+| Projects (max 12) | ~400 bytes | ~600 bytes | ~50 bytes each, 6-element arrays |
 | Co-occurrence (max 20) | ~80 bytes | ~120 bytes | Triples of small ints |
-| Timeline events (max 15) | ~100 bytes | ~150 bytes | Indexed types save bytes |
-| Session fingerprints (10) | ~250 bytes | ~300 bytes | 6-char IDs, project index |
+| Timeline events (max 25) | ~150 bytes | ~200 bytes | Indexed types, 4-element arrays |
+| Session fingerprints (20) | ~400 bytes | ~500 bytes | 14-element arrays (no ID field) |
 | YoY (5 values) | ~25 bytes | ~30 bytes | Optional |
-| **Total** | **~1.1KB** | **~1.6KB** | Safe margin under 2KB |
+| **Total** | **~1.3KB** | **~1.8KB** | Safe margin under 2KB |
 
 ### Hard Limits
 
@@ -149,8 +151,8 @@ These limits ensure URL size stays under 2KB:
 |-------|-------|-------------------|
 | `tp` (projects) | 12 | Remainder stats summed into hidden "Other" |
 | `pc` (co-occurrence) | 20 edges | Keep highest-weight edges |
-| `te` (events) | 15 | Prioritize: peak > milestones > streaks > gaps > new_project |
-| `sf` (fingerprints) | 10 | Keep highest significance score |
+| `te` (events) | 25 | Prioritize: peak > milestones > streaks > gaps > new_project |
+| `sf` (fingerprints) | 20 | Keep highest significance score |
 | Project names | 20 chars | Truncate with ellipsis |
 | Display name | 30 chars | Truncate |
 
@@ -1664,6 +1666,8 @@ function renderSessionFingerprints({
 
 ### 4.5 Card Playback Controls
 
+> **STATUS: FUTURE WORK** - Not yet implemented. Current implementation uses manual navigation only.
+
 The card flow supports pause/play functionality for users who want to study visualizations.
 
 **Control States:**
@@ -1913,6 +1917,8 @@ function handleUserInteraction(state: CardFlowState): CardFlowState {
 ```
 
 ### 4.9 Bento Box Layout (Dense 1-Pager)
+
+> **STATUS: FUTURE WORK** - Not yet implemented. Current implementation uses scrollable card flow only.
 
 Inspired by Apple's product page layouts, the Bento Box view presents all visualizations in a dense, information-rich grid that rewards close inspection. This is the **Tufte-optimized** view: maximum data-ink ratio, minimal navigation overhead.
 
