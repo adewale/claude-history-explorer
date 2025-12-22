@@ -34,7 +34,7 @@ function renderHeatmapSvg(hm: number[]): string {
   if (!hm || hm.length !== 168) return '';
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const cellSize = 10;
+  const cellSize = 12;
   const gap = 2;
   const labelWidth = 28;
   const width = labelWidth + 24 * (cellSize + gap);
@@ -56,7 +56,7 @@ function renderHeatmapSvg(hm: number[]): string {
     `<text x="${labelWidth + h * (cellSize + gap) + cellSize/2}" y="${height - 3}" fill="#666" font-size="7" text-anchor="middle">${h}</text>`
   ).join('');
 
-  return `<svg viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: 320px;">
+  return `<svg viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: 400px;">
     ${cells}
     ${hourLabels}
   </svg>`;
@@ -64,8 +64,8 @@ function renderHeatmapSvg(hm: number[]): string {
 
 function renderSparkline(data: number[]): string {
   if (!data || data.length === 0) return '';
-  const width = 200;
-  const height = 40;
+  const width = 280;
+  const height = 56;
   const max = Math.max(...data, 1);
   const barWidth = (width / data.length) - 2;
 
@@ -76,7 +76,7 @@ function renderSparkline(data: number[]): string {
     return `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="#333"/>`;
   }).join('');
 
-  return `<svg viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: 200px; height: 40px;">
+  return `<svg viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: 280px; height: 56px;">
     ${bars}
   </svg>`;
 }
@@ -118,11 +118,11 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
       font-family: 'Source Serif 4', Georgia, serif;
       color: var(--text);
       background: white;
-      max-width: 800px;
+      max-width: 960px;
       margin: 0 auto;
       padding: 2rem;
-      font-size: 11pt;
-      line-height: 1.65;
+      font-size: 13pt;
+      line-height: 1.55;
       letter-spacing: 0.01em;
     }
 
@@ -138,15 +138,16 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     }
 
     .header h1 {
-      font-size: 2rem;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      margin-bottom: 0.25rem;
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.5rem;
     }
 
     .header .subtitle {
-      color: var(--text-light);
+      color: var(--text);
       font-style: italic;
+      font-size: 1.15rem;
     }
 
 
@@ -164,10 +165,10 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     }
 
     .summary-value {
-      font-size: 1.85rem;
+      font-size: 2.75rem;
       font-weight: 700;
       line-height: 1;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
       font-variant-numeric: tabular-nums;
     }
 
@@ -295,7 +296,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
       font-size: 0.7rem;
       color: var(--text-light);
       margin-top: 0.25rem;
-      max-width: 200px;
+      max-width: 280px;
     }
 
     .footer {
@@ -312,11 +313,15 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     @media (max-width: 600px) {
       body {
         padding: 1rem;
-        font-size: 10pt;
+        font-size: 11pt;
       }
 
       .header h1 {
-        font-size: 1.25rem;
+        font-size: 1.75rem;
+      }
+
+      .header .subtitle {
+        font-size: 1rem;
       }
 
       .summary {
@@ -325,7 +330,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
       }
 
       .summary-value {
-        font-size: 1.5rem;
+        font-size: 2rem;
       }
 
       .two-col {
