@@ -309,6 +309,16 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
       text-align: center;
     }
 
+    .footer a {
+      color: #999;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      color: var(--text);
+      text-decoration: underline;
+    }
+
     /* Mobile responsiveness */
     @media (max-width: 600px) {
       body {
@@ -458,7 +468,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
   </div>
 
   <div class="footer">
-    Claude Code Wrapped ${year} | Generated from local Claude Code history
+    Claude Code Wrapped ${year} | Built on <a href="https://developers.cloudflare.com/" target="_blank" rel="noopener">the Cloudflare Developer Platform</a>
   </div>
 </body>
 </html>`;
