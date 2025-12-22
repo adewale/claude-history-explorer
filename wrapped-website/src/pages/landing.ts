@@ -42,12 +42,13 @@ export function renderLandingPage(): string {
       align-items: center;
       justify-content: center;
       padding: 2rem;
-      font-size: 11pt;
-      line-height: 1.65;
+      font-size: 13pt;
+      line-height: 1.55;
+      letter-spacing: 0.01em;
     }
 
     .container {
-      max-width: 520px;
+      max-width: 640px;
       width: 100%;
     }
 
@@ -58,15 +59,16 @@ export function renderLandingPage(): string {
     }
 
     h1 {
-      font-size: 1.75rem;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      margin-bottom: 0.25rem;
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.5rem;
     }
 
     .subtitle {
-      color: var(--text-light);
+      color: var(--text);
       font-style: italic;
+      font-size: 1.15rem;
     }
 
     .section {
@@ -179,9 +181,13 @@ export function renderLandingPage(): string {
     @media (max-width: 640px) {
       body {
         padding: 1.5rem;
+        font-size: 11pt;
       }
       h1 {
-        font-size: 1.5rem;
+        font-size: 1.75rem;
+      }
+      .subtitle {
+        font-size: 1rem;
       }
       .command-box {
         flex-direction: column;

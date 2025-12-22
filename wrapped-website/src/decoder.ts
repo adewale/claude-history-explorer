@@ -259,9 +259,20 @@ export function rleDecode(encoded: number[]): number[] {
 
 /**
  * Decode project array to object
- * Wire format: [name, messages, hours, days, sessions, agent_ratio]
+ *
+ * WIRE FORMAT: Array of 6 values [name, messages, hours, days, sessions, agent_ratio]
+ * Example: ["my-project", 500, 40, 15, 20, 60]
+ *
+ * NOT objects! If you're creating test data manually, use arrays not {n: "...", m: ...}
+ * The Python encoder (wrapped.py) creates this compact format for URL efficiency.
  */
 function decodeProject(arr: any[]): TopProjectV3 {
+  // Validate input is actually an array (catches common mistake of using object format)
+  if (arr && typeof arr === 'object' && !Array.isArray(arr)) {
+    console.warn('decodeProject received object instead of array - using object format directly');
+    const obj = arr as any;
+    return { n: obj.n || '', m: obj.m || 0, h: obj.h || 0, d: obj.d || 0, s: obj.s || 0, ar: obj.ar || 0 };
+  }
   return {
     n: arr[0] || '',
     m: arr[1] || 0,
@@ -274,9 +285,18 @@ function decodeProject(arr: any[]): TopProjectV3 {
 
 /**
  * Decode timeline event array to object
- * Wire format: [day, type, value, project_idx] (-1 for missing)
+ *
+ * WIRE FORMAT: Array of 4 values [day, type, value, project_idx] (-1 for missing)
+ * Example: [45, 0, 47, 0] means "peak_day on day 45, value 47, project index 0"
+ *
+ * Types: 0=peak_day, 1=streak_start, 2=streak_end, 3=new_project, 4=milestone, 5=gap_start, 6=gap_end
  */
 function decodeEvent(arr: any[]): TimelineEvent {
+  // Handle object format gracefully (for manually created test data)
+  if (arr && typeof arr === 'object' && !Array.isArray(arr)) {
+    console.warn('decodeEvent received object instead of array - using object format directly');
+    return arr as TimelineEvent;
+  }
   const event: TimelineEvent = {
     d: arr[0] || 0,
     t: arr[1] || 0,
@@ -288,9 +308,18 @@ function decodeEvent(arr: any[]): TimelineEvent {
 
 /**
  * Decode fingerprint array to object
- * Wire format: [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
+ *
+ * WIRE FORMAT: Array of 14 values [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
+ * Example: [3.5, 45, 1, 14, 2, 0, 72, 65, 78, 82, 45, 12, 68, 55]
+ *
+ * fp0-fp7 are the session "shape" fingerprint values (0-100 each)
  */
 function decodeFingerprint(arr: any[]): SessionFingerprint {
+  // Handle object format gracefully (for manually created test data)
+  if (arr && typeof arr === 'object' && !Array.isArray(arr)) {
+    console.warn('decodeFingerprint received object instead of array - using object format directly');
+    return arr as SessionFingerprint;
+  }
   // Get fingerprint values, pad to 8 elements if needed
   const rawFp = arr.slice(6, 14);
   const fp = rawFp.length >= 8 ? rawFp : [...rawFp, ...Array(8 - rawFp.length).fill(0)];
