@@ -1,5 +1,8 @@
 # Claude Code Wrapped - UX Specification
 
+> **Note**: This document describes the original card-based Story Mode which has been removed.
+> As of December 2024, Print view is the only view. This document is retained for historical reference.
+
 ## Overview
 
 This document specifies the user experience for the Wrapped landing page—the critical conversion point where viewers become generators, and generators become sharers.

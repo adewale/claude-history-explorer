@@ -24,6 +24,7 @@ import {
   normalizeFingerprint,
   getHeatmapValue,
   getEventTypeName,
+  dayOfYearToMonth,
   type WrappedStoryV3,
   type TraitScores,
 } from '../src/decoder';
@@ -589,6 +590,101 @@ function testEdgeCases() {
 }
 
 testEdgeCases();
+
+console.log('\n=== Audit Issue Tests ===');
+
+function testAuditIssues() {
+  // Issue #1: Array boundary validation - decodeProject with short arrays
+  // These tests verify the decoder handles malformed/short arrays gracefully
+  const shortProjectStory = {
+    v: 3,
+    y: 2025,
+    p: 1, s: 1, m: 100, h: 1, d: 1,
+    hm: Array(168).fill(0),
+    ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
+    sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
+    ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
+    tp: [
+      ['ProjectA'],  // Only 1 element instead of 6
+      ['ProjectB', 100],  // Only 2 elements
+      [],  // Empty array
+    ],
+    pc: [], te: [], sf: [], ls: 0, sk: [0, 0, 0, 0],
+    tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
+  };
+  const packed1 = msgpack.encode(shortProjectStory);
+  const encoded1 = base64UrlEncode(new Uint8Array(packed1));
+  const decoded1 = decodeWrappedStoryV3(encoded1);
+
+  assertEqual(decoded1.tp[0].n, 'ProjectA', 'short project array - name preserved');
+  assertEqual(decoded1.tp[0].m, 0, 'short project array - missing m defaults to 0');
+  assertEqual(decoded1.tp[1].n, 'ProjectB', 'partial project array - name preserved');
+  assertEqual(decoded1.tp[1].m, 100, 'partial project array - m preserved');
+  assertEqual(decoded1.tp[1].h, 0, 'partial project array - missing h defaults to 0');
+  assertEqual(decoded1.tp[2].n, '', 'empty project array - name defaults to empty');
+
+  // Issue #3: dayOfYearToMonth with year parameter
+  // Day 60 in leap year (2024) = Feb 29, in non-leap (2025) = Mar 1
+  assertEqual(dayOfYearToMonth(60, 2024), 'Feb', 'leap year day 60 is Feb');
+  assertEqual(dayOfYearToMonth(60, 2025), 'Mar', 'non-leap year day 60 is Mar');
+  assertEqual(dayOfYearToMonth(1, 2025), 'Jan', 'day 1 is Jan');
+  assertEqual(dayOfYearToMonth(365, 2025), 'Dec', 'day 365 is Dec');
+
+  // Issue #9: Fingerprint with short arrays
+  const shortFingerprintStory = {
+    v: 3,
+    y: 2025,
+    p: 1, s: 1, m: 100, h: 1, d: 1,
+    hm: Array(168).fill(0),
+    ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
+    sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
+    ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
+    tp: [],
+    pc: [], te: [],
+    sf: [
+      [120, 50, 1, 14, 2, 0, 80, 60],  // Only 8 elements instead of 14
+      [60, 25, 0],  // Only 3 elements
+    ],
+    ls: 0, sk: [0, 0, 0, 0],
+    tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
+  };
+  const packed2 = msgpack.encode(shortFingerprintStory);
+  const encoded2 = base64UrlEncode(new Uint8Array(packed2));
+  const decoded2 = decodeWrappedStoryV3(encoded2);
+
+  assertEqual(decoded2.sf[0].d, 120, 'short fingerprint - duration preserved');
+  assertEqual(decoded2.sf[0].fp.length, 8, 'short fingerprint - fp array padded to 8');
+  assertEqual(decoded2.sf[1].d, 60, 'minimal fingerprint - duration preserved');
+  assertEqual(decoded2.sf[1].fp.length, 8, 'minimal fingerprint - fp array padded to 8');
+
+  // Issue #10: Event type validation (should handle invalid types gracefully)
+  const invalidEventStory = {
+    v: 3,
+    y: 2025,
+    p: 1, s: 1, m: 100, h: 1, d: 1,
+    hm: Array(168).fill(0),
+    ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
+    sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
+    ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
+    tp: [],
+    pc: [],
+    te: [
+      [10, 99, -1, -1],  // Invalid event type 99
+      [20, 0, 100, 0],   // Valid event type 0
+    ],
+    sf: [], ls: 0, sk: [0, 0, 0, 0],
+    tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
+  };
+  const packed3 = msgpack.encode(invalidEventStory);
+  const encoded3 = base64UrlEncode(new Uint8Array(packed3));
+  const decoded3 = decodeWrappedStoryV3(encoded3);
+
+  // Should not crash, event type should be clamped or preserved
+  assertTrue(decoded3.te.length === 2, 'invalid event type - events decoded');
+  assertEqual(decoded3.te[1].t, 0, 'valid event type preserved');
+}
+
+testAuditIssues();
 
 // Summary
 console.log('\n=================================');

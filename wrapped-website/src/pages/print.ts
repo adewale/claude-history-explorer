@@ -4,6 +4,7 @@
  */
 
 import { WrappedStoryV3, formatNumber, getTraitDescription, TokenStats } from '../decoder';
+import { HEATMAP_QUANT_SCALE } from '../constants';
 
 function escapeHtml(str: string): string {
   if (!str) return '';
@@ -44,7 +45,7 @@ function renderHeatmapSvg(hm: number[]): string {
     cells += `<text x="0" y="${d * (cellSize + gap) + cellSize - 1}" fill="#333" font-size="8" font-family="sans-serif">${days[d]}</text>`;
     for (let h = 0; h < 24; h++) {
       const value = hm[d * 24 + h] || 0;
-      const opacity = value / 15;
+      const opacity = value / HEATMAP_QUANT_SCALE;
       const x = labelWidth + h * (cellSize + gap);
       const y = d * (cellSize + gap);
       cells += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="1" fill="#333" opacity="${Math.max(0.05, opacity)}"/>`;
@@ -95,7 +96,10 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${displayName}'s Claude Code Wrapped ${year} - Print</title>
+  <title>${escapeHtml(displayName)}'s Claude Code Wrapped ${year}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -111,14 +115,15 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     }
 
     body {
-      font-family: 'Georgia', serif;
+      font-family: 'Source Serif 4', Georgia, serif;
       color: var(--text);
       background: white;
       max-width: 800px;
       margin: 0 auto;
       padding: 2rem;
       font-size: 11pt;
-      line-height: 1.5;
+      line-height: 1.65;
+      letter-spacing: 0.01em;
     }
 
     @media print {
@@ -133,8 +138,9 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     }
 
     .header h1 {
-      font-size: 1.75rem;
-      font-weight: normal;
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
       margin-bottom: 0.25rem;
     }
 
@@ -143,26 +149,6 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
       font-style: italic;
     }
 
-    .view-links {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-
-    .view-links a {
-      color: var(--text-light);
-      text-decoration: none;
-      font-size: 0.9rem;
-    }
-
-    .view-links a:hover {
-      color: var(--text);
-    }
-
-    .view-links a.active {
-      color: var(--text);
-      font-weight: bold;
-    }
 
     .summary {
       display: grid;
@@ -178,16 +164,18 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     }
 
     .summary-value {
-      font-size: 2rem;
-      font-weight: bold;
+      font-size: 1.85rem;
+      font-weight: 700;
       line-height: 1;
+      letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
     }
 
     .summary-label {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       color: var(--text-light);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }
 
     .section {
@@ -195,10 +183,10 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     }
 
     .section-title {
-      font-size: 0.9rem;
-      font-weight: bold;
+      font-size: 0.85rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.12em;
       color: var(--text-light);
       margin-bottom: 0.75rem;
       border-bottom: 1px solid var(--border);
@@ -231,10 +219,11 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     }
 
     .project-table th {
-      font-weight: normal;
+      font-weight: 600;
       color: var(--text-light);
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
+      letter-spacing: 0.1em;
     }
 
     .project-table td:last-child {
@@ -255,7 +244,8 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
 
     .trait-name {
       width: 80px;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
+      font-weight: 500;
     }
 
     .trait-bar-bg {
@@ -312,8 +302,9 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
       margin-top: 2rem;
       padding-top: 1rem;
       border-top: 1px solid var(--border);
-      font-size: 0.8rem;
-      color: var(--text-light);
+      font-size: 0.75rem;
+      letter-spacing: 0.03em;
+      color: #999;
       text-align: center;
     }
 
@@ -353,10 +344,6 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
   <div class="header">
     <h1>Claude Code Wrapped ${year}</h1>
     <div class="subtitle">${escapeHtml(displayName)}'s Year in Review</div>
-    <div class="view-links no-print">
-      <a href="?d=${encodedData}">Bento</a>
-      <a href="?view=print&d=${encodedData}" class="active">Print</a>
-    </div>
   </div>
 
   <div class="summary">
@@ -467,6 +454,42 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
 
   <div class="footer">
     Claude Code Wrapped ${year} | Generated from local Claude Code history
+  </div>
+</body>
+</html>`;
+}
+
+export function renderErrorPage(error: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error - Claude Code Wrapped</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Georgia, serif;
+      background: white;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+    .error-container { max-width: 400px; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; font-weight: normal; }
+    p { color: #666; margin-bottom: 2rem; }
+    a { color: #1a1a1a; }
+  </style>
+</head>
+<body>
+  <div class="error-container">
+    <h1>Something went wrong</h1>
+    <p>${escapeHtml(error)}</p>
+    <a href="/">← Back to home</a>
   </div>
 </body>
 </html>`;

@@ -802,14 +802,12 @@ interface WrappedStoryV3 {
   };
 
   tp: Array<{
-    n: string;
-    m: number;
-    h: number;
-    d: number;
-    s: number;
-    ar: number;
-    fd: number;
-    ld: number;
+    n: string;   // project name
+    m: number;   // message count
+    h: number;   // hours (integer)
+    d: number;   // days active
+    s: number;   // session count
+    ar: number;  // agent ratio (0-100)
   }>;
 
   pc: Array<[number, number, number]>;
@@ -1644,239 +1642,23 @@ function renderSessionFingerprints({
 
 ### 4.4 Card Flow Definition
 
-**Card Sequence (all viewports):**
+> **STATUS: FUTURE WORK** - Not yet implemented. Current implementation uses Print view only.
 
-| # | Card ID | Title | Content | Skip Condition |
-|---|---------|-------|---------|----------------|
-| 1 | `welcome` | "Your {year}" | Name, core stats summary | Never |
-| 2 | `rhythm` | "Your Rhythm" | 7×24 Heatmap + peak time insight | Never |
-| 3 | `timeline` | "Your Year" | Monthly timeline + event markers | Never |
-| 4 | `sessions` | "Session Patterns" | Duration + Agent ratio histograms | Never |
-| 5 | `traits` | "Your Profile" | Radar (desktop) or Bars (mobile) | Never |
-| 6 | `projects` | "Your Projects" | Treemap + top project callout | p < 2 |
-| 7 | `connections` | "Project Flow" | Co-occurrence graph/list | p < 3 |
-| 8 | `growth` | "Year over Year" | Slope graph | No yoy data |
-| 9 | `fingerprints` | "Top Sessions" | Session fingerprint grid | s < 3 |
-| 10 | `share` | "Share Your Story" | Share buttons, print, copy URL | Never |
+The card flow is a planned feature for presenting stats as a sequence of interactive cards.
 
-**Navigation:**
-- **Mobile**: Swipe left/right, dot indicators, edge tap zones
-- **Desktop**: Arrow keys, click dots, optional auto-advance
-- **Keyboard**: Numbers 1-0 jump to cards
+### 4.5 Desktop Dashboard Layout
 
-### 4.5 Card Playback Controls
+> **STATUS: FUTURE WORK** - Not yet implemented. Current implementation uses Print view only.
 
-> **STATUS: FUTURE WORK** - Not yet implemented. Current implementation uses manual navigation only.
+The desktop dashboard is a planned feature for presenting all visualizations in a rich interactive grid.
 
-The card flow supports pause/play functionality for users who want to study visualizations.
+### 4.6 Mobile Card Layouts
 
-**Control States:**
-| State | Icon | Behavior |
-|-------|------|----------|
-| Playing | ▐▐ (pause) | Auto-advance every 5s, tap to pause |
-| Paused | ▶ (play) | Manual navigation only, tap to resume |
+> **STATUS: FUTURE WORK** - Not yet implemented. Current implementation uses Print view only.
 
-**Pause Triggers:**
-- Tap pause button (bottom center, near dots)
-- Any swipe gesture (user taking control)
-- Keyboard navigation (←/→ arrows)
-- Touch/click on visualization (inspecting detail)
+The mobile card layouts are a planned feature for swipeable card-based presentation on mobile devices.
 
-**Resume Triggers:**
-- Tap play button
-- Press Space key
-- 30s idle timeout (optional, configurable)
-
-**Visual Feedback:**
-```
-Paused state:
-┌─────────────────────────┐
-│                         │
-│   [Card Content]        │
-│                         │
-│                         │
-│   ▶  ● ○ ○ ○ ○ ○       │
-│   ↑ Play button         │
-└─────────────────────────┘
-
-Playing state:
-┌─────────────────────────┐
-│                         │
-│   [Card Content]        │
-│                         │
-│        ═══════▶ 3s      │  ← Progress bar (optional)
-│   ▐▐ ● ○ ○ ○ ○ ○       │
-│   ↑ Pause button        │
-└─────────────────────────┘
-```
-
-**Implementation:**
-```typescript
-interface CardFlowState {
-  currentIndex: number;
-  isPlaying: boolean;
-  autoAdvanceDelay: number;  // ms, default 5000
-  idleResumeTimeout: number; // ms, default 30000, 0 = disabled
-}
-
-function togglePlayback(state: CardFlowState): CardFlowState {
-  return { ...state, isPlaying: !state.isPlaying };
-}
-
-function handleUserInteraction(state: CardFlowState): CardFlowState {
-  // Pause on any user navigation
-  return { ...state, isPlaying: false };
-}
-```
-
-### 4.6 Touch Interactions
-
-| Gesture | Element | Action |
-|---------|---------|--------|
-| Swipe left | Card | Next card |
-| Swipe right | Card | Previous card |
-| Tap | Heatmap cell | Show tooltip with value |
-| Tap | Treemap rect | Highlight project, show stats |
-| Tap | Timeline event | Show event detail |
-| Tap | Fingerprint | Show session detail modal |
-| Long press | Any stat | Copy value to clipboard |
-| Pinch | Heatmap | Zoom in/out (optional) |
-| Double tap | Zoomed viz | Reset zoom |
-
-### 4.6 Desktop Dashboard Layout
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  Header: Claude Code Wrapped {year}              [Name]    [Card View] [Print]  │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌──────────────────────────────┐  ┌──────────────────────────────────────────┐│
-│  │ CORE STATS                   │  │ ACTIVITY HEATMAP                         ││
-│  │ 5,316 messages  312 hours    │  │ [7×24 grid - 400×140]                    ││
-│  │ 70 sessions     4 projects   │  │                                          ││
-│  │ 45 days active               │  │ Peak: Tuesday 10am                       ││
-│  └──────────────────────────────┘  └──────────────────────────────────────────┘│
-│                                                                                 │
-│  ┌──────────────────────────────────────────────────────────────────────────────┤
-│  │ TIMELINE + EVENTS                                                           ││
-│  │ [Monthly bars with event markers - full width × 130]                        ││
-│  └──────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌─────────────────┐ ┌─────────────────┐ ┌──────────────────────────────────────┤
-│  │ SESSION DIST    │ │ AGENT RATIO     │ │ TRAIT PROFILE (Radar)               ││
-│  │ [histogram]     │ │ [histogram]     │ │ [10-axis radar - 280×280]           ││
-│  │ 280×80          │ │ 280×80          │ │                                      ││
-│  └─────────────────┘ └─────────────────┘ └──────────────────────────────────────┤
-│                                                                                 │
-│  ┌──────────────────────────────────────┐ ┌────────────────────────────────────┤
-│  │ ALL PROJECTS (Treemap)               │ │ CO-OCCURRENCE GRAPH                ││
-│  │ [squarified treemap - 400×200]       │ │ [circular layout - 300×200]        ││
-│  │                                       │ │                                    ││
-│  └──────────────────────────────────────┘ └────────────────────────────────────┤
-│                                                                                 │
-│  ┌──────────────────────────────────────┐ ┌────────────────────────────────────┤
-│  │ YEAR OVER YEAR (if available)        │ │ TOP SESSIONS (Fingerprints)        ││
-│  │ [slope graph - 300×200]              │ │ [10 fingerprints - full width]     ││
-│  └──────────────────────────────────────┘ └────────────────────────────────────┤
-│                                                                                 │
-│  ┌──────────────────────────────────────────────────────────────────────────────┤
-│  │ TRAIT SCORES: ad:0.73 sp:0.81 fc:0.45 cc:0.89 wr:0.23 bs:0.62 cs:0.34 ...  ││
-│  └──────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  Footer: [Share] [Copy URL] [Download PDF] [View as Cards]                      │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 4.7 Mobile Card Layouts
-
-**Card: Welcome (xs-sm)**
-```
-┌─────────────────────────┐
-│                         │
-│   CLAUDE CODE WRAPPED   │
-│         2025            │
-│                         │
-│      [User Name]        │
-│                         │
-│   ┌─────────────────┐   │
-│   │    5,316        │   │
-│   │   messages      │   │
-│   └─────────────────┘   │
-│                         │
-│   312 hrs · 70 sessions │
-│   4 projects · 45 days  │
-│                         │
-│      [tap to begin]     │
-│                         │
-│         ○ ○ ○ ○ ○       │
-└─────────────────────────┘
-```
-
-**Card: Rhythm (xs-sm)**
-```
-┌─────────────────────────┐
-│     YOUR RHYTHM         │
-├─────────────────────────┤
-│                         │
-│  ┌───────────────────┐  │
-│  │ [Heatmap 290×100] │  │
-│  │ Mon ░░▓▓██▓░░░░░  │  │
-│  │ Tue ░░▓▓██▓░░░░░  │  │
-│  │ Wed ░░▓███▓▓░░░░  │  │
-│  │ Thu ░░▓▓██▓░░░░░  │  │
-│  │ Fri ░░░▓▓▓░░░░░░  │  │
-│  │ Sat ░░░░░░░░░░░░  │  │
-│  │ Sun ░░░░░░░░░░░░  │  │
-│  └───────────────────┘  │
-│                         │
-│  Peak: Tuesday 10am     │
-│  You're a morning coder │
-│                         │
-│       ● ○ ○ ○ ○ ○       │
-└─────────────────────────┘
-```
-
-**Card: Traits (xs-sm) - Bar Chart Fallback**
-```
-┌─────────────────────────┐
-│     YOUR PROFILE        │
-├─────────────────────────┤
-│                         │
-│  Delegation ████████░ 0.73
-│  Deep Work  █████████ 0.81
-│  Focus      █████░░░░ 0.45
-│  Regularity █████████ 0.89
-│  Burst      ██████░░░ 0.62
-│  Intensity  █████░░░░ 0.56
-│                         │
-│  [See all 10 traits →]  │
-│                         │
-│       ○ ○ ○ ● ○ ○       │
-└─────────────────────────┘
-```
-
-**Card: Connections (xs-sm) - List Fallback**
-```
-┌─────────────────────────┐
-│     PROJECT FLOW        │
-├─────────────────────────┤
-│                         │
-│  Worked together:       │
-│                         │
-│  Keyboardia + Auriga    │
-│  └─ 12 days             │
-│                         │
-│  Keyboardia + Lempicka  │
-│  └─ 8 days              │
-│                         │
-│  Auriga + CLI-tools     │
-│  └─ 5 days              │
-│                         │
-│       ○ ○ ○ ○ ○ ● ○     │
-└─────────────────────────┘
-```
-
-### 4.8 Print Layout (Single Page)
+### 4.7 Print Layout (Single Page)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -1916,182 +1698,7 @@ function handleUserInteraction(state: CardFlowState): CardFlowState {
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.9 Bento Box Layout (Dense 1-Pager)
-
-> **STATUS: FUTURE WORK** - Not yet implemented. Current implementation uses scrollable card flow only.
-
-Inspired by Apple's product page layouts, the Bento Box view presents all visualizations in a dense, information-rich grid that rewards close inspection. This is the **Tufte-optimized** view: maximum data-ink ratio, minimal navigation overhead.
-
-**Design Principles:**
-- Every pixel earns its place
-- No animation, no auto-advance—static contemplation
-- Information hierarchy through size, not sequence
-- Accessible via `?view=bento` URL parameter or toggle button
-
-**Grid Structure (12-column base):**
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│  CLAUDE CODE WRAPPED 2025                                    [Cards] [Bento] [Print] │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                      │
-│  ┌────────────────────────────────────┐  ┌────────────────────────────────────────┐ │
-│  │ ████  5,316                        │  │ ACTIVITY HEATMAP                       │ │
-│  │ ████  messages                     │  │ ┌──────────────────────────────────┐   │ │
-│  │ ████                               │  │ │ M ░░▓▓██▓▓░░░░░░░░░░░░░░        │   │ │
-│  │ ████  312 hours · 70 sessions      │  │ │ T ░░▓▓████▓▓░░░░░░░░░░░░        │   │ │
-│  │ ████  4 projects · 45 days         │  │ │ W ░░░▓████▓░░░░░░░░░░░░░        │   │ │
-│  │                                    │  │ │ T ░░▓▓██▓▓░░░░░░░░░░░░░░        │   │ │
-│  │  "A Deep Diver"                    │  │ │ F ░░░▓▓▓░░░░░░░░░░░░░░░░        │   │ │
-│  │                                    │  │ │ S ░░░░░░░░░░░░░░░░░░░░░░        │   │ │
-│  └────────────────────────────────────┘  │ │ S ░░░░░░░░░░░░░░░░░░░░░░        │   │ │
-│                                          │ └──────────────────────────────────┘   │ │
-│  ┌────────────────────────────────────┐  │ Peak: Tuesday 10am                     │ │
-│  │ TIMELINE + KEY MOMENTS             │  └────────────────────────────────────────┘ │
-│  │ ★        ◆            ▲    ●───○   │                                             │
-│  │ █▃▅▇████▇▆▅▄▃▂▁▂▃▄▅▆▇████▇▆▅▄▃▂▁  │  ┌────────────────────────────────────────┐ │
-│  │ J  F  M  A  M  J  J  A  S  O  N  D │  │ TRAIT PROFILE                          │ │
-│  │                                    │  │        Delegation                       │ │
-│  │ 🔥 Peak: Mar 15 (142 msgs)         │  │           ╱╲                            │ │
-│  │ 🏆 Milestone: 1K msgs (Feb 3)      │  │      Deep╱  ╲Focus                      │ │
-│  │ 🚀 7-day streak (Apr 1-7)          │  │   Work ╱    ╲                           │ │
-│  └────────────────────────────────────┘  │       ╲      ╱                          │ │
-│                                          │ Burst  ╲____╱  Regularity               │ │
-│  ┌─────────────────┐ ┌─────────────────┐ │        Intensity                        │ │
-│  │ SESSION LENGTH  │ │ AGENT USAGE     │ │                                         │ │
-│  │ ▁▂▅▇█▅▂▁░░      │ │ ▁▂▅▇██▇▅▂▁      │ │ ad:73 sp:81 fc:45 cc:89 bs:62 ri:56   │ │
-│  │ <15m····>48h    │ │ 0%·········100% │ └────────────────────────────────────────┘ │
-│  └─────────────────┘ └─────────────────┘                                            │
-│                                                                                      │
-│  ┌──────────────────────────────────────────────────────────────────────────────────┤
-│  │ PROJECTS (by messages)                                                           │
-│  │ ┌───────────────────────────────┬─────────────────────┬─────────────┬──────────┐│
-│  │ │                               │                     │             │          ││
-│  │ │    Keyboardia                 │    Auriga           │ Lempicka    │ CLI-tools││
-│  │ │    2,341 msgs · 156h          │    1,456 · 89h      │ 823 · 41h   │ 412 · 22h││
-│  │ │                               │                     │             │          ││
-│  │ └───────────────────────────────┴─────────────────────┴─────────────┴──────────┘│
-│  └──────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                      │
-│  ┌────────────────────────────────────┐  ┌────────────────────────────────────────┐ │
-│  │ PROJECT CO-OCCURRENCE              │  │ TOP SESSIONS                           │ │
-│  │                                    │  │                                        │ │
-│  │        Keyboardia                  │  │ [▓▓░░][░▓▓░][▓░░▓][░▓░▓][▓▓▓░]       │ │
-│  │           ╱╲                       │  │  abc1   def2  ghi3   jkl4  mno5        │ │
-│  │    12d╱    ╲8d                     │  │                                        │ │
-│  │      ╱        ╲                    │  │ [░░▓▓][▓░▓░][░▓▓▓][▓░░░][░░░▓]       │ │
-│  │ Auriga────────Lempicka             │  │  pqr6   stu7  vwx8   yza9  bcd0        │ │
-│  │        5d                          │  │                                        │ │
-│  └────────────────────────────────────┘  └────────────────────────────────────────┘ │
-│                                                                                      │
-│  ┌──────────────────────────────────────────────────────────────────────────────────┤
-│  │ wrapped-claude-codes.adewale-883.workers.dev · All data encoded in URL · No server│
-│  └──────────────────────────────────────────────────────────────────────────────────┤
-└─────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-**Bento Box CSS Grid:**
-```css
-.bento-grid {
-  display: grid;
-  gap: 16px;
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-
-  /* 12-column base grid */
-  grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: auto;
-
-  /* Named areas for flexible positioning */
-  grid-template-areas:
-    "hero   hero   hero   hero   heatmap heatmap heatmap heatmap heatmap heatmap heatmap heatmap"
-    "timeline timeline timeline timeline timeline timeline timeline traits traits traits traits traits"
-    "sess   sess   sess   agent  agent  agent  traits traits traits traits traits traits"
-    "treemap treemap treemap treemap treemap treemap treemap treemap treemap treemap treemap treemap"
-    "cooc   cooc   cooc   cooc   cooc   cooc   fingers fingers fingers fingers fingers fingers"
-    "footer footer footer footer footer footer footer footer footer footer footer footer";
-}
-
-.bento-hero { grid-area: hero; }
-.bento-heatmap { grid-area: heatmap; }
-.bento-timeline { grid-area: timeline; }
-.bento-traits { grid-area: traits; }
-.bento-sessions { grid-area: sess; }
-.bento-agent { grid-area: agent; }
-.bento-treemap { grid-area: treemap; }
-.bento-cooccurrence { grid-area: cooc; }
-.bento-fingerprints { grid-area: fingers; }
-.bento-footer { grid-area: footer; }
-
-/* Dense styling */
-.bento-grid .bento-cell {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 16px;
-  overflow: hidden;
-}
-
-.bento-cell h3 {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
-```
-
-**Responsive Bento (Tablet):**
-```css
-@media (max-width: 1024px) {
-  .bento-grid {
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-areas:
-      "hero   hero   hero   heatmap heatmap heatmap"
-      "timeline timeline timeline timeline timeline timeline"
-      "traits traits traits traits traits traits"
-      "sess   sess   sess   agent  agent  agent"
-      "treemap treemap treemap treemap treemap treemap"
-      "cooc   cooc   cooc   fingers fingers fingers";
-  }
-}
-```
-
-**Responsive Bento (Mobile):**
-On mobile (< 768px), Bento collapses to a scrollable single-column layout, maintaining density but allowing vertical scroll:
-
-```css
-@media (max-width: 767px) {
-  .bento-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .bento-cell {
-    width: 100%;
-  }
-}
-```
-
-**URL Parameter:**
-```
-/wrapped?d=...&view=bento    → Bento box layout
-/wrapped?d=...&view=cards    → Card flow (default)
-/wrapped?d=...&view=print    → Print-optimized
-```
-
-**Toggle Button:**
-Desktop header includes a view toggle:
-```html
-<div class="view-toggle">
-  <button class="active" data-view="cards">Cards</button>
-  <button data-view="bento">Bento</button>
-  <button data-view="print">Print</button>
-</div>
-```
-
-### 4.10 CSS Variables for Theming
+### 4.9 CSS Variables for Theming
 
 ```css
 :root {
@@ -2187,20 +1794,8 @@ Desktop header includes a view toggle:
 - [ ] Create `TraitBars` fallback for mobile
 - [ ] Create `Timeline` component with event markers
 - [ ] Create `SessionFingerprints` component with scroll
-- [ ] Implement card flow navigation (swipe, keys, dots)
-- [ ] Implement card pause/play controls with progress bar
-- [ ] Add pause triggers (swipe, keyboard nav, viz interaction)
-- [ ] Add idle resume timeout (configurable)
-- [ ] Create responsive card layouts for all breakpoints
-- [ ] Create dashboard layout for desktop
-- [ ] Create Bento Box dense 1-pager layout
-- [ ] Implement 12-column CSS Grid for Bento layout
-- [ ] Add responsive Bento for tablet (6-column)
-- [ ] Add responsive Bento for mobile (single-column scroll)
-- [ ] Create print stylesheet
+- [x] Create print stylesheet
 - [ ] Add "Download as PDF" button (browser print)
-- [ ] Add view toggle (cards ↔ bento ↔ print) on desktop
-- [ ] Support `?view=bento` URL parameter
 
 ### 5.3 Testing & Verification
 
@@ -2214,10 +1809,6 @@ Desktop header includes a view toggle:
 - [ ] Test payload size stays under 2KB with max data
 - [ ] Visual regression tests for all components at all breakpoints
 - [ ] Test print layout at 100%, 75%, 50% browser zoom
-- [ ] Test card navigation: swipe, keyboard, dots
-- [ ] Test card pause/play: manual pause, auto-pause on interaction, idle resume
-- [ ] Test Bento layout at all breakpoints (desktop, tablet, mobile)
-- [ ] Test view toggle persistence and URL parameter
 - [ ] Test on: iPhone SE, iPhone 14, iPad, 1080p desktop, 1440p desktop
 - [ ] Accessibility: screen reader, keyboard-only, reduced motion
 
@@ -2227,7 +1818,6 @@ Desktop header includes a view toggle:
 |--------|--------|-------------|
 | V3 payload size | < 2KB | Unit test with max data |
 | Initial render (mobile) | < 200ms | Lighthouse |
-| Card transition | < 100ms | Manual timing |
 | Heatmap render | < 16ms | Performance.now() |
 | Treemap layout | < 50ms | Performance.now() |
 | Total JS bundle | < 50KB gzipped | Build output |
@@ -2249,9 +1839,7 @@ The V3 URL format uses a query parameter:
 https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d={encoded}
 ```
 
-Optional view parameter:
-- `?view=bento` (default) - Interactive dashboard
-- `?view=print` - Print-friendly single page
+Print view is the only view. The page renders a Tufte-inspired, information-dense single page optimized for both screen and print.
 
 ### Breaking Changes from V2
 
@@ -2259,7 +1847,7 @@ Optional view parameter:
 - V1/V2 encoded data will not decode (error message shown)
 - Project name limit increased from 20 to 50 characters
 - All trait scores are now integers 0-100 (not floats)
-- Story mode view removed (only Bento and Print views remain)
+- Story mode and Bento views removed (only Print view remains)
 
 ---
 
@@ -2273,7 +1861,6 @@ Optional view parameter:
 | Information density | 5× V2 | Count distinct data points: V2 ~15, V3 ~75 |
 | Mobile usability | Score > 90 | Lighthouse |
 | Print quality | Clean at 100% zoom | Manual test |
-| Card completion rate | > 80% reach share card | Analytics (if added) |
 
 ---
 

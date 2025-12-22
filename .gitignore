@@ -50,3 +50,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 node_modules/
+
+# Wrangler-generated files in project root
+package.json
+package-lock.json

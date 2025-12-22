@@ -291,6 +291,10 @@ function decodeEvent(arr: any[]): TimelineEvent {
  * Wire format: [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
  */
 function decodeFingerprint(arr: any[]): SessionFingerprint {
+  // Get fingerprint values, pad to 8 elements if needed
+  const rawFp = arr.slice(6, 14);
+  const fp = rawFp.length >= 8 ? rawFp : [...rawFp, ...Array(8 - rawFp.length).fill(0)];
+
   return {
     d: arr[0] || 0,
     m: arr[1] || 0,
@@ -298,7 +302,7 @@ function decodeFingerprint(arr: any[]): SessionFingerprint {
     h: arr[3] || 0,
     w: arr[4] || 0,
     pi: arr[5] || 0,
-    fp: arr.slice(6, 14),  // Elements 6-13 are fp0..fp7
+    fp,
   };
 }
 
@@ -438,9 +442,11 @@ export function getTraitDescription(trait: string, score: number): string {
 
 /**
  * Convert day of year to month name
+ * @param dayOfYear - Day of year (1-366)
+ * @param year - Year to use for leap year calculation (default: current year)
  */
-export function dayOfYearToMonth(dayOfYear: number): string {
-  const date = new Date(2024, 0, dayOfYear);
+export function dayOfYearToMonth(dayOfYear: number, year: number = new Date().getFullYear()): string {
+  const date = new Date(year, 0, dayOfYear);
   return MONTHS_SHORT[date.getMonth()];
 }
 

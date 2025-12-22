@@ -48,130 +48,164 @@ pip install .
 
 ## Usage
 
-### List all projects
+> **Tip:** Every command supports `--example` to show usage examples: `claude-history search --example`
+
+### projects
+
+List all Claude Code projects sorted by last use.
 
 ```bash
 claude-history projects
+claude-history projects -n 10        # Limit to 10 projects
 ```
 
-Shows all projects you've used Claude Code with, sorted by last use.
+| Option | Description |
+|--------|-------------|
+| `-n, --limit` | Maximum projects to show (default: 20) |
 
-### List sessions for a project
+### sessions
+
+List sessions for a project. Search is a partial match on project path.
 
 ```bash
-claude-history sessions lempicka
-claude-history sessions "Documents/myproject"
+claude-history sessions myproject
+claude-history sessions "Documents/work" -n 5
 ```
 
-Shows all conversation sessions for a project. The search is a partial match on the project path.
+| Option | Description |
+|--------|-------------|
+| `-n, --limit` | Maximum sessions to show (default: 20) |
 
-### View a session
+### show
+
+Display messages from a session. Session ID can be a partial match.
 
 ```bash
 claude-history show e5c477f0
-claude-history show e5c477f0 --limit 100
+claude-history show e5c477f0 -n 100
 claude-history show e5c477f0 --raw
+claude-history show e5c477f0 -p myproject
 ```
 
-Shows the conversation messages from a session. Session ID can be a partial match.
+| Option | Description |
+|--------|-------------|
+| `-p, --project` | Limit search to specific project |
+| `-n, --limit` | Maximum messages to show (default: 50) |
+| `--raw` | Output raw JSON |
 
-### Search across conversations
+### search
+
+Search for a regex pattern across all conversations.
 
 ```bash
-# Search all projects
 claude-history search "TODO"
-
-# Search with regex
 claude-history search "error.*fix"
-
-# Search specific project
-claude-history search "prompt" -p lempicka
-
-# Case-sensitive search
-claude-history search "APIError" --case-sensitive
+claude-history search "bug" -p myproject
+claude-history search "API" -c
+claude-history search "function" -C 200
 ```
 
-### Export a session
+| Option | Description |
+|--------|-------------|
+| `-p, --project` | Limit search to specific project |
+| `-c, --case-sensitive` | Case-sensitive search |
+| `-n, --limit` | Maximum results to show (default: 20) |
+| `-C, --context` | Characters of context around match (default: 100) |
+
+### export
+
+Export a session to JSON, Markdown, or plain text.
 
 ```bash
-# Export to Markdown
 claude-history export e5c477f0 -f markdown -o session.md
-
-# Export to JSON
 claude-history export e5c477f0 -f json -o session.json
-
-# Export to plain text
 claude-history export e5c477f0 -f text
+claude-history export e5c477f0 -p myproject -f json
 ```
 
-### Show storage info
+| Option | Description |
+|--------|-------------|
+| `-p, --project` | Limit search to specific project |
+| `-f, --format` | Output format: `json`, `markdown`, `text` (default: markdown) |
+| `-o, --output` | Output file (default: stdout) |
+
+### info
+
+Show Claude Code storage location and usage statistics.
 
 ```bash
 claude-history info
 ```
 
-Shows where Claude Code stores data and statistics about your usage.
+### stats
 
-### View statistics
+Show detailed statistics including message counts, duration, storage size, and agent usage.
 
 ```bash
-# Global statistics
 claude-history stats
-
-# Project-specific statistics
-claude-history stats -p auriga
-
-# JSON output format
-claude-history stats --format json
+claude-history stats -p myproject
+claude-history stats -f json
 ```
 
-Shows detailed statistics including message counts, duration, storage size, and agent usage.
+| Option | Description |
+|--------|-------------|
+| `-p, --project` | Show stats for specific project only |
+| `-f, --format` | Output format: `table`, `json` (default: table) |
 
-### Generate summary
+### summary
+
+Generate a comprehensive summary with insights and charts.
 
 ```bash
-# Global summary (text format)
 claude-history summary
-
-# Project-specific summary
-claude-history summary -p auriga
-
-# Markdown format
-claude-history summary --format markdown
-
-# Save to file
-claude-history summary -o summary.md
+claude-history summary -p myproject
+claude-history summary -f markdown -o report.md
 ```
 
-Generates a comprehensive summary with insights, ASCII bar charts, and sparklines for trend visualization. The summary command reuses the stats functionality for analysis.
+| Option | Description |
+|--------|-------------|
+| `-p, --project` | Generate summary for specific project |
+| `-f, --format` | Output format: `text`, `markdown` (default: text) |
+| `-o, --output` | Output file (default: stdout) |
 
-### Tell project story
+### story
+
+Tell the story of your development journey with personality insights and patterns.
 
 ```bash
-# Global story of all projects
 claude-history story
-
-# Story for specific project
-claude-history story -p auriga
-
-# Different story formats
-claude-history story --format brief
-claude-history story --format detailed
-claude-history story --format timeline
-
-# Save story to file
-claude-history story -p auriga -o auriga_story.md
+claude-history story -p myproject
+claude-history story -f brief
+claude-history story -f timeline -o journey.md
 ```
 
-Generates narrative insights about your development journey, including:
-- **Project lifecycle** and evolution patterns
-- **Collaboration style** and agent usage patterns
-- **Work intensity** and session patterns
-- **Project personality** traits
-- **Key insights** and productivity patterns
-- **Timeline visualization** with sparklines showing daily activity patterns
+| Option | Description |
+|--------|-------------|
+| `-p, --project` | Tell story for specific project |
+| `-f, --format` | Story format: `brief`, `detailed`, `timeline` (default: detailed) |
+| `-o, --output` | Output file (default: stdout) |
 
-The story command transforms raw conversation data into compelling narratives about your coding journey, work patterns, and development personality.
+Generates narrative insights including project lifecycle, collaboration style, work intensity, personality traits, and timeline visualization with sparklines.
+
+### wrapped
+
+Generate a shareable Wrapped URL containing your year's stats. All data is encoded in the URL—nothing is stored on any server.
+
+```bash
+claude-history wrapped
+claude-history wrapped -y 2024
+claude-history wrapped -n "Your Name"
+claude-history wrapped --raw
+claude-history wrapped --decode "https://..."
+```
+
+| Option | Description |
+|--------|-------------|
+| `-y, --year` | Year to generate wrapped for (default: current year) |
+| `-n, --name` | Display name to show on wrapped cards |
+| `--raw` | Output raw JSON instead of URL |
+| `--no-copy` | Don't copy URL to clipboard |
+| `-d, --decode` | Decode and display a Wrapped URL |
 
 ## How Claude Code Stores History
 

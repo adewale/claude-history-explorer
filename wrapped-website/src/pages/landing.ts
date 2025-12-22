@@ -1,5 +1,6 @@
 /**
  * Landing page HTML for wrapped-claude-codes.adewale-883.workers.dev
+ * Stark, Tufte-inspired design matching the Print view
  */
 
 export function renderLandingPage(): string {
@@ -16,7 +17,7 @@ export function renderLandingPage(): string {
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -25,144 +26,149 @@ export function renderLandingPage(): string {
     }
 
     :root {
-      --bg-dark: #0a0a0a;
-      --bg-card: #141414;
-      --text-primary: #ffffff;
-      --text-secondary: #a0a0a0;
-      --accent: #d4a574;
-      --accent-hover: #e5b889;
-      --border: #2a2a2a;
+      --text: #1a1a1a;
+      --text-light: #666;
+      --border: #ddd;
+      --bg: #ffffff;
     }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg-dark);
-      color: var(--text-primary);
+      font-family: 'Source Serif 4', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 2rem;
+      font-size: 11pt;
+      line-height: 1.65;
     }
 
     .container {
-      max-width: 600px;
-      text-align: center;
+      max-width: 520px;
+      width: 100%;
     }
 
-    .logo {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-    }
-
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-      background: linear-gradient(135deg, var(--accent), #fff);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .subtitle {
-      font-size: 1.25rem;
-      color: var(--text-secondary);
-      margin-bottom: 3rem;
-    }
-
-    .command-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 2rem;
+    .header {
+      border-bottom: 2px solid var(--text);
+      padding-bottom: 1rem;
       margin-bottom: 2rem;
     }
 
-    .command-card h2 {
-      font-size: 1rem;
-      color: var(--text-secondary);
-      margin-bottom: 1rem;
-      font-weight: 500;
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
     }
 
-    .command {
-      background: #1a1a1a;
-      border-radius: 8px;
-      padding: 1rem 1.5rem;
+    .subtitle {
+      color: var(--text-light);
+      font-style: italic;
+    }
+
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-light);
+      margin-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.25rem;
+    }
+
+    .command-box {
+      border: 1px solid var(--border);
+      padding: 1rem;
       font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-      font-size: 1rem;
-      color: var(--accent);
+      font-size: 0.95rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
     }
 
-    .command code {
+    .command-box code {
       flex: 1;
-      text-align: left;
     }
 
     .copy-btn {
       background: none;
-      border: none;
-      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-light);
       cursor: pointer;
-      padding: 0.5rem;
-      border-radius: 4px;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
       transition: all 0.2s;
     }
 
     .copy-btn:hover {
-      color: var(--text-primary);
-      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      border-color: var(--text);
     }
 
-    .features {
-      display: grid;
-      gap: 1rem;
-      margin-bottom: 2rem;
+    .feature-list {
+      list-style: none;
     }
 
-    .feature {
+    .feature-list li {
+      padding: 0.4rem 0;
+      border-bottom: 1px solid var(--border);
       display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      color: var(--text-secondary);
-      font-size: 0.95rem;
+      align-items: baseline;
+      gap: 0.5rem;
     }
 
-    .feature-icon {
-      width: 24px;
-      height: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .feature-list li:last-child {
+      border-bottom: none;
+    }
+
+    .feature-bullet {
+      color: var(--text-light);
+      font-size: 0.8rem;
     }
 
     .privacy-note {
-      color: var(--text-secondary);
-      font-size: 0.875rem;
+      font-size: 0.9rem;
       padding: 1rem;
-      background: rgba(212, 165, 116, 0.1);
-      border-radius: 8px;
-      border: 1px solid rgba(212, 165, 116, 0.2);
+      border: 1px solid var(--border);
+      background: #fafafa;
     }
 
     .privacy-note strong {
-      color: var(--accent);
+      font-weight: 600;
     }
 
     footer {
-      margin-top: 3rem;
-      color: var(--text-secondary);
-      font-size: 0.875rem;
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-light);
+      font-size: 0.75rem;
+      letter-spacing: 0.03em;
+      text-align: center;
+    }
+
+    a {
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    a:hover {
+      color: var(--text-light);
     }
 
     footer a {
-      color: var(--accent);
       text-decoration: none;
     }
 
@@ -171,68 +177,65 @@ export function renderLandingPage(): string {
     }
 
     @media (max-width: 640px) {
+      body {
+        padding: 1.5rem;
+      }
       h1 {
-        font-size: 2rem;
+        font-size: 1.5rem;
       }
-      .subtitle {
-        font-size: 1rem;
-      }
-      .command {
+      .command-box {
         flex-direction: column;
         gap: 0.75rem;
-      }
-      .command code {
         text-align: center;
-        font-size: 0.9rem;
       }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="logo">🎁</div>
-    <h1>Claude Code Wrapped</h1>
-    <p class="subtitle">Your year in code with Claude</p>
+    <div class="header">
+      <h1>Claude Code Wrapped</h1>
+      <p class="subtitle">Your year in code with Claude</p>
+    </div>
 
-    <div class="command-card">
-      <h2>Generate your wrapped</h2>
-      <div class="command">
+    <div class="section">
+      <div class="section-title">About</div>
+      <p>Built on <a href="https://github.com/adewale/claude-history-explorer">Claude History Explorer</a>, a Python CLI tool to explore, search and visualise your Claude Code conversation history.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Generate</div>
+      <div class="command-box">
         <code>claude-history wrapped</code>
-        <button class="copy-btn" onclick="copyCommand()" title="Copy to clipboard">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-        </button>
+        <button class="copy-btn" onclick="copyCommand()">Copy</button>
       </div>
     </div>
 
-    <div class="features">
-      <div class="feature">
-        <span class="feature-icon">📊</span>
-        <span>See your message count, hours coded, and projects</span>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">🎭</span>
-        <span>Discover your coding personality traits</span>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">📈</span>
-        <span>View your monthly activity sparkline</span>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">🔗</span>
-        <span>Share your story with a unique URL</span>
-      </div>
+    <div class="section">
+      <div class="section-title">What You'll See</div>
+      <ul class="feature-list">
+        <li><span class="feature-bullet">-</span> Message count, hours coded, projects</li>
+        <li><span class="feature-bullet">-</span> Weekly activity heatmap</li>
+        <li><span class="feature-bullet">-</span> Monthly sparkline</li>
+        <li><span class="feature-bullet">-</span> Coding style traits</li>
+        <li><span class="feature-bullet">-</span> Shareable URL</li>
+      </ul>
     </div>
 
-    <div class="privacy-note">
-      <strong>🔒 Privacy first:</strong> All data is encoded in the URL itself.
-      We never see, store, or process your code or conversations.
+    <div class="section">
+      <div class="section-title">Example</div>
+      <p><a href="/wrapped?d=3gAaoXYDoXjNB-mhYwmhYqI3OKFozQTSoXnNB-ihZB6iaG3cAKgCAgIAAAAEBAULCwwGBg4PDg4HCAgCBAQCAQEBAAAFBQYLDA0GBg8PDQ0IBwgEBAQBAAEBAAEEBQUMDAsGBg4NDg8IBwkEAgQAAQACAQEGBAQNDAwHBg4PDg0IBwcDAgMAAAEAAAEEBgYMDQsHBQ0PDg4HCAcDAwICAAABAQACAQIEBQUDBAQEBgQFBgcEBAMAAAAAAAEDAgMFBAQEAgQFBQUFBQYCBAKibWGcChQeKDI8RlBaZG54om1onAUKDxQZHiMoLTI3PKJtc5wCBAYICgwOEBIUFhiic2SKomFkQaJzcC2iZmNGomNjAKJ3ckCiYnMoomNzPKJtdjKidGRLonJpN6JhcpoKDxQZFA8KBQMCom1slqI1MKMxMDCjMTUwozIwMKMyNTCjMzAwonRwk4ahbqxEZW1vIFByb2plY3Shbc0B9KFoKKFkD6FzFKJhcjyGoW6rRXhhbXBsZSBBcHChbc0BkKFoI6FkDKFzD6Jhci2GoW6qVGVzdCBTdWl0ZaFtzQFeoWgZoWQIoXMKomFyHqJwY5OTAAEFkwACA5MBAgKidGWQonNmkKJsc8tAEgAAAAAAAKFuqURlbW8gVXNlcqFtzQMMoXAFoXMyonRzhqJhZEGic3AtomZjRqJicyiiY3M8onJpN6Jza5QFBwMEonRrhqV0b3RhbM4AB6EgpWlucHV0zgAEk-Cmb3V0cHV0zgADDUCqY2FjaGVfcmVhZM3DUKxjYWNoZV9jcmVhdGXNJxCmbW9kZWxzgqZzb25uZXTOAAYagKVoYWlrdc4AAYag">View an example with sample data</a></p>
+    </div>
+
+    <div class="section">
+      <div class="privacy-note">
+        <strong>Privacy:</strong> All data is encoded in the URL itself.
+        We (the Wrapped web site) never see, store, or process your code or conversations.
+      </div>
     </div>
 
     <footer>
-      Part of <a href="https://github.com/anthropics/claude-code" target="_blank" rel="noopener">Claude Code</a>
+      Generated by <a href="https://github.com/adewale/claude-history-explorer" target="_blank" rel="noopener">claude-history-explorer</a>
     </footer>
   </div>
 
@@ -240,9 +243,14 @@ export function renderLandingPage(): string {
     function copyCommand() {
       navigator.clipboard.writeText('claude-history wrapped');
       const btn = document.querySelector('.copy-btn');
-      btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      const original = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.style.borderColor = '#1a1a1a';
+      btn.style.color = '#1a1a1a';
       setTimeout(() => {
-        btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+        btn.textContent = original;
+        btn.style.borderColor = '';
+        btn.style.color = '';
       }, 2000);
     }
   </script>

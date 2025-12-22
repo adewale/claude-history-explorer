@@ -16,7 +16,7 @@ Beyond being a fun year-in-review tool, Claude Code Wrapped can serve as an inte
 Workers KV's atomic increment operations and global read performance at the edge.
 
 ### User-Facing Display
-On each Wrapped card, show (year-specific):
+On each Wrapped page, show (year-specific):
 ```
 You're Wrapped #12,847 of 2025
         └── 847 people viewed in the last hour
@@ -459,7 +459,7 @@ This enables:
 Cloudflare's Browser Rendering API—running headless Chrome at the edge without managing infrastructure.
 
 ### User-Facing Display
-On the final share card:
+In the share section:
 ```
 ┌─────────────────────────────────────────┐
 │                                         │
