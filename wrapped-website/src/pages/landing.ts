@@ -9,9 +9,9 @@ export function renderLandingPage(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Code Wrapped</title>
+  <title>Unofficial Claude Code Wrapped</title>
   <meta name="description" content="Your year in code with Claude. Generate a shareable summary of your development journey.">
-  <meta property="og:title" content="Claude Code Wrapped">
+  <meta property="og:title" content="Unofficial Claude Code Wrapped">
   <meta property="og:description" content="Your year in code with Claude. See your development journey.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
@@ -200,7 +200,7 @@ export function renderLandingPage(): string {
 <body>
   <div class="container">
     <div class="header">
-      <h1>Claude Code Wrapped</h1>
+      <h1>Unofficial Claude Code Wrapped</h1>
       <p class="subtitle">Your year in code with Claude</p>
     </div>
 

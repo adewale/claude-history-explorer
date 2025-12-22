@@ -96,7 +96,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(displayName)}'s Claude Code Wrapped ${year}</title>
+  <title>${escapeHtml(displayName)}'s Unofficial Claude Code Wrapped ${year}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
@@ -357,7 +357,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
 </head>
 <body>
   <div class="header">
-    <h1>Claude Code Wrapped ${year}</h1>
+    <h1>Unofficial Claude Code Wrapped ${year}</h1>
     <div class="subtitle">${escapeHtml(displayName)}'s Year in Review</div>
   </div>
 
@@ -468,7 +468,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
   </div>
 
   <div class="footer">
-    Claude Code Wrapped ${year} | Built on <a href="https://developers.cloudflare.com/" target="_blank" rel="noopener">the Cloudflare Developer Platform</a>
+    Unofficial Claude Code Wrapped ${year} | Built on <a href="https://developers.cloudflare.com/" target="_blank" rel="noopener">the Cloudflare Developer Platform</a>
   </div>
 </body>
 </html>`;
