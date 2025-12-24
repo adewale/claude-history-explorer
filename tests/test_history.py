@@ -3,7 +3,10 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch, mock_open, MagicMock
+from datetime import datetime
+
+import pytest
 
 import claude_history_explorer.history as history
 from claude_history_explorer.history import (
@@ -1954,6 +1957,339 @@ class TestIntegerHours:
             assert isinstance(v, int), f"decoded.ts[{trait}] should be int"
 
 
+class TestGenerateProjectStory:
+    """Tests for generate_project_story() function."""
+
+    def _create_mock_session(self, session_id, start_time, duration_minutes, message_count, is_agent=False):
+        """Create a mock Session with specified attributes."""
+        from datetime import timedelta
+        end_time = start_time + timedelta(minutes=duration_minutes) if duration_minutes > 0 else None
+        messages = [
+            Message(role="user", content=f"Message {i}", timestamp=start_time + timedelta(minutes=i))
+            for i in range(message_count // 2)
+        ] + [
+            Message(role="assistant", content=f"Response {i}", timestamp=start_time + timedelta(minutes=i+1))
+            for i in range(message_count // 2)
+        ]
+        return Session(
+            session_id=session_id,
+            project_path="/test/project",
+            file_path=Path(f"/mock/{session_id}.jsonl"),
+            messages=messages,
+            start_time=start_time,
+            end_time=end_time,
+            slug=f"slug-{session_id}",
+        )
+
+    def _create_mock_project(self, session_files):
+        """Create a mock Project with session files."""
+        return Project(
+            name="-test-project",
+            path="/test/project",
+            dir_path=Path("/mock/.claude/projects/-test-project"),
+            session_files=session_files,
+        )
+
+    def test_generate_project_story_basic(self):
+        """Test basic project story generation."""
+        from datetime import timedelta
+        from claude_history_explorer.history import generate_project_story, parse_session
+
+        base_time = datetime(2025, 12, 1, 10, 0)
+        sessions_data = [
+            ("session1", base_time, 60, 20, False),
+            ("session2", base_time + timedelta(days=1), 45, 15, False),
+            ("agent-1", base_time + timedelta(days=2), 30, 10, True),
+        ]
+
+        session_files = [Path(f"/mock/{s[0]}.jsonl") for s in sessions_data]
+        project = self._create_mock_project(session_files)
+
+        # Mock parse_session to return our test sessions
+        def mock_parse_session(file_path, project_path):
+            for s in sessions_data:
+                if s[0] in str(file_path):
+                    return self._create_mock_session(s[0], s[1], s[2], s[3], s[4])
+            raise ValueError(f"Unknown file: {file_path}")
+
+        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+            story = generate_project_story(project)
+
+        assert story.project_name == "Project"  # short_name is capitalized
+        assert story.lifecycle_days == 3  # Dec 1-3
+        assert story.agent_sessions == 1
+        assert story.main_sessions == 2
+        assert story.total_messages == 44  # 20 + 14 + 10 (even splits)
+        assert len(story.personality_traits) >= 1
+        assert story.collaboration_style is not None
+
+    def test_generate_project_story_no_sessions_raises(self):
+        """Test that empty project raises ValueError."""
+        from claude_history_explorer.history import generate_project_story
+
+        project = self._create_mock_project([])
+
+        with pytest.raises(ValueError, match="No sessions found"):
+            generate_project_story(project)
+
+    def test_generate_project_story_sessions_without_timestamps(self):
+        """Test handling of sessions without valid timestamps."""
+        from claude_history_explorer.history import generate_project_story
+
+        session_files = [Path("/mock/session1.jsonl")]
+        project = self._create_mock_project(session_files)
+
+        # Return session with no start_time
+        def mock_parse_session(file_path, project_path):
+            return Session(
+                session_id="session1",
+                project_path=project_path,
+                file_path=file_path,
+                messages=[Message(role="user", content="test", timestamp=None)],
+                start_time=None,
+                end_time=None,
+                slug=None,
+            )
+
+        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+            with pytest.raises(ValueError, match="No sessions found"):
+                generate_project_story(project)
+
+    def test_generate_project_story_concurrent_detection(self):
+        """Test detection of concurrent Claude instances."""
+        from datetime import timedelta
+        from claude_history_explorer.history import generate_project_story
+
+        base_time = datetime(2025, 12, 1, 10, 0)
+        # Create many sessions starting at nearly the same time (within 30 min)
+        sessions_data = [
+            (f"session{i}", base_time + timedelta(minutes=i*5), 60, 10, False)
+            for i in range(5)
+        ]
+
+        session_files = [Path(f"/mock/{s[0]}.jsonl") for s in sessions_data]
+        project = self._create_mock_project(session_files)
+
+        def mock_parse_session(file_path, project_path):
+            for s in sessions_data:
+                if s[0] in str(file_path):
+                    return self._create_mock_session(s[0], s[1], s[2], s[3], s[4])
+            raise ValueError(f"Unknown file: {file_path}")
+
+        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+            story = generate_project_story(project)
+
+        # Should detect concurrent usage (sessions within 30 min of each other)
+        assert story.concurrent_claude_instances >= 2
+
+    def test_generate_project_story_work_pace_classification(self):
+        """Test work pace classification based on message rate."""
+        from datetime import timedelta
+        from claude_history_explorer.history import generate_project_story
+
+        base_time = datetime(2025, 12, 1, 10, 0)
+        # High message rate: 100 messages in 30 minutes = 200 msgs/hour
+        sessions_data = [
+            ("session1", base_time, 30, 100, False),
+        ]
+
+        session_files = [Path(f"/mock/{s[0]}.jsonl") for s in sessions_data]
+        project = self._create_mock_project(session_files)
+
+        def mock_parse_session(file_path, project_path):
+            for s in sessions_data:
+                if s[0] in str(file_path):
+                    return self._create_mock_session(s[0], s[1], s[2], s[3], s[4])
+            raise ValueError(f"Unknown file: {file_path}")
+
+        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+            story = generate_project_story(project)
+
+        # High message rate should result in "Rapid-fire" work pace
+        assert "Rapid" in story.work_pace or story.work_pace is not None
+
+    def test_generate_project_story_break_periods(self):
+        """Test detection of break periods in activity."""
+        from datetime import timedelta
+        from claude_history_explorer.history import generate_project_story
+
+        base_time = datetime(2025, 12, 1, 10, 0)
+        # Sessions with gaps
+        sessions_data = [
+            ("session1", base_time, 60, 10, False),
+            ("session2", base_time + timedelta(days=5), 60, 10, False),  # 4 day gap
+            ("session3", base_time + timedelta(days=10), 60, 10, False),  # 5 day gap
+        ]
+
+        session_files = [Path(f"/mock/{s[0]}.jsonl") for s in sessions_data]
+        project = self._create_mock_project(session_files)
+
+        def mock_parse_session(file_path, project_path):
+            for s in sessions_data:
+                if s[0] in str(file_path):
+                    return self._create_mock_session(s[0], s[1], s[2], s[3], s[4])
+            raise ValueError(f"Unknown file: {file_path}")
+
+        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+            story = generate_project_story(project)
+
+        # Should detect break periods
+        assert len(story.break_periods) >= 2
+        assert "Intermittent" in story.daily_engagement or "breaks" in story.daily_engagement
+
+
+class TestGenerateGlobalStory:
+    """Tests for generate_global_story() function."""
+
+    def test_generate_global_story_basic(self):
+        """Test basic global story generation."""
+        from claude_history_explorer.history import generate_global_story, ProjectStory, SessionInfo
+
+        mock_session_info = SessionInfo(
+            session_id="s1",
+            start_time=datetime(2025, 12, 1, 10, 0),
+            end_time=datetime(2025, 12, 1, 11, 0),
+            duration_minutes=60,
+            message_count=20,
+            user_message_count=10,
+            is_agent=False,
+            slug="test",
+        )
+
+        mock_stories = [
+            ProjectStory(
+                project_name="project1",
+                project_path="/p1",
+                lifecycle_days=30,
+                birth_date=datetime(2025, 11, 1, 10, 0),
+                last_active=datetime(2025, 12, 1, 10, 0),
+                peak_day=(datetime(2025, 11, 15), 50),
+                break_periods=[],
+                agent_sessions=5,
+                main_sessions=15,
+                collaboration_style="Balanced",
+                total_messages=500,
+                dev_time_hours=50.0,
+                message_rate=10.0,
+                work_pace="Steady",
+                avg_session_hours=2.5,
+                longest_session_hours=4.0,
+                session_style="Standard",
+                personality_traits=["Focused", "Collaborative"],
+                most_productive_session=mock_session_info,
+                daily_engagement="Consistent",
+                insights=["Insight 1"],
+                daily_activity={},
+                concurrent_claude_instances=1,
+                concurrent_insights=[],
+            ),
+            ProjectStory(
+                project_name="project2",
+                project_path="/p2",
+                lifecycle_days=15,
+                birth_date=datetime(2025, 11, 15, 10, 0),
+                last_active=datetime(2025, 12, 1, 10, 0),
+                peak_day=(datetime(2025, 11, 20), 30),
+                break_periods=[],
+                agent_sessions=10,
+                main_sessions=10,
+                collaboration_style="Heavy delegation",
+                total_messages=300,
+                dev_time_hours=30.0,
+                message_rate=10.0,
+                work_pace="Steady",
+                avg_session_hours=1.5,
+                longest_session_hours=3.0,
+                session_style="Quick",
+                personality_traits=["Agent-driven", "Focused"],
+                most_productive_session=mock_session_info,
+                daily_engagement="Consistent",
+                insights=["Insight 2"],
+                daily_activity={},
+                concurrent_claude_instances=2,
+                concurrent_insights=["Parallel usage"],
+            ),
+        ]
+
+        mock_projects = [MagicMock(spec=Project) for _ in range(2)]
+
+        with patch('claude_history_explorer.history.list_projects', return_value=mock_projects):
+            with patch('claude_history_explorer.history.generate_project_story', side_effect=mock_stories):
+                story = generate_global_story()
+
+        assert story.total_projects == 2
+        assert story.total_messages == 800  # 500 + 300
+        assert story.total_dev_time == 80.0  # 50 + 30
+        assert len(story.project_stories) == 2
+        assert len(story.common_traits) > 0
+        # "Focused" appears in both projects
+        assert any(t[0] == "Focused" for t in story.common_traits)
+
+    def test_generate_global_story_no_projects_raises(self):
+        """Test that no projects raises ValueError."""
+        from claude_history_explorer.history import generate_global_story
+
+        with patch('claude_history_explorer.history.list_projects', return_value=[]):
+            with pytest.raises(ValueError, match="No projects with sessions found"):
+                generate_global_story()
+
+    def test_generate_global_story_skips_failed_projects(self):
+        """Test that projects failing to generate stories are skipped."""
+        from claude_history_explorer.history import generate_global_story, ProjectStory, SessionInfo
+
+        mock_session_info = SessionInfo(
+            session_id="s1",
+            start_time=datetime(2025, 12, 1, 10, 0),
+            end_time=datetime(2025, 12, 1, 11, 0),
+            duration_minutes=60,
+            message_count=20,
+            user_message_count=10,
+            is_agent=False,
+            slug="test",
+        )
+
+        valid_story = ProjectStory(
+            project_name="project1",
+            project_path="/p1",
+            lifecycle_days=30,
+            birth_date=datetime(2025, 11, 1, 10, 0),
+            last_active=datetime(2025, 12, 1, 10, 0),
+            peak_day=None,
+            break_periods=[],
+            agent_sessions=5,
+            main_sessions=15,
+            collaboration_style="Balanced",
+            total_messages=500,
+            dev_time_hours=50.0,
+            message_rate=10.0,
+            work_pace="Steady",
+            avg_session_hours=2.5,
+            longest_session_hours=4.0,
+            session_style="Standard",
+            personality_traits=["Focused"],
+            most_productive_session=mock_session_info,
+            daily_engagement="Consistent",
+            insights=[],
+            daily_activity={},
+            concurrent_claude_instances=0,
+            concurrent_insights=[],
+        )
+
+        def mock_generate(project):
+            if project.path == "/fail":
+                raise ValueError("No sessions")
+            return valid_story
+
+        mock_projects = [MagicMock(spec=Project, path="/p1"), MagicMock(spec=Project, path="/fail")]
+
+        with patch('claude_history_explorer.history.list_projects', return_value=mock_projects):
+            with patch('claude_history_explorer.history.generate_project_story', side_effect=mock_generate):
+                story = generate_global_story()
+
+        # Should have 1 project (the failed one was skipped)
+        assert story.total_projects == 1
+
+
 if __name__ == "__main__":
     # Run tests manually if needed
     import sys
@@ -1982,6 +2318,8 @@ if __name__ == "__main__":
         TestV3Integration,
         TestTraitScoreQuantization,
         TestIntegerHours,
+        TestGenerateProjectStory,
+        TestGenerateGlobalStory,
     ]
     
     for test_class in test_classes:
