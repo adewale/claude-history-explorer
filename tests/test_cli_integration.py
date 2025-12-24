@@ -871,5 +871,132 @@ class TestErrorHandling:
             assert result.exit_code == 0
 
 
+# =============================================================================
+# Test: JSON Output Validation
+# =============================================================================
+
+class TestJSONOutputPaths:
+    """Tests for JSON output format across various commands."""
+
+    def test_stats_global_json_structure(self, runner, mock_global_stats):
+        """Test stats command JSON output has correct structure."""
+        with patch('claude_history_explorer.cli.calculate_global_stats', return_value=mock_global_stats):
+            result = runner.invoke(main, ['stats', '-f', 'json'])
+
+            assert result.exit_code == 0
+            data = json.loads(result.output)
+
+            # Verify all expected keys are present
+            assert 'total_projects' in data
+            assert 'total_sessions' in data
+            assert 'total_messages' in data
+            assert 'total_duration_str' in data
+            assert 'projects' in data
+            assert isinstance(data['projects'], list)
+
+    def test_stats_project_json_structure(self, runner, mock_project, mock_project_stats):
+        """Test stats command for project JSON output has correct structure."""
+        with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
+            with patch('claude_history_explorer.cli.calculate_project_stats', return_value=mock_project_stats):
+                result = runner.invoke(main, ['stats', '-p', 'myproject', '-f', 'json'])
+
+                assert result.exit_code == 0
+                data = json.loads(result.output)
+
+                # Verify project-specific keys
+                assert 'project_path' in data
+                assert 'total_sessions' in data
+                assert 'total_messages' in data
+                assert 'agent_sessions' in data
+                assert 'main_sessions' in data
+
+    def test_export_json_structure(self, runner, mock_project, mock_session):
+        """Test export command JSON output has correct structure."""
+        with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
+            with patch('claude_history_explorer.cli.get_session_by_id', return_value=mock_session):
+                result = runner.invoke(main, ['export', 'abc123', '-f', 'json'])
+
+                assert result.exit_code == 0
+                data = json.loads(result.output)
+
+                # Verify session structure
+                assert 'session_id' in data
+                assert 'project_path' in data
+                assert 'messages' in data
+                assert isinstance(data['messages'], list)
+
+                # Verify message structure
+                if data['messages']:
+                    msg = data['messages'][0]
+                    assert 'role' in msg
+                    assert 'content' in msg
+
+    def test_export_json_with_tools(self, runner, mock_project):
+        """Test export JSON includes tool uses."""
+        session_with_tools = Session(
+            session_id="test-tools",
+            project_path="/test/project",
+            file_path=Path("/mock/session.jsonl"),
+            messages=[
+                Message(
+                    role="user",
+                    content="Help me fix this",
+                    timestamp=datetime(2025, 12, 15, 10, 0),
+                ),
+                Message(
+                    role="assistant",
+                    content="I'll analyze the code.",
+                    timestamp=datetime(2025, 12, 15, 10, 1),
+                    tool_uses=[
+                        {"name": "Read", "input": {"file": "main.py"}},
+                        {"name": "Edit", "input": {"file": "main.py", "change": "fix"}},
+                    ],
+                ),
+            ],
+            start_time=datetime(2025, 12, 15, 10, 0),
+            end_time=datetime(2025, 12, 15, 10, 5),
+            slug="fix-code",
+        )
+
+        with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
+            with patch('claude_history_explorer.cli.get_session_by_id', return_value=session_with_tools):
+                result = runner.invoke(main, ['export', 'test-tools', '-f', 'json'])
+
+                assert result.exit_code == 0
+                data = json.loads(result.output)
+
+                # Find assistant message with tools
+                assistant_msg = next((m for m in data['messages'] if m['role'] == 'assistant'), None)
+                assert assistant_msg is not None
+                assert 'tool_uses' in assistant_msg
+                assert len(assistant_msg['tool_uses']) == 2
+                assert assistant_msg['tool_uses'][0]['name'] == 'Read'
+
+    def test_stats_json_handles_null_timestamps(self, runner):
+        """Test stats JSON output handles null timestamps gracefully."""
+        stats_no_time = GlobalStats(
+            projects=[],
+            total_projects=0,
+            total_sessions=0,
+            total_messages=0,
+            total_user_messages=0,
+            total_duration_minutes=0,
+            total_size_bytes=0,
+            avg_sessions_per_project=0.0,
+            avg_messages_per_session=0.0,
+            most_active_project="",
+            largest_project="",
+            most_recent_activity=None,  # null timestamp
+        )
+
+        with patch('claude_history_explorer.cli.calculate_global_stats', return_value=stats_no_time):
+            result = runner.invoke(main, ['stats', '-f', 'json'])
+
+            assert result.exit_code == 0
+            data = json.loads(result.output)
+            # Should have null for missing timestamp
+            assert data.get('most_recent_activity') is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

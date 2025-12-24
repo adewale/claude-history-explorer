@@ -202,3 +202,161 @@ describe('Constants', () => {
     expect(constants.HEATMAP_SIZE).toBe(168);
   });
 });
+
+describe('Defensive Fallback Paths', () => {
+  /**
+   * These tests verify that the decoder handles object format gracefully
+   * when the wire format should be arrays. This is defensive code for
+   * backwards compatibility or malformed data.
+   */
+
+  it('handles object format for projects (tp) gracefully', () => {
+    // Wire format should be arrays like ['name', messages, hours, days, sessions, ar]
+    // But we test with object format to hit the defensive path
+    const storyWithObjectProjects = {
+      v: 3, y: 2025, n: 'Test', p: 1, s: 1, m: 100, h: 1, d: 1,
+      hm: Array(168).fill(0),
+      ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
+      sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
+      ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
+      // Object format instead of array format - should trigger fallback
+      tp: [{ n: 'ObjectProject', m: 500, h: 25, d: 10, s: 15, ar: 40 }],
+      pc: [], te: [], sf: [], ls: 0, sk: [0, 0, 0, 0],
+      tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
+    };
+
+    const packed = msgpack.encode(storyWithObjectProjects);
+    const encoded = base64UrlEncode(new Uint8Array(packed));
+    const decoded = decodeWrappedStoryV3(encoded);
+
+    // Should still work and extract the project data
+    expect(decoded.tp.length).toBe(1);
+    expect(decoded.tp[0].n).toBe('ObjectProject');
+    expect(decoded.tp[0].m).toBe(500);
+  });
+
+  it('handles object format for events (te) gracefully', () => {
+    // Wire format should be arrays like [day, type, value, project_idx]
+    const storyWithObjectEvents = {
+      v: 3, y: 2025, n: 'Test', p: 1, s: 1, m: 100, h: 1, d: 1,
+      hm: Array(168).fill(0),
+      ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
+      sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
+      ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
+      tp: [],
+      pc: [],
+      // Object format instead of array format
+      te: [{ d: 45, t: 0, v: 100, p: 0 }],
+      sf: [], ls: 0, sk: [0, 0, 0, 0],
+      tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
+    };
+
+    const packed = msgpack.encode(storyWithObjectEvents);
+    const encoded = base64UrlEncode(new Uint8Array(packed));
+    const decoded = decodeWrappedStoryV3(encoded);
+
+    // Should still work
+    expect(decoded.te.length).toBe(1);
+    expect(decoded.te[0].d).toBe(45);
+    expect(decoded.te[0].t).toBe(0);
+  });
+
+  it('handles object format for fingerprints (sf) gracefully', () => {
+    // Wire format should be arrays like [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
+    const storyWithObjectFingerprints = {
+      v: 3, y: 2025, n: 'Test', p: 1, s: 1, m: 100, h: 1, d: 1,
+      hm: Array(168).fill(0),
+      ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
+      sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
+      ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
+      tp: [],
+      pc: [], te: [],
+      // Object format instead of array format
+      sf: [{ d: 120, m: 50, a: true, h: 14, w: 2, pi: 0, fp: [80, 60, 40, 20, 10, 5, 3, 1] }],
+      ls: 0, sk: [0, 0, 0, 0],
+      tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
+    };
+
+    const packed = msgpack.encode(storyWithObjectFingerprints);
+    const encoded = base64UrlEncode(new Uint8Array(packed));
+    const decoded = decodeWrappedStoryV3(encoded);
+
+    // Should still work
+    expect(decoded.sf.length).toBe(1);
+    expect(decoded.sf[0].d).toBe(120);
+    expect(decoded.sf[0].m).toBe(50);
+    expect(decoded.sf[0].a).toBe(true);
+  });
+
+  it('handles empty/short arrays for projects', () => {
+    const storyWithShortProjectArrays = {
+      v: 3, y: 2025, n: 'Test', p: 1, s: 1, m: 100, h: 1, d: 1,
+      hm: Array(168).fill(0),
+      ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
+      sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
+      ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
+      tp: [
+        ['OnlyName'],  // Only 1 element
+        ['TwoElems', 100],  // Only 2 elements
+        [],  // Empty array
+      ],
+      pc: [], te: [], sf: [], ls: 0, sk: [0, 0, 0, 0],
+      tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
+    };
+
+    const packed = msgpack.encode(storyWithShortProjectArrays);
+    const encoded = base64UrlEncode(new Uint8Array(packed));
+    const decoded = decodeWrappedStoryV3(encoded);
+
+    // Should handle gracefully with defaults
+    expect(decoded.tp.length).toBe(3);
+    expect(decoded.tp[0].n).toBe('OnlyName');
+    expect(decoded.tp[0].m).toBe(0);  // Default for missing
+    expect(decoded.tp[1].n).toBe('TwoElems');
+    expect(decoded.tp[1].m).toBe(100);
+    expect(decoded.tp[2].n).toBe('');  // Default for empty
+  });
+
+  it('handles short fingerprint arrays with padding', () => {
+    const storyWithShortFingerprints = {
+      v: 3, y: 2025, n: 'Test', p: 1, s: 1, m: 100, h: 1, d: 1,
+      hm: Array(168).fill(0),
+      ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
+      sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
+      ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
+      tp: [],
+      pc: [], te: [],
+      // Short fingerprint array - should pad fp to 8 elements
+      sf: [[120, 50, 1, 14, 2, 0, 80, 60]],  // Only 2 fp values instead of 8
+      ls: 0, sk: [0, 0, 0, 0],
+      tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
+    };
+
+    const packed = msgpack.encode(storyWithShortFingerprints);
+    const encoded = base64UrlEncode(new Uint8Array(packed));
+    const decoded = decodeWrappedStoryV3(encoded);
+
+    // Fingerprint fp array should be padded to 8 elements
+    expect(decoded.sf.length).toBe(1);
+    expect(decoded.sf[0].fp.length).toBe(8);
+    expect(decoded.sf[0].fp[0]).toBe(80);
+    expect(decoded.sf[0].fp[1]).toBe(60);
+    // Rest should be 0 (padded)
+    expect(decoded.sf[0].fp[2]).toBe(0);
+  });
+});
+
+describe('Normalization Functions', () => {
+  it('normalizes trait scores to 0-1 range', () => {
+    // Import the function we need to test
+    expect(normalizeTraitScore(0)).toBe(0);
+    expect(normalizeTraitScore(50)).toBe(0.5);
+    expect(normalizeTraitScore(100)).toBe(1);
+  });
+
+  it('normalizes fingerprint values to 0-1 range', () => {
+    expect(normalizeFingerprint(0)).toBe(0);
+    expect(normalizeFingerprint(50)).toBe(0.5);
+    expect(normalizeFingerprint(100)).toBe(1);
+  });
+});
