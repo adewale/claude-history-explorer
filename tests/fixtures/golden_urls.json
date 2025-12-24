@@ -1,0 +1,72 @@
+[
+  {
+    "id": "sample_demo_user",
+    "description": "Demo user sample URL from landing page - tests full data structure with all fields populated",
+    "source": "wrapped-website/tests/decoder.test.ts",
+    "encoded": "3gAXoXYDoXnNB-mhbqlEZW1vIFVzZXKhbc0LH6FozJyhcAihc3yhZFmibHPLQBDMzMzMzM2iaG3cAKgCAAECAQAEBgYNDQsFBw0PDw4ICAcCAgMBAAEAAAAGBgQMDQwGBQ4ODg4JCQgCBAQAAAACAgIFBgYNCwwHBQ0NDw0JBwkEBAMAAQAAAAEGBgQNCw0FBw8ODw4HCQkDBAICAQEBAAAGBQQNCwsFBw0NDw8ICAgCBAIAAAACAgEBAgIDBAUEAgUEBAUFBgUCAwQAAgEBAQABAgEFAwQDAwYGBgUHBwcDAwKibWGcVcyOzMbNAQvNATjNAR3NAVXNASrNAQDM4My9zPqibWicCAsOEhUTGBQRDwwRom1znAYJDA4QDxIQDQsJDKJzZIqiYWREonNwKqJmY0uiY2MjondyOqJicy2iY3M-om12JqJ0ZEeicmk0omFymggMEhgWEAoGAwGibWyWojUwozEyMKMyODCjNDUwozYyMKM4NTCidHOGomFkRKJzcCqiZmNLomJzLaJjcz6icmk0onRwlpa3Y2xhdWRlLWhpc3RvcnktZXhwbG9yZXLNA3w0Ii1Ilq93cmFwcGVkLXdlYnNpdGXNAnomHCBBlq1wZXJzb25hbC1zaXRlzQGcGBIWMJaqYXBpLWNsaWVudM0BHxAMDyOWqGRvdGZpbGVzzJwICAoWlqdzY3JpcHRzYgUFBg-icGOVkwABHJMAAgyTAQIIkwADBpMCBASidGWVlC0ALwCUAQEM_5RZBM0D6P-UeAP_AZTMyAA0AaJzZpOey0AMAAAAAAAALQEOAgBIQU5SLQxEN57LQADMzMzMzM0cAAoAATpIQEYmCDQwnstAEMzMzMzMzT4BEAMAVU5YXDQPSz6ic2uUDA4FBqJ0a4aldG90YWzOAIGzIKVpbnB1dM4AT1iApm91dHB1dM4AMlqgqmNhY2hlX3JlYWTOABJPgKxjYWNoZV9jcmVhdGXOAAbd0KZtb2RlbHOCpnNvbm5ldM4AZ8KApWhhaWt1zgAZ8KA",
+    "expected_core": {
+      "v": 3,
+      "y": 2025,
+      "n": "Demo User",
+      "p": 8,
+      "s": 124,
+      "m": 2847,
+      "h": 156,
+      "d": 89
+    },
+    "expected_arrays": {
+      "hm_length": 168,
+      "ma_length": 12,
+      "mh_length": 12,
+      "ms_length": 12,
+      "ar_length": 10,
+      "tp_min_length": 3,
+      "pc_min_length": 1,
+      "te_min_length": 1,
+      "sf_min_length": 1,
+      "sk_length": 4
+    },
+    "expected_first_project": {
+      "n": "claude-history-explorer",
+      "m": 892,
+      "h": 52
+    },
+    "expected_tokens": {
+      "total": 8500000,
+      "has_models": true
+    }
+  },
+  {
+    "id": "real_user_dec_2025",
+    "description": "Real user data from December 2025 - tests production data structure with RLE compression",
+    "source": "Generated via 'claude-history wrapped' command",
+    "encoded": "3gAXoXYDoXnNB-mhcAqhc8yDoW3NNDOhaM0FoKFkD6JobdwANgABAQEADA8BAAcCAQcBAAIBAQALDgEAGQIBAAEIAQARAgEAHQMBAB8EAQAHAQEABwkBAgEABKJtYZwAAAAAAAAAAAAAzQXEzS5vom1onAAAAAAAAAAAAADNA4LNAh6ibXOcAAAAAAAAAAAAABNwonNkmjMAAAEAAQABBgiiYXKaAQAAAAAAAgEDA6JtbJjNAhzNBk7NA1vNAW_Mpcz_zK_Mt6J0c4qiYWRUonNwAaJmYx-iY2MAondyNaJic2SiY3Mbom12AKJ0ZGSicmlkonRwmpa1VHVuZWpzIEltcGxlbWVudGF0aW9uzRedNAMmX5aqS2V5Ym9hcmRpYc0N780BKQUfUZa3Q2xhdWRlIEhpc3RvcnkgRXhwbG9yZXLNCL3MwAgZVJatQmxvY2sgQnJvd3Nlcs0CXM0CkgIJTpamU2tpbGxzzQGeawMGQ5awQ2YgQWR2aXNvciBTa2lsbM0BOGoCBTyWrEdlaXN0IEZhYnJpa8yWGwEBAJaoUHJvamVjdHMeAAEMU5ajQWRlAgABAmSWo1RtcAIAAQJkonBjnpMBAgOTAggBkwIEAZMAAgGTAQcBkwEJAZMCBwGTBwkBkwIJAZMDBQGTAwQBkwQFAZMDBgGTAAEBonRl3AAVlM0BQwRk_5TNAUQEzQH0_5TNAUcD_waUzQFHBM0D6P-UzQFIA_8DlM0BSAP_BZTNAUgF__-UzQFcAf__lM0BXAP_CZTNAVwD_weUzQFcBM0H0P-UzQFcBhT_lM0BXQTNE4j_lM0BXgDNDHz_lM0BXgP_AJTNAV8EzScQ_5TNAWMD_wSUzQFkA_8BlM0BZgIL_5TNAWYD_wKUzQFmA_8IonNm3AAUns0QwM0F0wASBgFjY2NkIA0gCJ7NBa_NCaoADgAAZGRkZCINIgWezQZFzQipAA4BAGRkZGQlCyEGns2Yvc0BCQAWAANjY2NkIAgkAp7NCTHNBBEAFwABZGRkZCMLGwWezQSxzQTwABICAmRkZGQjBSYEns0ViM0B9AASBAJkZGRkIgghBJ7NE13NAYcADAMEYWFhZCEDPgqezRi9zQESABACBWFhYWQdBTcJns0TAM0BOAACBgFkZGRkIQU4Bp7NEr51AAoGAmFhYWQgEBwGns0GUsyWABMGBl9fX2QmCw8Hns0BhMz0ABMGA2RkZGQoBycFns0GVFYAFwABW1tbZBkJAhGezRIQFQASBAFTU1NkHQ4ICp7NBckRABYABFBQUGQVAAAAnkAoARABAWRkZGQeBQAFngpMAQ8AAGRkZGQgCAADngHMtQACBgFiYmJkIQYWCJ4EVAETAQBkZGRkHwYAAqJsc8tAhF2ZmZmZmqJza5QDCwsFonRrhqV0b3RhbM4AXOeMpWlucHV0zgArz4imb3V0cHV0zgAxGASqY2FjaGVfcmVhZM47mYCrrGNhY2hlX2NyZWF0Zc4Fwoh4pm1vZGVsc4Skb3B1c84AMJA6pWhhaWt1zgARI12rPHN5bnRoZXRpYz4ApnNvbm5ldM4AGzP1pmhtX3JsZcM",
+    "expected_core": {
+      "v": 3,
+      "y": 2025,
+      "p": 10,
+      "s": 131,
+      "m": 13363,
+      "h": 1440,
+      "d": 15
+    },
+    "expected_arrays": {
+      "hm_length": 168,
+      "ma_length": 12,
+      "mh_length": 12,
+      "ms_length": 12,
+      "ar_length": 10,
+      "tp_min_length": 3,
+      "pc_min_length": 1,
+      "te_min_length": 1,
+      "sf_min_length": 1,
+      "sk_length": 4
+    },
+    "expected_first_project": {
+      "n": "Tunejs Implementation"
+    },
+    "expected_tokens": {
+      "has_models": true
+    }
+  }
+]
