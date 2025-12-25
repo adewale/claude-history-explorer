@@ -150,6 +150,33 @@ claude-history export <session-id> -f text | tail -50
 claude-history show <session-id> -n 200
 ```
 
+## How do I show the last 5 messages from my project?
+
+The `--limit` (`-n`) flag shows the *first* N messages, not the last. To see the most recent messages:
+
+**Option 1: Export and pipe to `tail`**
+```bash
+# Get the session ID first
+claude-history sessions myproject
+
+# Export and show last 5 messages
+claude-history export <session-id> -f text | tail -20
+```
+
+**Option 2: Use a large limit and scroll**
+```bash
+claude-history show <session-id> -n 500
+# Then scroll to the bottom
+```
+
+**Option 3: Export to a file and view the end**
+```bash
+claude-history export <session-id> -f markdown -o session.md
+tail -50 session.md
+```
+
+**Tip:** Sessions are sorted by most recent first, so the first session listed in `claude-history sessions myproject` is your latest conversation.
+
 ## How do I search across all my conversations?
 
 ```bash
