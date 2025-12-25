@@ -280,6 +280,26 @@ class TestSessionsCommand:
         assert result.exit_code == 0
         assert 'Examples' in result.output
 
+    def test_sessions_with_tail_flag(self, runner, mock_project, mock_session):
+        """Test sessions command with --tail flag shows oldest sessions."""
+        mock_project.session_files = [Path(f"/mock/session{i}.jsonl") for i in range(10)]
+
+        with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
+            with patch('claude_history_explorer.cli.parse_session', return_value=mock_session):
+                result = runner.invoke(main, ['sessions', 'myproject', '-n', '3', '--tail'])
+
+                assert result.exit_code == 0
+
+    def test_sessions_with_tail_short_flag(self, runner, mock_project, mock_session):
+        """Test sessions command with -t short flag for tail."""
+        mock_project.session_files = [Path(f"/mock/session{i}.jsonl") for i in range(10)]
+
+        with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
+            with patch('claude_history_explorer.cli.parse_session', return_value=mock_session):
+                result = runner.invoke(main, ['sessions', 'myproject', '-n', '3', '-t'])
+
+                assert result.exit_code == 0
+
 
 # =============================================================================
 # Test: show command
@@ -327,6 +347,77 @@ class TestShowCommand:
 
         assert result.exit_code == 0
         assert 'Examples' in result.output
+
+    def test_show_with_tail_flag(self, runner, mock_session):
+        """Test show command with --tail flag shows last N messages."""
+        with patch('claude_history_explorer.cli.get_session_by_id', return_value=mock_session):
+            # mock_session has 4 messages, get last 2
+            result = runner.invoke(main, ['show', 'abc123', '-n', '2', '--tail'])
+
+            assert result.exit_code == 0
+            # Should show the last 2 messages (about fixing bug)
+            assert 'fix this bug' in result.output or 'fixed the bug' in result.output
+            # Should NOT show the first message about Python
+            # (Note: first message "Hello, help me with Python" should not appear)
+
+    def test_show_with_tail_short_flag(self, runner, mock_session):
+        """Test show command with -t short flag for tail."""
+        with patch('claude_history_explorer.cli.get_session_by_id', return_value=mock_session):
+            result = runner.invoke(main, ['show', 'abc123', '-n', '2', '-t'])
+
+            assert result.exit_code == 0
+
+    def test_show_tail_with_raw(self, runner, mock_session):
+        """Test show command with --tail and --raw flags."""
+        with patch('claude_history_explorer.cli.get_session_by_id', return_value=mock_session):
+            result = runner.invoke(main, ['show', 'abc123', '-n', '2', '--tail', '--raw'])
+
+            assert result.exit_code == 0
+            # Raw output should contain the last messages
+            assert 'fix' in result.output.lower()
+
+    def test_show_footer_says_last_with_tail(self, runner):
+        """Test that footer indicates 'last' when using --tail."""
+        # Create a session with more messages than limit
+        many_messages = [
+            Message(role="user", content=f"Message {i}", timestamp=datetime(2025, 12, 15, 10, i))
+            for i in range(10)
+        ]
+        session = Session(
+            session_id="test-session",
+            project_path="/test/project",
+            file_path=Path("/mock/session.jsonl"),
+            messages=many_messages,
+            start_time=datetime(2025, 12, 15, 10, 0),
+            end_time=datetime(2025, 12, 15, 10, 10),
+            slug="test",
+        )
+        with patch('claude_history_explorer.cli.get_session_by_id', return_value=session):
+            result = runner.invoke(main, ['show', 'test', '-n', '3', '--tail'])
+
+            assert result.exit_code == 0
+            assert 'last 3 of 10' in result.output.lower()
+
+    def test_show_footer_says_first_without_tail(self, runner):
+        """Test that footer indicates 'first' when not using --tail."""
+        many_messages = [
+            Message(role="user", content=f"Message {i}", timestamp=datetime(2025, 12, 15, 10, i))
+            for i in range(10)
+        ]
+        session = Session(
+            session_id="test-session",
+            project_path="/test/project",
+            file_path=Path("/mock/session.jsonl"),
+            messages=many_messages,
+            start_time=datetime(2025, 12, 15, 10, 0),
+            end_time=datetime(2025, 12, 15, 10, 10),
+            slug="test",
+        )
+        with patch('claude_history_explorer.cli.get_session_by_id', return_value=session):
+            result = runner.invoke(main, ['show', 'test', '-n', '3'])
+
+            assert result.exit_code == 0
+            assert 'first 3 of 10' in result.output.lower()
 
 
 # =============================================================================

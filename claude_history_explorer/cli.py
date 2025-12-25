@@ -64,7 +64,9 @@ Examples:
 Examples:
   claude-history sessions myproject          # List sessions for 'myproject'
   claude-history sessions "Documents/work"   # Partial path match
-  claude-history sessions myproject -n 5     # Show only 5 sessions
+  claude-history sessions myproject -n 5     # Show 5 most recent sessions (--head is default)
+  claude-history sessions myproject -n 5 --tail  # Show 5 oldest sessions
+  claude-history sessions myproject -n 5 -t  # Show 5 oldest sessions (short form)
 """,
     "show": """
 Examples:
@@ -189,8 +191,10 @@ def projects(limit: int, example: bool):
 @main.command()
 @click.argument("project_search", required=False)
 @click.option("--limit", "-n", default=20, help="Maximum number of sessions to show")
+@click.option("--head", is_flag=True, default=True, is_eager=True, help="Show most recent sessions (default)")
+@click.option("--tail", "-t", is_flag=True, help="Show oldest sessions instead of most recent")
 @click.option("--example", is_flag=True, help="Show usage examples")
-def sessions(project_search: str, limit: int, example: bool):
+def sessions(project_search: str, limit: int, head: bool, tail: bool, example: bool):
     """List sessions for a project.
 
     PROJECT_SEARCH can be a partial path match (e.g., 'myproject' or 'Documents/work')
@@ -219,7 +223,10 @@ def sessions(project_search: str, limit: int, example: bool):
     table.add_column("Started", style="yellow")
     table.add_column("Slug", style="dim")
 
-    for session_file in project.session_files[:limit]:
+    # Select sessions from head (most recent, default) or tail (oldest)
+    session_files = project.session_files[-limit:] if tail else project.session_files[:limit]
+
+    for session_file in session_files:
         session = parse_session(session_file, project.path)
         start_str = (
             session.start_time.strftime("%Y-%m-%d %H:%M")
@@ -244,8 +251,9 @@ def sessions(project_search: str, limit: int, example: bool):
     console.print(table)
 
     if project.session_count > limit:
+        position = "oldest" if tail else "most recent"
         console.print(
-            f"\n[dim]Showing {limit} of {project.session_count} sessions. Use --limit to see more.[/dim]"
+            f"\n[dim]Showing {position} {limit} of {project.session_count} sessions. Use --limit to see more.[/dim]"
         )
 
 
