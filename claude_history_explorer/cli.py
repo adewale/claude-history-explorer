@@ -69,7 +69,9 @@ Examples:
     "show": """
 Examples:
   claude-history show abc123                 # Show session by ID (partial match)
-  claude-history show abc123 --limit 20      # Show first 20 messages
+  claude-history show abc123 -n 20           # Show first 20 messages (--head is default)
+  claude-history show abc123 -n 10 --tail    # Show last 10 messages
+  claude-history show abc123 -n 5 -t         # Show last 5 messages (short form)
   claude-history show abc123 --raw           # Output raw JSON
   claude-history show abc123 -p myproject    # Search in specific project
 """,
@@ -251,9 +253,11 @@ def sessions(project_search: str, limit: int, example: bool):
 @click.argument("session_id", required=False)
 @click.option("--project", "-p", default=None, help="Project path to search in")
 @click.option("--limit", "-n", default=50, help="Maximum messages to show")
+@click.option("--head", is_flag=True, default=True, is_eager=True, help="Show first N messages (default)")
+@click.option("--tail", "-t", is_flag=True, help="Show last N messages instead of first")
 @click.option("--raw", is_flag=True, help="Show raw JSON output")
 @click.option("--example", is_flag=True, help="Show usage examples")
-def show(session_id: str, project: str, limit: int, raw: bool, example: bool):
+def show(session_id: str, project: str, limit: int, head: bool, tail: bool, raw: bool, example: bool):
     """Show messages from a specific session.
 
     SESSION_ID can be a partial match of the session ID.
@@ -272,8 +276,11 @@ def show(session_id: str, project: str, limit: int, raw: bool, example: bool):
         console.print(f"[red]No session found matching '{session_id}'[/red]")
         return
 
+    # Select messages from head (default) or tail
+    messages = session.messages[-limit:] if tail else session.messages[:limit]
+
     if raw:
-        for msg in session.messages[:limit]:
+        for msg in messages:
             output = {
                 "role": msg.role,
                 "content": msg.content,
@@ -296,7 +303,7 @@ def show(session_id: str, project: str, limit: int, raw: bool, example: bool):
 
     console.print()
 
-    for i, msg in enumerate(session.messages[:limit]):
+    for i, msg in enumerate(messages):
         if msg.role == "user":
             style = "bold blue"
             prefix = "USER"
@@ -332,8 +339,9 @@ def show(session_id: str, project: str, limit: int, raw: bool, example: bool):
         console.print()
 
     if session.message_count > limit:
+        position = "last" if tail else "first"
         console.print(
-            f"[dim]Showing {limit} of {session.message_count} messages. Use --limit to see more.[/dim]"
+            f"[dim]Showing {position} {limit} of {session.message_count} messages. Use --limit to see more.[/dim]"
         )
 
 

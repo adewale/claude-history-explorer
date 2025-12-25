@@ -137,43 +137,31 @@ claude-history sessions orange_garden
 
 **Step 3: View messages from a session**
 ```bash
-claude-history show <session-id> -n 5
-```
-
-**Note:** The `-n` flag shows the *first* N messages, not the last. To see the last messages of a long session:
-
-```bash
-# Option 1: Export and use tail
-claude-history export <session-id> -f text | tail -50
-
-# Option 2: Show more messages and scroll to the end
-claude-history show <session-id> -n 200
+claude-history show <session-id> -n 5        # First 5 messages (--head is default)
+claude-history show <session-id> -n 5 --tail # Last 5 messages
 ```
 
 ## How do I show the last 5 messages from my project?
 
-The `--limit` (`-n`) flag shows the *first* N messages, not the last. To see the most recent messages:
+Use the `--tail` (or `-t`) flag:
 
-**Option 1: Export and pipe to `tail`**
 ```bash
 # Get the session ID first
 claude-history sessions myproject
 
-# Export and show last 5 messages
-claude-history export <session-id> -f text | tail -20
+# Show last 5 messages
+claude-history show <session-id> -n 5 --tail
+
+# Or use the short form
+claude-history show <session-id> -n 5 -t
 ```
 
-**Option 2: Use a large limit and scroll**
-```bash
-claude-history show <session-id> -n 500
-# Then scroll to the bottom
-```
+The `show` command supports both `--head` (default) and `--tail`:
 
-**Option 3: Export to a file and view the end**
-```bash
-claude-history export <session-id> -f markdown -o session.md
-tail -50 session.md
-```
+| Flag | Meaning | Example |
+|------|---------|---------|
+| `--head` | Show first N messages (default) | `show abc123 -n 10` |
+| `--tail` / `-t` | Show last N messages | `show abc123 -n 10 --tail` |
 
 **Tip:** Sessions are sorted by most recent first, so the first session listed in `claude-history sessions myproject` is your latest conversation.
 
