@@ -112,6 +112,44 @@ claude-history export <session-id> -f json -o session.json
 claude-history export <session-id> -f text
 ```
 
+## How do I view messages from a specific project?
+
+Finding and viewing messages is a three-step process:
+
+```
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│  projects    │ ───► │  sessions    │ ───► │    show      │
+│              │      │  <project>   │      │  <session>   │
+│ "Find your   │      │ "List the    │      │ "View the    │
+│  project"    │      │  sessions"   │      │  messages"   │
+└──────────────┘      └──────────────┘      └──────────────┘
+```
+
+**Step 1: Find your project**
+```bash
+claude-history projects
+```
+
+**Step 2: List sessions for that project** (partial name match works)
+```bash
+claude-history sessions orange_garden
+```
+
+**Step 3: View messages from a session**
+```bash
+claude-history show <session-id> -n 5
+```
+
+**Note:** The `-n` flag shows the *first* N messages, not the last. To see the last messages of a long session:
+
+```bash
+# Option 1: Export and use tail
+claude-history export <session-id> -f text | tail -50
+
+# Option 2: Show more messages and scroll to the end
+claude-history show <session-id> -n 200
+```
+
 ## How do I search across all my conversations?
 
 ```bash
