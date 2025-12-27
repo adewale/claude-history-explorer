@@ -15,7 +15,8 @@ from claude_history_explorer.history import (
     Project,
     ProjectStats,
     GlobalStats,
-    active_duration_minutes,
+    SessionInfo,
+    _active_duration_minutes,
     # V3 imports
     SessionInfoV3,
     ProjectStatsV3,
@@ -222,9 +223,102 @@ class TestSession:
         assert session.message_count == 3
         assert session.user_message_count == 2
 
+    def test_active_duration_minutes_property_basic(self):
+        """Test Session.active_duration_minutes with normal gaps."""
+        session = Session(
+            session_id="test",
+            project_path="/test",
+            file_path=Path("/test.jsonl"),
+            messages=[
+                Message(role="user", content="Hello",
+                       timestamp=datetime(2025, 1, 1, 10, 0)),
+                Message(role="assistant", content="Hi",
+                       timestamp=datetime(2025, 1, 1, 10, 5)),
+                Message(role="user", content="Bye",
+                       timestamp=datetime(2025, 1, 1, 10, 15)),
+            ],
+        )
+        # 5 min + 10 min = 15 min
+        assert session.active_duration_minutes == 15
+
+    def test_active_duration_minutes_property_caps_gaps(self):
+        """Test Session.active_duration_minutes caps large gaps."""
+        session = Session(
+            session_id="test",
+            project_path="/test",
+            file_path=Path("/test.jsonl"),
+            messages=[
+                Message(role="user", content="Start",
+                       timestamp=datetime(2025, 1, 1, 10, 0)),
+                Message(role="assistant", content="Response",
+                       timestamp=datetime(2025, 1, 1, 10, 5)),
+                # 4 hour gap (lunch + meetings)
+                Message(role="user", content="Back",
+                       timestamp=datetime(2025, 1, 1, 14, 5)),
+            ],
+        )
+        # 5 min + 30 min (capped from 240) = 35 min
+        assert session.active_duration_minutes == 35
+
+    def test_active_duration_minutes_property_single_message(self):
+        """Test Session.active_duration_minutes with single message returns 0."""
+        session = Session(
+            session_id="test",
+            project_path="/test",
+            file_path=Path("/test.jsonl"),
+            messages=[
+                Message(role="user", content="Hello",
+                       timestamp=datetime(2025, 1, 1, 10, 0)),
+            ],
+        )
+        assert session.active_duration_minutes == 0
+
+    def test_active_duration_minutes_property_no_messages(self):
+        """Test Session.active_duration_minutes with no messages returns 0."""
+        session = Session(
+            session_id="test",
+            project_path="/test",
+            file_path=Path("/test.jsonl"),
+            messages=[],
+        )
+        assert session.active_duration_minutes == 0
+
+    def test_active_duration_minutes_property_no_timestamps(self):
+        """Test Session.active_duration_minutes with no timestamps returns 0."""
+        session = Session(
+            session_id="test",
+            project_path="/test",
+            file_path=Path("/test.jsonl"),
+            messages=[
+                Message(role="user", content="Hello"),
+                Message(role="assistant", content="Hi"),
+            ],
+        )
+        assert session.active_duration_minutes == 0
+
+    def test_duration_str_uses_active_duration_minutes(self):
+        """Test that duration_str uses the active_duration_minutes property."""
+        session = Session(
+            session_id="test",
+            project_path="/test",
+            file_path=Path("/test.jsonl"),
+            messages=[
+                Message(role="user", content="Start",
+                       timestamp=datetime(2025, 1, 1, 10, 0)),
+                # 2 hour gap
+                Message(role="assistant", content="Done",
+                       timestamp=datetime(2025, 1, 1, 12, 0)),
+            ],
+            start_time=datetime(2025, 1, 1, 10, 0),
+            end_time=datetime(2025, 1, 1, 12, 0),
+        )
+        # Raw duration would be "2h 0m", active duration is 30m (capped)
+        assert session.active_duration_minutes == 30
+        assert session.duration_str == "30m"
+
 
 class TestActiveDuration:
-    """Test active_duration_minutes function."""
+    """Test _active_duration_minutes helper function."""
 
     def test_active_duration_basic(self):
         """Test basic active duration calculation."""
@@ -234,7 +328,7 @@ class TestActiveDuration:
             Message(role="user", content="How are you?", timestamp=datetime(2025, 12, 15, 10, 10)),
         ]
 
-        duration = active_duration_minutes(messages)
+        duration = _active_duration_minutes(messages)
 
         # 5 min + 5 min = 10 min
         assert duration == 10
@@ -248,7 +342,7 @@ class TestActiveDuration:
             Message(role="user", content="Back", timestamp=datetime(2025, 12, 15, 14, 5)),
         ]
 
-        duration = active_duration_minutes(messages, max_gap_minutes=30)
+        duration = _active_duration_minutes(messages, max_gap_minutes=30)
 
         # 5 min + 30 min (capped) = 35 min
         assert duration == 35
@@ -262,7 +356,7 @@ class TestActiveDuration:
             Message(role="user", content="Morning", timestamp=datetime(2025, 12, 16, 9, 0)),
         ]
 
-        duration = active_duration_minutes(messages, max_gap_minutes=30)
+        duration = _active_duration_minutes(messages, max_gap_minutes=30)
 
         # 5 min + 30 min (capped) = 35 min (not 600+ min)
         assert duration == 35
@@ -273,12 +367,12 @@ class TestActiveDuration:
             Message(role="user", content="Hello", timestamp=datetime(2025, 12, 15, 10, 0)),
         ]
 
-        duration = active_duration_minutes(messages)
+        duration = _active_duration_minutes(messages)
         assert duration == 0
 
     def test_active_duration_empty_messages(self):
         """Test with empty messages returns 0."""
-        duration = active_duration_minutes([])
+        duration = _active_duration_minutes([])
         assert duration == 0
 
     def test_active_duration_no_timestamps(self):
@@ -288,7 +382,7 @@ class TestActiveDuration:
             Message(role="assistant", content="Hi"),
         ]
 
-        duration = active_duration_minutes(messages)
+        duration = _active_duration_minutes(messages)
         assert duration == 0
 
     def test_active_duration_custom_max_gap(self):
@@ -300,12 +394,50 @@ class TestActiveDuration:
         ]
 
         # With 60 min cap
-        duration_60 = active_duration_minutes(messages, max_gap_minutes=60)
+        duration_60 = _active_duration_minutes(messages, max_gap_minutes=60)
         assert duration_60 == 60
 
         # With 15 min cap
-        duration_15 = active_duration_minutes(messages, max_gap_minutes=15)
+        duration_15 = _active_duration_minutes(messages, max_gap_minutes=15)
         assert duration_15 == 15
+
+
+class TestActiveDurationConsistency:
+    """Verify active duration is used consistently across all duration calculation sites."""
+
+    def _make_session_with_gap(self, gap_hours: int = 4):
+        """Helper: create session with a large gap that should be capped."""
+        messages = [
+            Message(role="user", content="start",
+                   timestamp=datetime(2025, 1, 1, 10, 0)),
+            Message(role="assistant", content="response",
+                   timestamp=datetime(2025, 1, 1, 10, 5)),
+            # Large gap (e.g., lunch break)
+            Message(role="user", content="back",
+                   timestamp=datetime(2025, 1, 1, 10 + gap_hours, 5)),
+        ]
+        return Session(
+            session_id="test-gap",
+            project_path="/test",
+            file_path=Path("/test.jsonl"),
+            messages=messages,
+            start_time=messages[0].timestamp,
+            end_time=messages[-1].timestamp,
+        )
+
+    def test_session_duration_str_uses_active_duration(self):
+        """Session.duration_str should cap gaps, not use raw end-start."""
+        session = self._make_session_with_gap(gap_hours=4)
+        # Raw duration would be 4h 5m (245 min)
+        # Active duration: 5 + 30 (capped) = 35 min
+        assert session.duration_str == "35m"
+
+    def test_session_info_uses_active_duration(self):
+        """SessionInfo.from_session() should use active duration."""
+        session = self._make_session_with_gap(gap_hours=4)
+        info = SessionInfo.from_session(session, is_agent=False)
+        # Should be 35 min, not 245 min
+        assert info.duration_minutes == 35
 
 
 class TestProjectStats:
@@ -1406,16 +1538,19 @@ class TestSessionInfoV3:
 
     def test_from_session_with_project(self):
         """Test creating SessionInfoV3 from Session."""
+        # Messages with timestamps 10 minutes apart (well under 30 min cap)
         session = Session(
             session_id="test123",
             project_path="/test/project",
             file_path=Path("/test.jsonl"),
             messages=[
-                Message(role="user", content="Hello"),
-                Message(role="assistant", content="Hi"),
+                Message(role="user", content="Hello",
+                       timestamp=datetime(2025, 12, 15, 10, 0)),
+                Message(role="assistant", content="Hi",
+                       timestamp=datetime(2025, 12, 15, 10, 10)),
             ],
             start_time=datetime(2025, 12, 15, 10, 0),
-            end_time=datetime(2025, 12, 15, 11, 30),
+            end_time=datetime(2025, 12, 15, 10, 10),
         )
 
         info = SessionInfoV3.from_session_with_project(
@@ -1426,7 +1561,7 @@ class TestSessionInfoV3:
         assert info.session_id == "test123"
         assert info.project_name == "TestProject"
         assert info.project_path == "/test/project"
-        assert info.duration_minutes == 90
+        assert info.duration_minutes == 10  # Active duration based on message gaps
         assert info.message_count == 2
         assert info.is_agent is False
 

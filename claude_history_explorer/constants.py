@@ -20,3 +20,7 @@ AGENT_RATIO_BALANCED = 0.5
 # Activity intensity thresholds (messages per day)
 ACTIVITY_INTENSITY_HIGH = 300
 ACTIVITY_INTENSITY_MEDIUM = 100
+
+# Active duration calculation
+# Maximum gap between messages counted as active time (in minutes)
+ACTIVITY_GAP_CAP_MINUTES = 30

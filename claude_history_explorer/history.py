@@ -49,6 +49,7 @@ from .constants import (
     AGENT_RATIO_BALANCED,
     ACTIVITY_INTENSITY_HIGH,
     ACTIVITY_INTENSITY_MEDIUM,
+    ACTIVITY_GAP_CAP_MINUTES,
 )
 
 __all__ = [
@@ -69,8 +70,6 @@ __all__ = [
     "get_projects_dir",
     # Helper functions
     "format_duration",
-    "duration_minutes",
-    "active_duration_minutes",
     "format_timestamp",
     "classify",
     # Core functions
@@ -129,35 +128,20 @@ def format_duration(minutes: int) -> str:
     return f"{hours}h {mins}m"
 
 
-def duration_minutes(start: datetime, end: datetime) -> int:
-    """Calculate duration in minutes between two datetimes.
-
-    Args:
-        start: Start datetime
-        end: End datetime
-
-    Returns:
-        Duration in minutes
-
-    Example:
-        >>> from datetime import datetime, timedelta
-        >>> start = datetime.now()
-        >>> end = start + timedelta(hours=2, minutes=30)
-        >>> duration_minutes(start, end)
-        150
-    """
-    return int((end - start).total_seconds() / 60)
-
-
-def active_duration_minutes(messages: list, max_gap_minutes: int = 30) -> int:
+def _active_duration_minutes(
+    messages: list, max_gap_minutes: int = ACTIVITY_GAP_CAP_MINUTES
+) -> int:
     """Calculate active duration by summing gaps between messages, capping each gap.
 
     This prevents inflated durations from sessions left open overnight or for days.
     Each gap between consecutive messages is capped at max_gap_minutes.
 
+    Note: This is a private helper. Use Session.active_duration_minutes property instead.
+
     Args:
         messages: List of Message objects with timestamps
-        max_gap_minutes: Maximum minutes to count for any single gap (default 30)
+        max_gap_minutes: Maximum minutes to count for any single gap
+            (default: ACTIVITY_GAP_CAP_MINUTES)
 
     Returns:
         Active duration in minutes
@@ -410,11 +394,27 @@ class Session:
         return len([m for m in self.messages if m.role == "user"])
 
     @property
+    def active_duration_minutes(self) -> int:
+        """Active duration in minutes with gaps capped at ACTIVITY_GAP_CAP_MINUTES.
+
+        Calculates duration by summing gaps between consecutive messages,
+        capping each gap to avoid inflated durations from idle sessions.
+
+        Returns:
+            Duration in minutes, or 0 if insufficient timestamp data.
+        """
+        return _active_duration_minutes(self.messages)
+
+    @property
     def duration_str(self) -> str:
+        """Human-readable active duration (e.g., '2h 30m')."""
+        minutes = self.active_duration_minutes
+        if minutes > 0:
+            return format_duration(minutes)
+        # Fallback for sessions without message timestamps
         if self.start_time and self.end_time:
             delta = self.end_time - self.start_time
-            minutes = int(delta.total_seconds() / 60)
-            return format_duration(minutes)
+            return format_duration(int(delta.total_seconds() / 60))
         return "unknown"
 
 
@@ -865,12 +865,11 @@ def calculate_project_stats(project: Project) -> ProjectStats:
         total_messages += session.message_count
         total_user_messages += session.user_message_count
 
-        # Duration
-        if session.start_time and session.end_time:
-            duration = duration_minutes(session.start_time, session.end_time)
-            total_duration_minutes += duration
-            if duration > longest_duration_minutes:
-                longest_duration_minutes = duration
+        # Duration - use active duration (gaps capped)
+        duration = session.active_duration_minutes
+        total_duration_minutes += duration
+        if duration > longest_duration_minutes:
+            longest_duration_minutes = duration
 
         # Most recent session
         if session.start_time:
@@ -1011,9 +1010,8 @@ class SessionInfo:
         if start_time is None:
             return None
 
-        duration = 0
-        if session.end_time:
-            duration = duration_minutes(start_time, session.end_time)
+        # Use active duration (gaps capped) instead of raw duration
+        duration = session.active_duration_minutes
 
         return cls(
             session_id=session.session_id,
@@ -1502,9 +1500,8 @@ class SessionInfoV3(SessionInfo):
         if start_time is None:
             return None
 
-        # Use active duration (gaps capped at 30 min) instead of raw duration
-        # This prevents inflated hours from sessions left open overnight
-        duration = active_duration_minutes(session.messages)
+        # Use active duration from Session property
+        duration = session.active_duration_minutes
 
         return cls(
             session_id=session.session_id,
