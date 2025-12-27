@@ -15,6 +15,7 @@ from claude_history_explorer.history import (
     Project,
     ProjectStats,
     GlobalStats,
+    active_duration_minutes,
     # V3 imports
     SessionInfoV3,
     ProjectStatsV3,
@@ -220,6 +221,91 @@ class TestSession:
         
         assert session.message_count == 3
         assert session.user_message_count == 2
+
+
+class TestActiveDuration:
+    """Test active_duration_minutes function."""
+
+    def test_active_duration_basic(self):
+        """Test basic active duration calculation."""
+        messages = [
+            Message(role="user", content="Hello", timestamp=datetime(2025, 12, 15, 10, 0)),
+            Message(role="assistant", content="Hi", timestamp=datetime(2025, 12, 15, 10, 5)),
+            Message(role="user", content="How are you?", timestamp=datetime(2025, 12, 15, 10, 10)),
+        ]
+
+        duration = active_duration_minutes(messages)
+
+        # 5 min + 5 min = 10 min
+        assert duration == 10
+
+    def test_active_duration_caps_large_gaps(self):
+        """Test that large gaps are capped at max_gap_minutes."""
+        messages = [
+            Message(role="user", content="Hello", timestamp=datetime(2025, 12, 15, 10, 0)),
+            Message(role="assistant", content="Hi", timestamp=datetime(2025, 12, 15, 10, 5)),
+            # 4 hour gap (left session open)
+            Message(role="user", content="Back", timestamp=datetime(2025, 12, 15, 14, 5)),
+        ]
+
+        duration = active_duration_minutes(messages, max_gap_minutes=30)
+
+        # 5 min + 30 min (capped) = 35 min
+        assert duration == 35
+
+    def test_active_duration_overnight_gap(self):
+        """Test that overnight gaps are properly capped."""
+        messages = [
+            Message(role="user", content="Goodnight", timestamp=datetime(2025, 12, 15, 23, 0)),
+            Message(role="assistant", content="Night", timestamp=datetime(2025, 12, 15, 23, 5)),
+            # Next morning
+            Message(role="user", content="Morning", timestamp=datetime(2025, 12, 16, 9, 0)),
+        ]
+
+        duration = active_duration_minutes(messages, max_gap_minutes=30)
+
+        # 5 min + 30 min (capped) = 35 min (not 600+ min)
+        assert duration == 35
+
+    def test_active_duration_single_message(self):
+        """Test with single message returns 0."""
+        messages = [
+            Message(role="user", content="Hello", timestamp=datetime(2025, 12, 15, 10, 0)),
+        ]
+
+        duration = active_duration_minutes(messages)
+        assert duration == 0
+
+    def test_active_duration_empty_messages(self):
+        """Test with empty messages returns 0."""
+        duration = active_duration_minutes([])
+        assert duration == 0
+
+    def test_active_duration_no_timestamps(self):
+        """Test with messages without timestamps returns 0."""
+        messages = [
+            Message(role="user", content="Hello"),
+            Message(role="assistant", content="Hi"),
+        ]
+
+        duration = active_duration_minutes(messages)
+        assert duration == 0
+
+    def test_active_duration_custom_max_gap(self):
+        """Test with custom max_gap_minutes."""
+        messages = [
+            Message(role="user", content="Hello", timestamp=datetime(2025, 12, 15, 10, 0)),
+            # 2 hour gap
+            Message(role="assistant", content="Hi", timestamp=datetime(2025, 12, 15, 12, 0)),
+        ]
+
+        # With 60 min cap
+        duration_60 = active_duration_minutes(messages, max_gap_minutes=60)
+        assert duration_60 == 60
+
+        # With 15 min cap
+        duration_15 = active_duration_minutes(messages, max_gap_minutes=15)
+        assert duration_15 == 15
 
 
 class TestProjectStats:

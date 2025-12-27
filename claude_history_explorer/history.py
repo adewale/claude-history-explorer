@@ -70,6 +70,7 @@ __all__ = [
     # Helper functions
     "format_duration",
     "duration_minutes",
+    "active_duration_minutes",
     "format_timestamp",
     "classify",
     # Core functions
@@ -146,6 +147,38 @@ def duration_minutes(start: datetime, end: datetime) -> int:
         150
     """
     return int((end - start).total_seconds() / 60)
+
+
+def active_duration_minutes(messages: list, max_gap_minutes: int = 30) -> int:
+    """Calculate active duration by summing gaps between messages, capping each gap.
+
+    This prevents inflated durations from sessions left open overnight or for days.
+    Each gap between consecutive messages is capped at max_gap_minutes.
+
+    Args:
+        messages: List of Message objects with timestamps
+        max_gap_minutes: Maximum minutes to count for any single gap (default 30)
+
+    Returns:
+        Active duration in minutes
+
+    Example:
+        If messages are at 10:00, 10:05, 10:10, then 14:00 (4 hour gap):
+        - Raw duration: 240 minutes
+        - Active duration: 5 + 5 + 30 = 40 minutes (gap capped at 30)
+    """
+    timestamps = [m.timestamp for m in messages if m.timestamp is not None]
+    if len(timestamps) < 2:
+        return 0
+
+    timestamps.sort()
+    total_minutes = 0
+
+    for i in range(1, len(timestamps)):
+        gap = (timestamps[i] - timestamps[i - 1]).total_seconds() / 60
+        total_minutes += min(gap, max_gap_minutes)
+
+    return int(total_minutes)
 
 
 def format_timestamp(dt: Optional[datetime], fmt: str = "%Y-%m-%d %H:%M") -> str:
@@ -1469,9 +1502,9 @@ class SessionInfoV3(SessionInfo):
         if start_time is None:
             return None
 
-        duration = 0
-        if session.end_time:
-            duration = duration_minutes(start_time, session.end_time)
+        # Use active duration (gaps capped at 30 min) instead of raw duration
+        # This prevents inflated hours from sessions left open overnight
+        duration = active_duration_minutes(session.messages)
 
         return cls(
             session_id=session.session_id,
