@@ -19,7 +19,6 @@ from .models import (
     MAX_DISPLAY_NAME_LENGTH,
     MAX_PROJECT_NAME_LENGTH,
     WRAPPED_VERSION_V3,
-    Message,
     ProjectStatsV3,
     Session,
     SessionInfoV3,
