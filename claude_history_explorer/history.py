@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from bisect import bisect_right
-from typing import Any, Callable, Iterator, Optional, Dict, List, Set, Tuple
+from typing import Any, Iterator, Optional, Dict, List, Set, Tuple
 
 from .constants import (
     MESSAGE_RATE_HIGH,
@@ -126,6 +126,35 @@ def format_duration(minutes: int) -> str:
     hours = minutes // 60
     mins = minutes % 60
     return f"{hours}h {mins}m"
+
+
+# ReDoS-vulnerable patterns: nested quantifiers like (a+)+, (a*)*
+_REDOS_PATTERN = re.compile(r"\([^)]*[+*][^)]*\)[+*]")
+
+
+def _compile_regex_safe(pattern: str, flags: int = 0) -> re.Pattern:
+    """Compile a regex pattern with basic ReDoS protection.
+
+    Checks for patterns that could cause catastrophic backtracking and
+    raises a descriptive error if found.
+
+    Args:
+        pattern: Regular expression pattern to compile
+        flags: Regex flags (e.g., re.IGNORECASE)
+
+    Returns:
+        Compiled regex pattern
+
+    Raises:
+        ValueError: If pattern contains ReDoS-vulnerable constructs
+        re.error: If pattern is not a valid regex
+    """
+    # Check for nested quantifiers that can cause catastrophic backtracking
+    if _REDOS_PATTERN.search(pattern):
+        raise ValueError(
+            f"Pattern may cause slow matching (nested quantifiers): {pattern}"
+        )
+    return re.compile(pattern, flags)
 
 
 def _active_duration_minutes(
@@ -684,7 +713,7 @@ def search_sessions(
         projects = list_projects()
 
     flags = 0 if case_sensitive else re.IGNORECASE
-    regex = re.compile(pattern, flags)
+    regex = _compile_regex_safe(pattern, flags)
 
     for proj in projects:
         for session_file in proj.session_files:
@@ -2002,8 +2031,8 @@ def get_top_session_fingerprints(
             try:
                 full_session = parse_session(session_file_map[info.session_id], info.project_path)
                 fp = compute_session_fingerprint(full_session)
-            except Exception:
-                pass  # Use default on error
+            except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError, KeyError):
+                pass  # Use default fingerprint on parse/compute error
 
         # Compact array format: [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
         fingerprints.append([

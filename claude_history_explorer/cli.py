@@ -17,14 +17,13 @@ Commands:
 
 import json
 import re
+from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.markdown import Markdown
 from rich.syntax import Syntax
-from rich.text import Text
 from sparklines import sparklines
 
 from .history import (
@@ -52,6 +51,40 @@ from .history import (
 __all__ = ["main"]
 
 console = Console()
+
+
+def _sanitize_output_path(output: str) -> Path:
+    """Sanitize output file path to prevent directory traversal attacks.
+
+    Validates that relative paths don't escape the current working directory
+    using parent directory references (e.g., ../../../etc/passwd).
+
+    Args:
+        output: The user-provided output file path
+
+    Returns:
+        Sanitized Path object
+
+    Raises:
+        click.ClickException: If relative path contains directory traversal
+    """
+    path = Path(output)
+
+    # For relative paths, check for parent directory traversal
+    if not path.is_absolute():
+        try:
+            # Resolve to catch traversal attempts like foo/../../../etc/passwd
+            resolved = (Path.cwd() / path).resolve()
+            if not str(resolved).startswith(str(Path.cwd().resolve())):
+                raise click.ClickException(
+                    f"Path escapes current directory: {output}\n"
+                    "Use a path within the current directory."
+                )
+        except (OSError, ValueError) as e:
+            raise click.ClickException(f"Invalid output path: {output} ({e})")
+
+    return path
+
 
 # Example text for each command
 EXAMPLES = {
@@ -541,9 +574,10 @@ def export(
         result = "\n".join(lines)
 
     if output:
-        with open(output, "w", encoding="utf-8") as f:
+        safe_path = _sanitize_output_path(output)
+        with open(safe_path, "w", encoding="utf-8") as f:
             f.write(result)
-        console.print(f"[green]Exported to {output}[/green]")
+        console.print(f"[green]Exported to {safe_path}[/green]")
     else:
         console.print(result)
 
@@ -613,9 +647,10 @@ def summary(project: str, output_format: str, output: str, example: bool):
             summary_text = _generate_global_summary(global_stats, output_format)
 
         if output:
-            with open(output, "w", encoding="utf-8") as f:
+            safe_path = _sanitize_output_path(output)
+            with open(safe_path, "w", encoding="utf-8") as f:
                 f.write(summary_text)
-            console.print(f"[green]Summary written to {output}[/green]")
+            console.print(f"[green]Summary written to {safe_path}[/green]")
         else:
             console.print(summary_text)
 
@@ -656,9 +691,10 @@ def story(project: str, output_format: str, output: str, example: bool):
             story_text = _format_global_story(story_data, output_format)
 
         if output:
-            with open(output, "w", encoding="utf-8") as f:
+            safe_path = _sanitize_output_path(output)
+            with open(safe_path, "w", encoding="utf-8") as f:
                 f.write(story_text)
-            console.print(f"[green]Story written to {output}[/green]")
+            console.print(f"[green]Story written to {safe_path}[/green]")
         else:
             console.print(story_text)
 
@@ -704,7 +740,7 @@ def info(example: bool):
         console.print(f"  Total size: {size_mb:.1f} MB")
 
 
-def _display_project_stats(stats: ProjectStats, output_format: str):
+def _display_project_stats(stats: ProjectStats, output_format: str) -> None:
     """Display statistics for a single project."""
     if output_format == "json":
         data = {
@@ -742,7 +778,7 @@ def _display_project_stats(stats: ProjectStats, output_format: str):
     )
 
 
-def _display_global_stats(stats: GlobalStats, output_format: str):
+def _display_global_stats(stats: GlobalStats, output_format: str) -> None:
     """Display global statistics across all projects."""
     if output_format == "json":
         data = {
@@ -1377,7 +1413,9 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
             import pyperclip
             pyperclip.copy(url)
             console.print("\n[green]📋 Copied to clipboard![/green]")
-        except Exception:
+        except (ImportError, OSError, RuntimeError):
+            # ImportError: pyperclip not installed
+            # OSError/RuntimeError: clipboard access failed (headless, permissions, etc.)
             console.print("\n[yellow]⚠️  Could not copy to clipboard[/yellow]")
 
 

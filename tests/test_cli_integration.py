@@ -1089,5 +1089,32 @@ class TestJSONOutputPaths:
             assert data.get('most_recent_activity') is None
 
 
+# =============================================================================
+# Critical Error Path Tests (G1, G2)
+# =============================================================================
+
+class TestCriticalErrorPaths:
+    """Test critical error handling paths that affect user experience."""
+
+    def test_projects_no_claude_dir(self, runner):
+        """G1: Test projects command when ~/.claude directory doesn't exist."""
+        mock_path = MagicMock()
+        mock_path.exists.return_value = False
+
+        with patch('claude_history_explorer.cli.get_projects_dir', return_value=mock_path):
+            result = runner.invoke(main, ['projects'])
+
+            # Should show helpful error message, not crash
+            assert result.exit_code == 0  # Graceful exit
+            assert "not found" in result.output.lower() or "no projects" in result.output.lower()
+
+    def test_sessions_missing_project_arg(self, runner):
+        """G2: Test sessions command without PROJECT_SEARCH argument."""
+        result = runner.invoke(main, ['sessions'])
+
+        # Click should handle missing required argument
+        assert result.exit_code != 0 or "Missing argument" in result.output or "Error" in result.output
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
