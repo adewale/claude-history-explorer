@@ -58,25 +58,48 @@ Add approximately 60 lines:
 # Work Type Classification
 # =============================================================================
 
+# Pattern Design Principles:
+# 1. Extensions use $ anchor: r"\.tex$" (matches end of path)
+# 2. Directories use enclosing slashes: r"/papers?/" (avoids partial matches)
+# 3. Terminal directories use (?:/|$): r"/thesis(?:/|$)" (matches /thesis or /thesis/)
+# 4. All patterns are matched case-insensitively
+
 WORK_TYPE_PATTERNS = {
     "writing": [
-        r"\.tex$", r"\.md$", r"\.docx?$", r"\.rst$",
-        r"/papers?/", r"/docs?/", r"/thesis", r"/dissertation",
-        r"/manuscript", r"/proposal", r"/draft",
+        # File extensions (anchored at end)
+        r"\.tex$", r"\.md$", r"\.docx?$", r"\.rst$", r"\.txt$",
+        # Directory patterns (enclosed or terminal)
+        r"/papers?/", r"/docs?/", r"/documentation/",
+        r"/thesis(?:/|$)", r"/dissertation(?:/|$)",
+        r"/manuscripts?(?:/|$)", r"/proposals?(?:/|$)", r"/drafts?(?:/|$)",
+        r"/writing(?:/|$)", r"/book(?:/|$)", r"/chapter(?:/|$)",
     ],
     "analysis": [
+        # File extensions
         r"\.csv$", r"\.xlsx?$", r"\.ipynb$", r"\.r$", r"\.rmd$",
-        r"/data/", r"/analysis/", r"/results/", r"/notebook",
+        r"\.parquet$", r"\.feather$", r"\.sav$",  # Data formats
+        # Directory patterns
+        r"/data/", r"/datasets?/", r"/analysis/", r"/analytics/",
+        r"/results?/", r"/notebooks?/", r"/jupyter/",
+        r"/statistics?(?:/|$)", r"/viz(?:/|$)", r"/visuali[sz]ations?(?:/|$)",
     ],
     "research": [
-        r"\.bib$",
-        r"/research/", r"/literature/", r"/bibliography", r"/references",
+        # File extensions
+        r"\.bib$", r"\.ris$", r"\.enw$",  # Bibliography formats
+        # Directory patterns
+        r"/research/", r"/literature/", r"/lit[-_]?review/",
+        r"/bibliography(?:/|$)", r"/references(?:/|$)", r"/sources(?:/|$)",
+        r"/reading(?:/|$)", r"/papers[-_]to[-_]read(?:/|$)",
     ],
     "teaching": [
-        r"/course", r"/class/", r"/grading", r"/assignment",
-        r"/syllabus", r"/student", r"/rubric", r"/lecture",
+        # Directory patterns (no common file extensions)
+        r"/courses?/", r"/class(?:es)?/", r"/teaching/",
+        r"/grading(?:/|$)", r"/assignments?(?:/|$)", r"/homework(?:/|$)",
+        r"/syllabus(?:/|$)", r"/syllabi(?:/|$)",
+        r"/students?(?:/|$)", r"/rubrics?(?:/|$)", r"/lectures?(?:/|$)",
+        r"/exams?(?:/|$)", r"/quizzes?(?:/|$)",
     ],
-    # Default: "coding" - this is Claude CODE after all
+    # Note: "coding" has no patterns - it's the default for Claude Code
 }
 
 WORK_TYPE_INFO = {
@@ -309,6 +332,8 @@ from claude_history_explorer.history import (
 class TestClassifyProject:
     """Test project classification by path."""
 
+    # === Positive tests: paths that SHOULD match ===
+
     def test_papers_directory_is_writing(self):
         assert classify_project("/Users/me/papers/thesis") == "writing"
 
@@ -317,6 +342,11 @@ class TestClassifyProject:
 
     def test_docs_directory_is_writing(self):
         assert classify_project("/Users/me/docs/manual") == "writing"
+
+    def test_terminal_thesis_is_writing(self):
+        # Terminal directory without trailing slash
+        assert classify_project("/Users/me/thesis") == "writing"
+        assert classify_project("/Users/me/thesis/") == "writing"
 
     def test_data_directory_is_analysis(self):
         assert classify_project("/Users/me/data/experiment") == "analysis"
@@ -347,6 +377,27 @@ class TestClassifyProject:
     def test_case_insensitive(self):
         assert classify_project("/PAPERS/THESIS") == "writing"
         assert classify_project("/Data/Results") == "analysis"
+
+    # === Negative tests: paths that should NOT false-positive ===
+
+    def test_no_false_positive_on_partial_match(self):
+        # "thesis" should not match inside "synthesis"
+        assert classify_project("/Users/me/synthesis-project") == "coding"
+        # "data" should not match inside "metadata"
+        assert classify_project("/Users/me/metadata-service") == "coding"
+        # "draft" should not match inside "craftsman"
+        assert classify_project("/Users/me/craftsman-tools") == "coding"
+
+    def test_no_false_positive_on_extension_substring(self):
+        # ".tex" should not match ".texture" or ".text"
+        assert classify_project("/project/file.texture") == "coding"
+        # ".csv" should not match ".csvx"
+        assert classify_project("/project/file.csvx") == "coding"
+
+    def test_mid_path_requires_slashes(self):
+        # "/data/" requires slashes on both sides for mid-path
+        assert classify_project("/mydata/project") == "coding"  # no leading slash before "data"
+        assert classify_project("/project/database") == "coding"  # "data" is substring
 
 
 class TestWorkTypeInfo:
@@ -447,6 +498,98 @@ claude-history stats --by-worktype
 
 5. **Update documentation**
    - Add examples to FAQ or README
+
+---
+
+## Extensibility: Adding or Removing Work Types
+
+The design makes work types easy to modify. All definitions live in two adjacent dicts
+in `history.py`:
+
+### To Add a New Work Type
+
+1. **Add patterns to `WORK_TYPE_PATTERNS`:**
+```python
+WORK_TYPE_PATTERNS = {
+    # ... existing types ...
+    "design": [
+        r"\.fig$", r"\.sketch$", r"\.xd$",  # Design file extensions
+        r"/design/", r"/ui/", r"/ux/",       # Directory patterns
+        r"/mockups?(?:/|$)", r"/wireframes?(?:/|$)",
+    ],
+}
+```
+
+2. **Add metadata to `WORK_TYPE_INFO`:**
+```python
+WORK_TYPE_INFO = {
+    # ... existing types ...
+    "design": {
+        "name": "Design & UX",
+        "description": "UI/UX design, mockups, wireframes",
+    },
+}
+```
+
+3. **No other changes needed.** The CLI command and stats integration automatically
+   pick up new types because they iterate over `WORK_TYPE_INFO.keys()`.
+
+### To Remove a Work Type
+
+1. **Delete the entry from `WORK_TYPE_PATTERNS`**
+2. **Delete the entry from `WORK_TYPE_INFO`**
+3. **Projects that matched the removed type will now classify as `coding` (default)**
+
+No migration needed - classification is computed on-the-fly, not stored.
+
+### To Rename a Work Type
+
+1. **Change the key in both dicts** (e.g., `"writing"` → `"docs"`)
+2. **Update the `name` in `WORK_TYPE_INFO`** for display
+
+### Future: User-Defined Work Types
+
+If users want custom types, we could later add:
+
+```python
+# ~/.claude/work_types.json (future feature)
+{
+    "custom_types": {
+        "client_work": {
+            "name": "Client Projects",
+            "description": "Billable client work",
+            "patterns": ["/clients?/", "/billable/"]
+        }
+    },
+    "overrides": {
+        "/Users/me/secret-project": "research"  # Force classification
+    }
+}
+```
+
+This would be loaded and merged with built-in types. **Not in scope for this plan**
+but the architecture supports it.
+
+### Pattern Guidelines for New Types
+
+| Pattern Type | Format | Example | Matches |
+|--------------|--------|---------|---------|
+| File extension | `r"\.ext$"` | `r"\.tex$"` | `/foo/paper.tex` |
+| Mid-path directory | `r"/dirname/"` | `r"/data/"` | `/foo/data/bar` |
+| Terminal directory | `r"/dirname(?:/\|$)"` | `r"/thesis(?:/\|$)"` | `/foo/thesis` or `/foo/thesis/` |
+| Optional plural | `r"/names?/"` | `r"/papers?/"` | `/paper/` or `/papers/` |
+| Variant spellings | `r"/visuali[sz]e/"` | - | US and UK spelling |
+
+### Testing New Patterns
+
+Add tests to `test_work_type.py`:
+
+```python
+def test_new_design_type(self):
+    assert classify_project("/Users/me/design/app-mockups") == "design"
+    assert classify_project("/project/wireframes") == "design"
+    assert classify_project("/ui/components.fig") == "design"
+```
 
 ---
 
