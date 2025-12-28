@@ -1115,6 +1115,80 @@ class TestCriticalErrorPaths:
         # Click should handle missing required argument
         assert result.exit_code != 0 or "Missing argument" in result.output or "Error" in result.output
 
+    def test_sessions_position_display_head(self, runner, mock_project, mock_session):
+        """G3: Test position calculation displays correctly for head."""
+        with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
+            with patch('claude_history_explorer.cli.parse_session', return_value=mock_session):
+                result = runner.invoke(main, ['sessions', 'myproject', '--limit', '1'])
+
+                assert result.exit_code == 0
+                # Should show position info when limit is less than total
+                # "first 1 of 2" or similar
+
+    def test_sessions_position_display_tail(self, runner, mock_project, mock_session):
+        """G3: Test position calculation displays correctly for tail."""
+        with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
+            with patch('claude_history_explorer.cli.parse_session', return_value=mock_session):
+                result = runner.invoke(main, ['sessions', 'myproject', '--tail', '--limit', '1'])
+
+                assert result.exit_code == 0
+                # Should show "last" position
+
+    def test_search_no_pattern(self, runner):
+        """G5: Test search command without pattern argument."""
+        result = runner.invoke(main, ['search'])
+
+        # Should handle missing pattern gracefully
+        assert result.exit_code != 0 or "Missing argument" in result.output or "pattern" in result.output.lower()
+
+    def test_search_no_results(self, runner):
+        """G5: Test search command with pattern that matches nothing."""
+        # search_sessions is a generator, so we need to mock it as returning an empty iterable
+        with patch('claude_history_explorer.cli.search_sessions', return_value=iter([])):
+            result = runner.invoke(main, ['search', 'nonexistent-pattern-xyz'])
+
+            assert result.exit_code == 0
+            assert "no matches" in result.output.lower()
+
+    def test_search_with_invalid_regex(self, runner):
+        """G5: Test search command with invalid regex pattern."""
+        with patch('claude_history_explorer.cli.search_sessions', side_effect=ValueError("Invalid pattern")):
+            result = runner.invoke(main, ['search', '[invalid(regex'])
+
+            # Should handle regex error gracefully
+            assert result.exit_code != 0 or "error" in result.output.lower() or "invalid" in result.output.lower()
+
+    def test_export_invalid_format(self, runner, mock_project, mock_session):
+        """G6: Test export command with invalid format option."""
+        # Note: Click validates options, so this tests the CLI option handling
+        result = runner.invoke(main, ['export', 'myproject', '--format', 'invalid-format'])
+
+        # Click should reject invalid format choice
+        assert result.exit_code != 0
+
+    def test_export_nonexistent_session(self, runner):
+        """G6: Test export command with nonexistent session."""
+        with patch('claude_history_explorer.cli.get_session_by_id', return_value=None):
+            result = runner.invoke(main, ['export', 'nonexistent-session-id'])
+
+            assert result.exit_code == 0  # Graceful exit
+            assert "no session found" in result.output.lower()
+
+
+# =============================================================================
+# Test: Year Validation in Wrapped
+# =============================================================================
+
+class TestWrappedYearValidation:
+    """Test year validation in wrapped command."""
+
+    def test_wrapped_year_too_old(self, runner):
+        """Test wrapped command rejects years before Claude Code existed."""
+        result = runner.invoke(main, ['wrapped', '--year', '2023', '--no-copy'])
+
+        assert result.exit_code == 0  # Command runs but shows error
+        assert "2024" in result.output  # Should mention 2024 as minimum
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -334,8 +334,8 @@ class TestGenerateWrappedStoryV3Integration:
                 return mock_session1
             return mock_session2
 
-        with patch('claude_history_explorer.history.list_projects', return_value=[mock_project]):
-            with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+        with patch('claude_history_explorer.wrapped.list_projects', return_value=[mock_project]):
+            with patch('claude_history_explorer.wrapped.parse_session', side_effect=mock_parse_session):
                 story = generate_wrapped_story_v3(2025, name="Integration User")
 
         # Verify story was generated

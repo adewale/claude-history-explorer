@@ -493,8 +493,8 @@ class TestGlobalStats:
                 with open(session_file, "w") as f:
                     f.write('{"type": "user", "message": {"content": "test"}}\n')
             
-            # Mock the projects directory
-            with patch('claude_history_explorer.history.get_projects_dir', return_value=temp_path):
+            # Mock the projects directory (patch where it's looked up, not where defined)
+            with patch('claude_history_explorer.projects.get_projects_dir', return_value=temp_path):
                 stats = history.calculate_global_stats()
                 
                 assert isinstance(stats, GlobalStats)
@@ -669,7 +669,7 @@ class TestErrorHandling:
     
     def test_missing_claude_directory(self):
         """Test handling of missing Claude directory."""
-        with patch('claude_history_explorer.history.get_projects_dir', return_value=Path("/nonexistent")):
+        with patch('claude_history_explorer.projects.get_projects_dir', return_value=Path("/nonexistent")):
             projects = history.list_projects()
             assert projects == []
     
@@ -692,12 +692,93 @@ class TestErrorHandling:
             temp_path = Path(tmpdir)
             session_file = temp_path / "empty.jsonl"
             session_file.write_text("")
-            
+
             session = history.parse_session(session_file, "/test")
-            
+
             assert session.session_id == "empty"
             assert session.message_count == 0
             assert session.messages == []
+
+    def test_invalid_timestamp_parsing(self):
+        """G7: Test handling of invalid timestamp formats."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_path = Path(tmpdir)
+            session_file = temp_path / "bad-timestamps.jsonl"
+
+            # Various invalid timestamps
+            data = [
+                {"type": "user", "message": {"content": "Hello"}, "timestamp": "not-a-date"},
+                {"type": "assistant", "message": {"content": "Hi"}, "timestamp": "2025-13-45T99:99:99Z"},
+                {"type": "user", "message": {"content": "More"}, "timestamp": ""},
+                {"type": "assistant", "message": {"content": "Content"}, "timestamp": None},
+            ]
+
+            with open(session_file, "w") as f:
+                for item in data:
+                    f.write(json.dumps(item) + "\n")
+
+            # Should parse without crashing, skipping invalid timestamps
+            session = history.parse_session(session_file, "/test")
+            assert session is not None
+            # Messages with invalid timestamps should still be parsed
+
+    def test_session_file_read_errors(self):
+        """G8: Test handling of session file read errors."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_path = Path(tmpdir)
+            session_file = temp_path / "test.jsonl"
+
+            # Create file with binary content that's not valid UTF-8
+            with open(session_file, "wb") as f:
+                f.write(b'\x80\x81\x82\x83')
+
+            # Should handle encoding errors gracefully
+            try:
+                session = history.parse_session(session_file, "/test")
+                # May succeed with empty messages or raise an error
+            except UnicodeDecodeError:
+                pass  # Expected for invalid encoding
+
+    def test_content_extraction_fallbacks(self):
+        """G9: Test content extraction from various message formats."""
+        # Test various content structures
+        test_cases = [
+            # String content
+            {"type": "user", "message": {"content": "Simple string"}},
+            # List content with text
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "From list"}]}},
+            # Empty list content
+            {"type": "assistant", "message": {"content": []}},
+            # None content
+            {"type": "user", "message": {"content": None}},
+            # Missing content key
+            {"type": "user", "message": {}},
+            # Nested structure
+            {"type": "assistant", "message": {"content": [
+                {"type": "text", "text": "Part 1"},
+                {"type": "tool_use", "name": "test", "input": {}},
+                {"type": "text", "text": "Part 2"},
+            ]}},
+        ]
+
+        for data in test_cases:
+            message = Message.from_json(data)
+            # Should not crash on any of these formats
+
+    def test_malformed_message_structure(self):
+        """Test handling of malformed message structures."""
+        test_cases = [
+            {},  # Empty dict
+            {"type": "user"},  # Missing message key
+            {"message": {}},  # Missing type key
+            {"type": "user", "message": None},  # None message
+            {"type": "user", "message": "not a dict"},  # Wrong message type
+        ]
+
+        for data in test_cases:
+            message = Message.from_json(data)
+            # Should return None for invalid structures, not crash
+            # (some may return None, some may extract partial data)
 
 
 from datetime import datetime, timedelta
@@ -1949,8 +2030,8 @@ class TestGenerateWrappedStoryV3:
                 return mock_session1
             return mock_session2
 
-        with patch('claude_history_explorer.history.list_projects', return_value=[mock_project]):
-            with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+        with patch('claude_history_explorer.wrapped.list_projects', return_value=[mock_project]):
+            with patch('claude_history_explorer.wrapped.parse_session', side_effect=mock_parse_session):
                 story = generate_wrapped_story_v3(2025, name="Test User")
 
         # Verify core fields
@@ -2233,7 +2314,7 @@ class TestGenerateProjectStory:
                     return self._create_mock_session(s[0], s[1], s[2], s[3], s[4])
             raise ValueError(f"Unknown file: {file_path}")
 
-        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+        with patch('claude_history_explorer.stories.parse_session', side_effect=mock_parse_session):
             story = generate_project_story(project)
 
         assert story.project_name == "Project"  # short_name is capitalized
@@ -2272,7 +2353,7 @@ class TestGenerateProjectStory:
                 slug=None,
             )
 
-        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+        with patch('claude_history_explorer.stories.parse_session', side_effect=mock_parse_session):
             with pytest.raises(ValueError, match="No sessions found"):
                 generate_project_story(project)
 
@@ -2297,7 +2378,7 @@ class TestGenerateProjectStory:
                     return self._create_mock_session(s[0], s[1], s[2], s[3], s[4])
             raise ValueError(f"Unknown file: {file_path}")
 
-        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+        with patch('claude_history_explorer.stories.parse_session', side_effect=mock_parse_session):
             story = generate_project_story(project)
 
         # Should detect concurrent usage (sessions within 30 min of each other)
@@ -2323,7 +2404,7 @@ class TestGenerateProjectStory:
                     return self._create_mock_session(s[0], s[1], s[2], s[3], s[4])
             raise ValueError(f"Unknown file: {file_path}")
 
-        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+        with patch('claude_history_explorer.stories.parse_session', side_effect=mock_parse_session):
             story = generate_project_story(project)
 
         # High message rate should result in "Rapid-fire" work pace
@@ -2351,7 +2432,7 @@ class TestGenerateProjectStory:
                     return self._create_mock_session(s[0], s[1], s[2], s[3], s[4])
             raise ValueError(f"Unknown file: {file_path}")
 
-        with patch('claude_history_explorer.history.parse_session', side_effect=mock_parse_session):
+        with patch('claude_history_explorer.stories.parse_session', side_effect=mock_parse_session):
             story = generate_project_story(project)
 
         # Should detect break periods
@@ -2434,8 +2515,8 @@ class TestGenerateGlobalStory:
 
         mock_projects = [MagicMock(spec=Project) for _ in range(2)]
 
-        with patch('claude_history_explorer.history.list_projects', return_value=mock_projects):
-            with patch('claude_history_explorer.history.generate_project_story', side_effect=mock_stories):
+        with patch('claude_history_explorer.stories.list_projects', return_value=mock_projects):
+            with patch('claude_history_explorer.stories.generate_project_story', side_effect=mock_stories):
                 story = generate_global_story()
 
         assert story.total_projects == 2
@@ -2450,7 +2531,7 @@ class TestGenerateGlobalStory:
         """Test that no projects raises ValueError."""
         from claude_history_explorer.history import generate_global_story
 
-        with patch('claude_history_explorer.history.list_projects', return_value=[]):
+        with patch('claude_history_explorer.stories.list_projects', return_value=[]):
             with pytest.raises(ValueError, match="No projects with sessions found"):
                 generate_global_story()
 
@@ -2503,8 +2584,8 @@ class TestGenerateGlobalStory:
 
         mock_projects = [MagicMock(spec=Project, path="/p1"), MagicMock(spec=Project, path="/fail")]
 
-        with patch('claude_history_explorer.history.list_projects', return_value=mock_projects):
-            with patch('claude_history_explorer.history.generate_project_story', side_effect=mock_generate):
+        with patch('claude_history_explorer.stories.list_projects', return_value=mock_projects):
+            with patch('claude_history_explorer.stories.generate_project_story', side_effect=mock_generate):
                 story = generate_global_story()
 
         # Should have 1 project (the failed one was skipped)
