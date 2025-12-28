@@ -8,56 +8,17 @@ This module provides functions to calculate usage statistics:
 import re
 from typing import List, Optional
 
+from .constants import WORK_TYPE_PATTERNS
 from .models import GlobalStats, Project, ProjectStats
 from .parser import parse_session
 from .projects import find_project, list_projects
 from .utils import format_duration
 
 
-# Import work type patterns directly to avoid circular imports
-# These are also defined in history.py for public API
-_WORK_TYPE_PATTERNS = {
-    "writing": [
-        r"\.tex$", r"\.md$", r"\.docx?$", r"\.rst$", r"\.txt$",
-        r"/papers?/", r"/docs?/", r"/documentation/",
-        r"/thesis(?:/|$)", r"/dissertation(?:/|$)",
-        r"/manuscripts?(?:/|$)", r"/proposals?(?:/|$)", r"/drafts?(?:/|$)",
-        r"/writing(?:/|$)", r"/book(?:/|$)", r"/chapter(?:/|$)",
-    ],
-    "analysis": [
-        r"\.csv$", r"\.xlsx?$", r"\.ipynb$", r"\.r$", r"\.rmd$",
-        r"\.parquet$", r"\.feather$", r"\.sav$",
-        r"/data/", r"/datasets?/", r"/analysis/", r"/analytics/",
-        r"/results?/", r"/notebooks?/", r"/jupyter/",
-        r"/statistics?(?:/|$)", r"/viz(?:/|$)", r"/visuali[sz]ations?(?:/|$)",
-    ],
-    "research": [
-        r"\.bib$", r"\.ris$", r"\.enw$",
-        r"/research/", r"/literature/", r"/lit[-_]?review/",
-        r"/bibliography(?:/|$)", r"/references(?:/|$)", r"/sources(?:/|$)",
-        r"/reading(?:/|$)", r"/papers[-_]to[-_]read(?:/|$)",
-    ],
-    "teaching": [
-        r"/courses?/", r"/class(?:es)?/", r"/teaching/",
-        r"/grading(?:/|$)", r"/assignments?(?:/|$)", r"/homework(?:/|$)",
-        r"/syllabus(?:/|$)", r"/syllabi(?:/|$)",
-        r"/students?(?:/|$)", r"/rubrics?(?:/|$)", r"/lectures?(?:/|$)",
-        r"/exams?(?:/|$)", r"/quizzes?(?:/|$)",
-    ],
-    "design": [
-        r"\.fig$", r"\.sketch$", r"\.xd$", r"\.psd$", r"\.ai$",
-        r"\.svg$", r"\.figma$",
-        r"/design/", r"/designs/", r"/ui/", r"/ux/",
-        r"/mockups?(?:/|$)", r"/wireframes?(?:/|$)", r"/prototypes?(?:/|$)",
-        r"/assets(?:/|$)", r"/icons(?:/|$)", r"/illustrations?(?:/|$)",
-    ],
-}
-
-
 def _classify_project(path: str) -> str:
-    """Classify a project by its path (internal version to avoid circular imports)."""
+    """Classify a project by its path."""
     path_lower = path.lower()
-    for work_type, patterns in _WORK_TYPE_PATTERNS.items():
+    for work_type, patterns in WORK_TYPE_PATTERNS.items():
         for pattern in patterns:
             if re.search(pattern, path_lower, re.IGNORECASE):
                 return work_type
