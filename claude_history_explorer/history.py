@@ -50,6 +50,8 @@ from .constants import (
     ACTIVITY_INTENSITY_HIGH,
     ACTIVITY_INTENSITY_MEDIUM,
     ACTIVITY_GAP_CAP_MINUTES,
+    CONCURRENT_WINDOW_MINUTES,
+    MILESTONE_VALUES,
 )
 
 __all__ = [
@@ -158,7 +160,7 @@ def _compile_regex_safe(pattern: str, flags: int = 0) -> re.Pattern:
 
 
 def _active_duration_minutes(
-    messages: list, max_gap_minutes: int = ACTIVITY_GAP_CAP_MINUTES
+    messages: List["Message"], max_gap_minutes: int = ACTIVITY_GAP_CAP_MINUTES
 ) -> int:
     """Calculate active duration by summing gaps between messages, capping each gap.
 
@@ -1181,13 +1183,11 @@ def generate_project_story(project: Project) -> ProjectStory:
         overlapping_sessions = 0
         for j, session2 in enumerate(sessions):
             if i != j and session1.start_time and session2.start_time:
-                # Check if sessions overlap (within 30 minutes suggests concurrent use)
+                # Check if sessions overlap (suggests concurrent use)
                 time_diff = abs(
                     (session1.start_time - session2.start_time).total_seconds() / 60
                 )
-                if (
-                    time_diff < 30
-                ):  # Sessions starting within 30 minutes likely concurrent
+                if time_diff < CONCURRENT_WINDOW_MINUTES:
                     overlapping_sessions += 1
 
         if overlapping_sessions > 2:  # Session overlaps with 2+ others
@@ -1266,7 +1266,7 @@ def generate_project_story(project: Project) -> ProjectStory:
     personality_traits = []
 
     # Agent ratio trait
-    agent_ratio = agent_sessions / len(sessions)
+    agent_ratio = agent_sessions / len(sessions) if sessions else 0.0
     personality_traits.append(
         classify(
             agent_ratio,
@@ -1425,11 +1425,16 @@ def generate_global_story() -> GlobalStory:
     total_dev_time = sum(s.dev_time_hours for s in project_stories)
 
     # Work personality analysis
-    avg_agent_ratio = sum(s.agent_sessions for s in project_stories) / sum(
-        s.agent_sessions + s.main_sessions for s in project_stories
+    total_sessions_all = sum(s.agent_sessions + s.main_sessions for s in project_stories)
+    avg_agent_ratio = (
+        sum(s.agent_sessions for s in project_stories) / total_sessions_all
+        if total_sessions_all > 0
+        else 0.0
     )
     avg_session_length = (
         sum(s.avg_session_hours for s in project_stories) / total_projects
+        if total_projects > 0
+        else 0.0
     )
 
     # Most common traits
@@ -1869,12 +1874,11 @@ def detect_timeline_events(
 
     # === MILESTONES ===
     cumulative = 0
-    milestones = [100, 500, 1000, 2000, 5000, 10000]
     milestone_idx = 0
     for day in sorted(messages_by_day.keys()):
         cumulative += messages_by_day[day]
-        while milestone_idx < len(milestones) and cumulative >= milestones[milestone_idx]:
-            events.append([day, EVENT_TYPE_INDICES['milestone'], milestones[milestone_idx], -1])
+        while milestone_idx < len(MILESTONE_VALUES) and cumulative >= MILESTONE_VALUES[milestone_idx]:
+            events.append([day, EVENT_TYPE_INDICES['milestone'], MILESTONE_VALUES[milestone_idx], -1])
             milestone_idx += 1
 
     # === STREAKS AND GAPS ===
@@ -2432,7 +2436,8 @@ def generate_wrapped_story_v3(
     # Group by project for the year
     year_project_sessions: Dict[str, List[SessionInfoV3]] = defaultdict(list)
     for s in year_sessions:
-        year_project_sessions[s.project_name].append(s)
+        if s.project_name:  # Skip sessions with empty project names
+            year_project_sessions[s.project_name].append(s)
 
     # Calculate project stats
     project_stats: List[ProjectStatsV3] = []

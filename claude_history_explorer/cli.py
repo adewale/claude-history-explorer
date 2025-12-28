@@ -17,7 +17,9 @@ Commands:
 
 import json
 import re
+from datetime import datetime
 from pathlib import Path
+from typing import List, Optional
 
 import click
 from rich.console import Console
@@ -26,6 +28,19 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from sparklines import sparklines
 
+from .constants import (
+    MESSAGE_DISPLAY_LIMIT,
+    TOOL_INPUT_PREVIEW_LIMIT,
+    SEARCH_TRUNCATION_LIMIT,
+    SLUG_DISPLAY_LIMIT,
+    DEFAULT_PROJECTS_LIMIT,
+    DEFAULT_SESSIONS_LIMIT,
+    DEFAULT_SHOW_LIMIT,
+    DEFAULT_SEARCH_LIMIT,
+    DATETIME_FORMAT,
+    DATETIME_FORMAT_FULL,
+    WRAPPED_URL_DOMAIN,
+)
 from .history import (
     list_projects,
     find_project,
@@ -84,6 +99,58 @@ def _sanitize_output_path(output: str) -> Path:
             raise click.ClickException(f"Invalid output path: {output} ({e})")
 
     return path
+
+
+def format_datetime(dt: Optional[datetime], fallback: str = "unknown") -> str:
+    """Format a datetime object consistently across the CLI.
+
+    Args:
+        dt: The datetime to format, or None
+        fallback: String to return if dt is None
+
+    Returns:
+        Formatted datetime string or fallback value
+    """
+    if dt is None:
+        return fallback
+    return dt.strftime(DATETIME_FORMAT)
+
+
+def truncate(text: str, limit: int, suffix: str = "...") -> str:
+    """Truncate text to a maximum length with suffix.
+
+    Args:
+        text: The text to truncate
+        limit: Maximum length before truncation
+        suffix: String to append when truncated
+
+    Returns:
+        Original text if short enough, or truncated with suffix
+    """
+    if len(text) <= limit:
+        return text
+    return text[:limit] + suffix
+
+
+def safe_sparkline(values: List[int]) -> Optional[str]:
+    """Generate a sparkline string, returning None on failure.
+
+    Wraps the sparklines library with error handling for edge cases
+    like empty lists, single values, or invalid data.
+
+    Args:
+        values: List of integers to visualize
+
+    Returns:
+        Sparkline string or None if generation fails
+    """
+    if not values or len(values) < 2:
+        return None
+    try:
+        result = sparklines(values)
+        return result[0] if result else None
+    except (ValueError, TypeError):
+        return None
 
 
 # Example text for each command
@@ -180,7 +247,7 @@ def main():
 
 
 @main.command()
-@click.option("--limit", "-n", default=20, help="Maximum number of projects to show")
+@click.option("--limit", "-n", default=DEFAULT_PROJECTS_LIMIT, help="Maximum number of projects to show")
 @click.option("--example", is_flag=True, help="Show usage examples")
 def projects(limit: int, example: bool):
     """List all Claude Code projects sorted by last use."""
@@ -206,12 +273,11 @@ def projects(limit: int, example: bool):
     table.add_column("Last Used", style="yellow")
 
     for proj in all_projects[:limit]:
-        last_mod = (
-            proj.last_modified.strftime("%Y-%m-%d %H:%M")
-            if proj.last_modified
-            else "unknown"
+        table.add_row(
+            proj.path,
+            str(proj.session_count),
+            format_datetime(proj.last_modified),
         )
-        table.add_row(proj.path, str(proj.session_count), last_mod)
 
     console.print(table)
 
@@ -223,7 +289,7 @@ def projects(limit: int, example: bool):
 
 @main.command()
 @click.argument("project_search", required=False)
-@click.option("--limit", "-n", default=20, help="Maximum number of sessions to show")
+@click.option("--limit", "-n", default=DEFAULT_SESSIONS_LIMIT, help="Maximum number of sessions to show")
 @click.option("--head", is_flag=True, default=True, is_eager=True, help="Show most recent sessions (default)")
 @click.option("--tail", "-t", is_flag=True, help="Show oldest sessions instead of most recent")
 @click.option("--example", is_flag=True, help="Show usage examples")
@@ -261,23 +327,14 @@ def sessions(project_search: str, limit: int, head: bool, tail: bool, example: b
 
     for session_file in session_files:
         session = parse_session(session_file, project.path)
-        start_str = (
-            session.start_time.strftime("%Y-%m-%d %H:%M")
-            if session.start_time
-            else "unknown"
-        )
-        slug = (
-            session.slug[:20] + "..."
-            if session.slug and len(session.slug) > 20
-            else (session.slug or "")
-        )
+        slug = truncate(session.slug, SLUG_DISPLAY_LIMIT) if session.slug else ""
 
         table.add_row(
             session.session_id[:12] + "...",
             str(session.message_count),
             str(session.user_message_count),
             session.duration_str,
-            start_str,
+            format_datetime(session.start_time),
             slug,
         )
 
@@ -293,7 +350,7 @@ def sessions(project_search: str, limit: int, head: bool, tail: bool, example: b
 @main.command()
 @click.argument("session_id", required=False)
 @click.option("--project", "-p", default=None, help="Project path to search in")
-@click.option("--limit", "-n", default=50, help="Maximum messages to show")
+@click.option("--limit", "-n", default=DEFAULT_SHOW_LIMIT, help="Maximum messages to show")
 @click.option("--head", is_flag=True, default=True, is_eager=True, help="Show first N messages (default)")
 @click.option("--tail", "-t", is_flag=True, help="Show last N messages instead of first")
 @click.option("--raw", is_flag=True, help="Show raw JSON output")
@@ -360,10 +417,11 @@ def show(session_id: str, project: str, limit: int, head: bool, tail: bool, raw:
         if msg.content:
             # Truncate very long messages
             content = msg.content
-            if len(content) > 2000:
-                content = (
-                    content[:2000]
-                    + "\n\n[dim]... (truncated, use --raw for full content)[/dim]"
+            if len(content) > MESSAGE_DISPLAY_LIMIT:
+                content = truncate(
+                    content,
+                    MESSAGE_DISPLAY_LIMIT,
+                    "\n\n[dim]... (truncated, use --raw for full content)[/dim]",
                 )
             console.print(content)
 
@@ -373,8 +431,9 @@ def show(session_id: str, project: str, limit: int, head: bool, tail: bool, raw:
                 console.print(f"\n[yellow]Tool: {tool['name']}[/yellow]")
                 if tool.get("input"):
                     input_preview = json.dumps(tool["input"], indent=2)
-                    if len(input_preview) > 500:
-                        input_preview = input_preview[:500] + "\n..."
+                    input_preview = truncate(
+                        input_preview, TOOL_INPUT_PREVIEW_LIMIT, "\n..."
+                    )
                     console.print(Syntax(input_preview, "json", theme="monokai"))
 
         console.print()
@@ -392,7 +451,7 @@ def show(session_id: str, project: str, limit: int, head: bool, tail: bool, raw:
     "--project", "-p", default=None, help="Limit search to a specific project"
 )
 @click.option("--case-sensitive", "-c", is_flag=True, help="Case-sensitive search")
-@click.option("--limit", "-n", default=20, help="Maximum results to show")
+@click.option("--limit", "-n", default=DEFAULT_SEARCH_LIMIT, help="Maximum results to show")
 @click.option("--context", "-C", default=100, help="Characters of context around match")
 @click.option("--example", is_flag=True, help="Show usage examples")
 def search(
@@ -454,7 +513,7 @@ def search(
                     snippet = snippet + "..."
                 console.print(f"  {snippet}")
             else:
-                console.print(f"  {content[:200]}...")
+                console.print(f"  {truncate(content, SEARCH_TRUNCATION_LIMIT)}")
 
         console.print()
         results_count += 1
@@ -839,18 +898,13 @@ def _display_global_stats(stats: GlobalStats, output_format: str) -> None:
     for proj_stats in sorted(
         stats.projects, key=lambda p: p.total_messages, reverse=True
     ):
-        last_active = (
-            proj_stats.most_recent_session.strftime("%Y-%m-%d %H:%M")
-            if proj_stats.most_recent_session
-            else "unknown"
-        )
         table.add_row(
             proj_stats.project.path,
             str(proj_stats.total_sessions),
             str(proj_stats.total_messages),
             f"{proj_stats.total_size_mb:.1f} MB",
             proj_stats.total_duration_str,
-            last_active,
+            format_datetime(proj_stats.most_recent_session),
         )
 
     console.print("\n", table)
@@ -994,14 +1048,10 @@ def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
         ]
 
         # Add sparkline
-        try:
-            if len(session_data) > 1:
-                sparkline_list = sparklines(session_data)
-                if sparkline_list:
-                    lines.append(f"Session trend: {sparkline_list[0]}")
-                    lines.append("")
-        except (ValueError, TypeError):
-            pass  # sparklines may fail with invalid data
+        sparkline = safe_sparkline(session_data)
+        if sparkline:
+            lines.append(f"Session trend: {sparkline}")
+            lines.append("")
 
         for proj_stats in sorted(
             stats.projects, key=lambda p: p.total_sessions, reverse=True
@@ -1021,14 +1071,10 @@ def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
                 stats.projects, key=lambda p: p.total_messages, reverse=True
             )
         ]
-        try:
-            if len(message_data) > 1:
-                sparkline_list = sparklines(message_data)
-                if sparkline_list:
-                    lines.append(f"Message trend: {sparkline_list[0]}")
-                    lines.append("")
-        except (ValueError, TypeError):
-            pass  # sparklines may fail with invalid data
+        sparkline = safe_sparkline(message_data)
+        if sparkline:
+            lines.append(f"Message trend: {sparkline}")
+            lines.append("")
 
         for proj_stats in sorted(
             stats.projects, key=lambda p: p.total_messages, reverse=True
@@ -1141,14 +1187,10 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
         if story.daily_activity:
             sorted_days = sorted(story.daily_activity.keys())
             daily_values = [story.daily_activity[day] for day in sorted_days]
-            try:
-                if len(daily_values) > 1:
-                    sparkline_list = sparklines(daily_values)
-                    if sparkline_list:
-                        lines.append(f"📈 Activity: {sparkline_list[0]}")
-                        lines.append("")
-            except (ValueError, TypeError):
-                pass  # sparklines may fail with invalid data
+            sparkline = safe_sparkline(daily_values)
+            if sparkline:
+                lines.append(f"📈 Activity: {sparkline}")
+                lines.append("")
 
         lines.append("### Daily Progress:")
 
@@ -1196,14 +1238,10 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
         if story.daily_activity:
             sorted_days = sorted(story.daily_activity.keys())
             daily_values = [story.daily_activity[day] for day in sorted_days]
-            try:
-                if len(daily_values) > 1:
-                    sparkline_list = sparklines(daily_values)
-                    if sparkline_list:
-                        lines.append(f"📈 Daily Activity: {sparkline_list[0]}")
-                        lines.append("")
-            except (ValueError, TypeError):
-                pass  # sparklines may fail with invalid data
+            sparkline = safe_sparkline(daily_values)
+            if sparkline:
+                lines.append(f"📈 Daily Activity: {sparkline}")
+                lines.append("")
 
         lines.append(
             f"🏔️  Peak Activity: {story.peak_day[1]} messages on {story.peak_day[0].strftime('%B %d')}"
@@ -1374,6 +1412,15 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
     if year is None:
         year = dt.datetime.now().year
 
+    # Validate year range (Claude Code didn't exist before 2024)
+    current_year = dt.datetime.now().year
+    if year < 2024:
+        console.print(f"[red]Error: Year must be 2024 or later (Claude Code was released in 2024)[/red]")
+        return
+    if year > current_year + 1:
+        console.print(f"[red]Error: Year cannot be more than 1 year in the future[/red]")
+        return
+
     # Early January suggestion
     now = dt.datetime.now()
     if now.month == 1 and now.day <= 7 and year == now.year:
@@ -1402,7 +1449,7 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
 
     # Generate URL
     encoded = encode_wrapped_story_v3(story)
-    url = f"https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d={encoded}"
+    url = f"https://{WRAPPED_URL_DOMAIN}/wrapped?d={encoded}"
 
     # Display summary
     _display_wrapped_summary(story, url, year)
@@ -1475,15 +1522,12 @@ def _decode_wrapped_url(url_or_data: str) -> None:
 
     # Monthly activity sparkline
     if story.ma and any(story.ma):
-        try:
-            sparkline_list = sparklines(story.ma)
-            if sparkline_list:
-                console.print("[bold]Monthly Activity:[/bold]")
-                console.print(f"  {sparkline_list[0]}")
-                console.print("  J F M A M J J A S O N D")
-                console.print()
-        except (ValueError, TypeError):
-            pass
+        sparkline = safe_sparkline(story.ma)
+        if sparkline:
+            console.print("[bold]Monthly Activity:[/bold]")
+            console.print(f"  {sparkline}")
+            console.print("  J F M A M J J A S O N D")
+            console.print()
 
     # Top projects (V3 format: [name, messages, hours, days, sessions, agent_ratio])
     if story.tp:
@@ -1540,14 +1584,11 @@ def _display_wrapped_summary(story: WrappedStoryV3, url: str, year: int) -> None
 
     # Monthly activity sparkline
     if story.ma and any(story.ma):
-        try:
-            sparkline_list = sparklines(story.ma)
-            if sparkline_list:
-                console.print(f"[bold]📈[/bold] {sparkline_list[0]}")
-                console.print("   J F M A M J J A S O N D")
-                console.print()
-        except (ValueError, TypeError):
-            pass
+        sparkline = safe_sparkline(story.ma)
+        if sparkline:
+            console.print(f"[bold]📈[/bold] {sparkline}")
+            console.print("   J F M A M J J A S O N D")
+            console.print()
 
     console.print("━" * 50)
     console.print()
