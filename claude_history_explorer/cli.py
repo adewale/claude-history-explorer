@@ -56,6 +56,9 @@ from .history import (
     generate_wrapped_story_v3,
     encode_wrapped_story_v3,
     decode_wrapped_story_v3,
+    classify_project,
+    get_work_type_name,
+    WORK_TYPE_INFO,
     ProjectStats,
     GlobalStats,
     ProjectStory,
@@ -223,6 +226,13 @@ Examples:
   claude-history wrapped --raw               # Output raw JSON
   claude-history wrapped --decode <url>      # Decode and inspect any Wrapped URL
   claude-history wrapped --no-copy           # Don't copy URL to clipboard
+""",
+    "worktype": """
+Examples:
+  claude-history worktype                    # Show work type distribution (chart)
+  claude-history worktype --format table     # Show as table
+  claude-history worktype --format json      # Show as JSON
+  claude-history worktype -p myproject       # Show for specific project
 """,
 }
 
@@ -1551,6 +1561,112 @@ def _decode_wrapped_url(url_or_data: str) -> None:
     console.print()
     console.print("[green]✓ This URL contains only aggregate statistics.[/green]")
     console.print("[dim]  No conversation content, code, or file paths.[/dim]")
+
+
+@main.command()
+@click.option(
+    "--project", "-p", default=None,
+    help="Show work type for specific project only"
+)
+@click.option(
+    "--format", "-f", "output_format",
+    type=click.Choice(["table", "json", "chart"]),
+    default="chart",
+    help="Output format"
+)
+@click.option("--example", is_flag=True, help="Show usage examples")
+def worktype(project: str, output_format: str, example: bool):
+    """Analyze work type distribution across projects.
+
+    Classifies projects into work types based on their paths:
+    - Software Development (coding, debugging)
+    - Writing & Documentation (papers, docs)
+    - Data Analysis (notebooks, data processing)
+    - Research & Literature (literature review)
+    - Teaching & Grading (courses, assignments)
+    - Design & UX (mockups, wireframes)
+    """
+    if example:
+        show_examples("worktype")
+        return
+
+    from collections import defaultdict
+
+    try:
+        stats = calculate_global_stats(project)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        return
+
+    # Aggregate by work type
+    by_type = defaultdict(lambda: {"hours": 0.0, "messages": 0, "projects": 0})
+
+    for project_stats in stats.projects:
+        wt = project_stats.work_type
+        by_type[wt]["hours"] += project_stats.total_duration_minutes / 60
+        by_type[wt]["messages"] += project_stats.total_messages
+        by_type[wt]["projects"] += 1
+
+    total_hours = sum(d["hours"] for d in by_type.values())
+
+    if output_format == "json":
+        # JSON output
+        output = {
+            "total_hours": round(total_hours, 1),
+            "breakdown": {
+                wt: {
+                    "name": get_work_type_name(wt),
+                    "hours": round(d["hours"], 1),
+                    "percentage": round(100 * d["hours"] / total_hours, 1) if total_hours else 0,
+                    "messages": d["messages"],
+                    "projects": d["projects"],
+                }
+                for wt, d in by_type.items()
+            }
+        }
+        console.print_json(data=output)
+
+    elif output_format == "table":
+        # Table output
+        table = Table(title="Work Type Distribution")
+        table.add_column("Work Type", style="cyan")
+        table.add_column("Hours", justify="right")
+        table.add_column("Percentage", justify="right")
+        table.add_column("Projects", justify="right")
+        table.add_column("Messages", justify="right")
+
+        for wt, d in sorted(by_type.items(), key=lambda x: x[1]["hours"], reverse=True):
+            pct = 100 * d["hours"] / total_hours if total_hours else 0
+            table.add_row(
+                get_work_type_name(wt),
+                f"{d['hours']:.1f}h",
+                f"{pct:.1f}%",
+                str(d["projects"]),
+                str(d["messages"]),
+            )
+
+        console.print(table)
+
+    else:  # chart (default)
+        # ASCII bar chart
+        console.print()
+        console.print("[bold]Work Type Distribution[/bold]")
+        console.print("=" * 55)
+        console.print()
+
+        sorted_types = sorted(by_type.items(), key=lambda x: x[1]["hours"], reverse=True)
+
+        for wt, d in sorted_types:
+            pct = 100 * d["hours"] / total_hours if total_hours else 0
+            if pct < 1:
+                continue
+            bar_len = int(pct / 5)  # 20 chars max
+            bar = "█" * bar_len + "░" * (20 - bar_len)
+            name = get_work_type_name(wt)
+            console.print(f"{name:<24} {bar} {d['hours']:>6.1f}h ({pct:>4.1f}%)")
+
+        console.print()
+        console.print(f"[dim]Total: {total_hours:.1f} hours across {len(stats.projects)} projects[/dim]")
 
 
 def _display_wrapped_summary(story: WrappedStoryV3, url: str, year: int) -> None:

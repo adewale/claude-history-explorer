@@ -24,6 +24,7 @@ Key Functions:
     calculate_project_stats(project): Generate project statistics
     calculate_global_stats(): Generate global statistics
     generate_project_story(project): Generate narrative insights
+    classify_project(path): Classify a project by work type
 
 Example:
     >>> from claude_history_explorer.history import list_projects, parse_session
@@ -31,6 +32,8 @@ Example:
     >>> for project in projects:
     ...     print(f"{project.path}: {project.session_count} sessions")
 """
+
+import re
 
 # Re-export all public symbols for backward compatibility
 
@@ -104,6 +107,116 @@ from .wrapped import (
     rle_encode_if_smaller,
 )
 
+
+# =============================================================================
+# Work Type Classification
+# =============================================================================
+
+# Pattern Design Principles:
+# 1. Extensions use $ anchor: r"\.tex$" (matches end of path)
+# 2. Directories use enclosing slashes: r"/papers?/" (avoids partial matches)
+# 3. Terminal directories use (?:/|$): r"/thesis(?:/|$)" (matches /thesis or /thesis/)
+# 4. All patterns are matched case-insensitively
+
+WORK_TYPE_PATTERNS = {
+    "writing": [
+        # File extensions (anchored at end)
+        r"\.tex$", r"\.md$", r"\.docx?$", r"\.rst$", r"\.txt$",
+        # Directory patterns (enclosed or terminal)
+        r"/papers?/", r"/docs?/", r"/documentation/",
+        r"/thesis(?:/|$)", r"/dissertation(?:/|$)",
+        r"/manuscripts?(?:/|$)", r"/proposals?(?:/|$)", r"/drafts?(?:/|$)",
+        r"/writing(?:/|$)", r"/book(?:/|$)", r"/chapter(?:/|$)",
+    ],
+    "analysis": [
+        # File extensions
+        r"\.csv$", r"\.xlsx?$", r"\.ipynb$", r"\.r$", r"\.rmd$",
+        r"\.parquet$", r"\.feather$", r"\.sav$",  # Data formats
+        # Directory patterns
+        r"/data/", r"/datasets?/", r"/analysis/", r"/analytics/",
+        r"/results?/", r"/notebooks?/", r"/jupyter/",
+        r"/statistics?(?:/|$)", r"/viz(?:/|$)", r"/visuali[sz]ations?(?:/|$)",
+    ],
+    "research": [
+        # File extensions
+        r"\.bib$", r"\.ris$", r"\.enw$",  # Bibliography formats
+        # Directory patterns
+        r"/research/", r"/literature/", r"/lit[-_]?review/",
+        r"/bibliography(?:/|$)", r"/references(?:/|$)", r"/sources(?:/|$)",
+        r"/reading(?:/|$)", r"/papers[-_]to[-_]read(?:/|$)",
+    ],
+    "teaching": [
+        # Directory patterns (no common file extensions)
+        r"/courses?/", r"/class(?:es)?/", r"/teaching/",
+        r"/grading(?:/|$)", r"/assignments?(?:/|$)", r"/homework(?:/|$)",
+        r"/syllabus(?:/|$)", r"/syllabi(?:/|$)",
+        r"/students?(?:/|$)", r"/rubrics?(?:/|$)", r"/lectures?(?:/|$)",
+        r"/exams?(?:/|$)", r"/quizzes?(?:/|$)",
+    ],
+    "design": [
+        # File extensions
+        r"\.fig$", r"\.sketch$", r"\.xd$", r"\.psd$", r"\.ai$",
+        r"\.svg$", r"\.figma$",
+        # Directory patterns
+        r"/design/", r"/designs/", r"/ui/", r"/ux/",
+        r"/mockups?(?:/|$)", r"/wireframes?(?:/|$)", r"/prototypes?(?:/|$)",
+        r"/assets(?:/|$)", r"/icons(?:/|$)", r"/illustrations?(?:/|$)",
+    ],
+    # Note: "coding" has no patterns - it's the default for Claude Code
+}
+
+WORK_TYPE_INFO = {
+    "coding": {
+        "name": "Software Development",
+        "description": "Coding, debugging, infrastructure",
+    },
+    "writing": {
+        "name": "Writing & Documentation",
+        "description": "Papers, proposals, documentation",
+    },
+    "analysis": {
+        "name": "Data Analysis",
+        "description": "Statistics, data processing, visualization",
+    },
+    "research": {
+        "name": "Research & Literature",
+        "description": "Literature review, reading, synthesis",
+    },
+    "teaching": {
+        "name": "Teaching & Grading",
+        "description": "Course materials, grading, feedback",
+    },
+    "design": {
+        "name": "Design & UX",
+        "description": "UI/UX design, mockups, wireframes",
+    },
+}
+
+
+def classify_project(path: str) -> str:
+    """Classify a project by its path.
+
+    Uses file patterns to determine work type. Returns 'coding' as default
+    since this is Claude Code.
+
+    Args:
+        path: Project path (e.g., "/Users/me/papers/thesis")
+
+    Returns:
+        Work type ID: 'coding', 'writing', 'analysis', 'research', 'teaching', or 'design'
+    """
+    path_lower = path.lower()
+    for work_type, patterns in WORK_TYPE_PATTERNS.items():
+        for pattern in patterns:
+            if re.search(pattern, path_lower, re.IGNORECASE):
+                return work_type
+    return "coding"
+
+
+def get_work_type_name(work_type: str) -> str:
+    """Get human-readable name for a work type."""
+    return WORK_TYPE_INFO.get(work_type, {}).get("name", work_type.title())
+
 __all__ = [
     # Data models
     "Message",
@@ -139,6 +252,11 @@ __all__ = [
     # Story functions
     "generate_project_story",
     "generate_global_story",
+    # Work type classification
+    "classify_project",
+    "get_work_type_name",
+    "WORK_TYPE_PATTERNS",
+    "WORK_TYPE_INFO",
     # V3 Wrapped functions
     "generate_wrapped_story_v3",
     "encode_wrapped_story_v3",
