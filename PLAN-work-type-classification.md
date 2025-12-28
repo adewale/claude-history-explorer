@@ -13,14 +13,14 @@ Do NOT modify Wrapped. Keep it simple and focused.
 |-----------|-----------|
 | **Project-level classification** | Projects ARE the natural unit; paths encode intent |
 | **Path patterns only** | More reliable than keyword matching on message content |
-| **5 categories (not 9)** | Simpler, less overlap, clearer meaning |
+| **6 categories (not 9)** | Simpler, less overlap, clearer meaning |
 | **Opt-in via CLI command** | Don't clutter existing commands; users trigger when wanted |
 | **Reuse existing structures** | Add to `ProjectStats`, don't create parallel classes |
 | **Salvage PR #4 value** | Extract file patterns, names, formatting; discard keywords |
 
 ---
 
-## Categories (Consolidated from PR #4's 9 → 5)
+## Categories (Consolidated from PR #4's 9 → 6)
 
 ```
 coding      → "Software Development" (default)
@@ -28,6 +28,7 @@ writing     → "Writing & Documentation"
 analysis    → "Data Analysis"
 research    → "Research & Literature"
 teaching    → "Teaching & Grading"
+design      → "Design & UX"
 ```
 
 **Removed categories:**
@@ -99,6 +100,15 @@ WORK_TYPE_PATTERNS = {
         r"/students?(?:/|$)", r"/rubrics?(?:/|$)", r"/lectures?(?:/|$)",
         r"/exams?(?:/|$)", r"/quizzes?(?:/|$)",
     ],
+    "design": [
+        # File extensions
+        r"\.fig$", r"\.sketch$", r"\.xd$", r"\.psd$", r"\.ai$",
+        r"\.svg$", r"\.figma$",
+        # Directory patterns
+        r"/design/", r"/designs/", r"/ui/", r"/ux/",
+        r"/mockups?(?:/|$)", r"/wireframes?(?:/|$)", r"/prototypes?(?:/|$)",
+        r"/assets(?:/|$)", r"/icons(?:/|$)", r"/illustrations?(?:/|$)",
+    ],
     # Note: "coding" has no patterns - it's the default for Claude Code
 }
 
@@ -122,6 +132,10 @@ WORK_TYPE_INFO = {
     "teaching": {
         "name": "Teaching & Grading",
         "description": "Course materials, grading, feedback",
+    },
+    "design": {
+        "name": "Design & UX",
+        "description": "UI/UX design, mockups, wireframes",
     },
 }
 
@@ -369,6 +383,15 @@ class TestClassifyProject:
     def test_grading_directory_is_teaching(self):
         assert classify_project("/work/grading/hw1") == "teaching"
 
+    def test_design_directory_is_design(self):
+        assert classify_project("/Users/me/design/app-mockups") == "design"
+
+    def test_figma_extension_is_design(self):
+        assert classify_project("/project/components.fig") == "design"
+
+    def test_ui_directory_is_design(self):
+        assert classify_project("/Users/me/ui/dashboard") == "design"
+
     def test_default_is_coding(self):
         assert classify_project("/Users/me/code/myapp") == "coding"
         assert classify_project("/random/project") == "coding"
@@ -404,7 +427,7 @@ class TestWorkTypeInfo:
     """Test work type metadata."""
 
     def test_all_types_have_info(self):
-        for work_type in ["coding", "writing", "analysis", "research", "teaching"]:
+        for work_type in ["coding", "writing", "analysis", "research", "teaching", "design"]:
             assert work_type in WORK_TYPE_INFO
             assert "name" in WORK_TYPE_INFO[work_type]
             assert "description" in WORK_TYPE_INFO[work_type]
@@ -609,7 +632,7 @@ def test_new_design_type(self):
 | Metric | Before (PR #4) | After (This Plan) |
 |--------|---------------|-------------------|
 | Lines of code | 762 | ~190 |
-| Categories | 9 (overlapping) | 5 (distinct) |
+| Categories | 9 (overlapping) | 6 (distinct) |
 | Classification level | Session | Project |
 | Primary signal | Keywords (unreliable) | Path patterns (reliable) |
 | Integration | Orphaned | Integrated into history.py + CLI |
