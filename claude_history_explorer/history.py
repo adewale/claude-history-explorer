@@ -24,6 +24,7 @@ Key Functions:
     calculate_project_stats(project): Generate project statistics
     calculate_global_stats(): Generate global statistics
     generate_project_story(project): Generate narrative insights
+    classify_project(path): Classify a project by work type
 
 Example:
     >>> from claude_history_explorer.history import list_projects, parse_session
@@ -32,7 +33,12 @@ Example:
     ...     print(f"{project.path}: {project.session_count} sessions")
 """
 
+import re
+
 # Re-export all public symbols for backward compatibility
+
+# Work type classification (single source of truth in constants.py)
+from .constants import WORK_TYPE_INFO, WORK_TYPE_PATTERNS
 
 # Models
 from .models import (
@@ -104,6 +110,38 @@ from .wrapped import (
     rle_encode_if_smaller,
 )
 
+
+# =============================================================================
+# Work Type Classification Functions
+# =============================================================================
+# Patterns and info are defined in constants.py (single source of truth)
+# and imported above for re-export in the public API.
+
+
+def classify_project(path: str) -> str:
+    """Classify a project by its path.
+
+    Uses file patterns to determine work type. Returns 'coding' as default
+    since this is Claude Code.
+
+    Args:
+        path: Project path (e.g., "/Users/me/papers/thesis")
+
+    Returns:
+        Work type ID: 'coding', 'writing', 'analysis', 'research', 'teaching', or 'design'
+    """
+    path_lower = path.lower()
+    for work_type, patterns in WORK_TYPE_PATTERNS.items():
+        for pattern in patterns:
+            if re.search(pattern, path_lower, re.IGNORECASE):
+                return work_type
+    return "coding"
+
+
+def get_work_type_name(work_type: str) -> str:
+    """Get human-readable name for a work type."""
+    return WORK_TYPE_INFO.get(work_type, {}).get("name", work_type.title())
+
 __all__ = [
     # Data models
     "Message",
@@ -139,6 +177,11 @@ __all__ = [
     # Story functions
     "generate_project_story",
     "generate_global_story",
+    # Work type classification
+    "classify_project",
+    "get_work_type_name",
+    "WORK_TYPE_PATTERNS",
+    "WORK_TYPE_INFO",
     # V3 Wrapped functions
     "generate_wrapped_story_v3",
     "encode_wrapped_story_v3",

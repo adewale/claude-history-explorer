@@ -56,6 +56,9 @@ from .history import (
     generate_wrapped_story_v3,
     encode_wrapped_story_v3,
     decode_wrapped_story_v3,
+    classify_project,
+    get_work_type_name,
+    WORK_TYPE_INFO,
     ProjectStats,
     GlobalStats,
     ProjectStory,
@@ -195,6 +198,7 @@ Examples:
   claude-history stats                       # Global statistics
   claude-history stats -p myproject          # Project-specific stats
   claude-history stats --format json         # JSON output for scripting
+  claude-history stats --show-worktype       # Include work type column
 """,
     "summary": """
 Examples:
@@ -202,6 +206,7 @@ Examples:
   claude-history summary -p myproject        # Project-specific summary
   claude-history summary --format markdown   # Markdown with charts
   claude-history summary -o report.md        # Save to file
+  claude-history summary --show-worktype     # Include work type distribution
 """,
     "story": """
 Examples:
@@ -653,8 +658,9 @@ def export(
     default="table",
     help="Output format",
 )
+@click.option("--show-worktype", is_flag=True, help="Include work type classification")
 @click.option("--example", is_flag=True, help="Show usage examples")
-def stats(project: str, output_format: str, example: bool):
+def stats(project: str, output_format: str, show_worktype: bool, example: bool):
     """Show detailed statistics for projects including message counts, duration, and storage."""
     if example:
         show_examples("stats")
@@ -666,10 +672,10 @@ def stats(project: str, output_format: str, example: bool):
                 console.print(f"[red]No project found matching '{project}'[/red]")
                 return
             project_stats = calculate_project_stats(proj)
-            _display_project_stats(project_stats, output_format)
+            _display_project_stats(project_stats, output_format, show_worktype)
         else:
             global_stats = calculate_global_stats()
-            _display_global_stats(global_stats, output_format)
+            _display_global_stats(global_stats, output_format, show_worktype)
     except ValueError as e:
         console.print(f"[red]{e}[/red]")
 
@@ -687,8 +693,9 @@ def stats(project: str, output_format: str, example: bool):
     help="Output format",
 )
 @click.option("--output", "-o", default=None, help="Output file (default: stdout)")
+@click.option("--show-worktype", is_flag=True, help="Include work type distribution")
 @click.option("--example", is_flag=True, help="Show usage examples")
-def summary(project: str, output_format: str, output: str, example: bool):
+def summary(project: str, output_format: str, output: str, show_worktype: bool, example: bool):
     """Generate a comprehensive summary with insights, charts, and sparklines."""
     if example:
         show_examples("summary")
@@ -700,10 +707,10 @@ def summary(project: str, output_format: str, output: str, example: bool):
                 console.print(f"[red]No project found matching '{project}'[/red]")
                 return
             project_stats = calculate_project_stats(proj)
-            summary_text = _generate_project_summary(project_stats, output_format)
+            summary_text = _generate_project_summary(project_stats, output_format, show_worktype)
         else:
             global_stats = calculate_global_stats()
-            summary_text = _generate_global_summary(global_stats, output_format)
+            summary_text = _generate_global_summary(global_stats, output_format, show_worktype)
 
         if output:
             safe_path = _sanitize_output_path(output)
@@ -799,7 +806,7 @@ def info(example: bool):
         console.print(f"  Total size: {size_mb:.1f} MB")
 
 
-def _display_project_stats(stats: ProjectStats, output_format: str) -> None:
+def _display_project_stats(stats: ProjectStats, output_format: str, show_worktype: bool = False) -> None:
     """Display statistics for a single project."""
     if output_format == "json":
         data = {
@@ -818,13 +825,21 @@ def _display_project_stats(stats: ProjectStats, output_format: str) -> None:
             if stats.most_recent_session
             else None,
         }
+        if show_worktype:
+            data["work_type"] = stats.work_type
+            data["work_type_name"] = get_work_type_name(stats.work_type)
         console.print(json.dumps(data, indent=2))
         return
 
     # Table format
+    worktype_line = ""
+    if show_worktype:
+        worktype_line = f"[bold]Work Type:[/bold] {get_work_type_name(stats.work_type)}\n"
+
     console.print(
         Panel(
             f"[bold]Project:[/bold] {stats.project.path}\n"
+            f"{worktype_line}"
             f"[bold]Sessions:[/bold] {stats.total_sessions} ({stats.main_sessions} main, {stats.agent_sessions} agents)\n"
             f"[bold]Messages:[/bold] {stats.total_messages} ({stats.total_user_messages} from user)\n"
             f"[bold]Duration:[/bold] {stats.total_duration_str}\n"
@@ -837,7 +852,7 @@ def _display_project_stats(stats: ProjectStats, output_format: str) -> None:
     )
 
 
-def _display_global_stats(stats: GlobalStats, output_format: str) -> None:
+def _display_global_stats(stats: GlobalStats, output_format: str, show_worktype: bool = False) -> None:
     """Display global statistics across all projects."""
     if output_format == "json":
         data = {
@@ -862,6 +877,7 @@ def _display_global_stats(stats: GlobalStats, output_format: str) -> None:
                     "messages": p.total_messages,
                     "size_mb": p.total_size_mb,
                     "duration_str": p.total_duration_str,
+                    **({"work_type": p.work_type, "work_type_name": get_work_type_name(p.work_type)} if show_worktype else {}),
                 }
                 for p in stats.projects
             ],
@@ -889,6 +905,8 @@ def _display_global_stats(stats: GlobalStats, output_format: str) -> None:
     # Projects table
     table = Table(title="Project Breakdown")
     table.add_column("Project", style="cyan", no_wrap=False)
+    if show_worktype:
+        table.add_column("Work Type", style="magenta")
     table.add_column("Sessions", justify="right", style="green")
     table.add_column("Messages", justify="right", style="blue")
     table.add_column("Size", justify="right", style="yellow")
@@ -898,19 +916,22 @@ def _display_global_stats(stats: GlobalStats, output_format: str) -> None:
     for proj_stats in sorted(
         stats.projects, key=lambda p: p.total_messages, reverse=True
     ):
-        table.add_row(
-            proj_stats.project.path,
+        row = [proj_stats.project.path]
+        if show_worktype:
+            row.append(get_work_type_name(proj_stats.work_type))
+        row.extend([
             str(proj_stats.total_sessions),
             str(proj_stats.total_messages),
             f"{proj_stats.total_size_mb:.1f} MB",
             proj_stats.total_duration_str,
             format_datetime(proj_stats.most_recent_session),
-        )
+        ])
+        table.add_row(*row)
 
     console.print("\n", table)
 
 
-def _generate_project_summary(stats: ProjectStats, output_format: str) -> str:
+def _generate_project_summary(stats: ProjectStats, output_format: str, show_worktype: bool = False) -> str:
     """Generate a text summary for a single project."""
     if output_format == "markdown":
         lines = [
@@ -923,6 +944,12 @@ def _generate_project_summary(stats: ProjectStats, output_format: str) -> str:
             f"- **Total Duration**: {stats.total_duration_str}",
             f"- **Storage Size**: {stats.total_size_mb:.1f} MB",
             f"- **Average Messages per Session**: {stats.avg_messages_per_session:.1f}",
+        ]
+
+        if show_worktype:
+            lines.append(f"- **Work Type**: {get_work_type_name(stats.work_type)}")
+
+        lines.extend([
             "",
             "## Session Breakdown",
             f"- **Main Sessions**: {stats.main_sessions}",
@@ -931,7 +958,7 @@ def _generate_project_summary(stats: ProjectStats, output_format: str) -> str:
             f"- **Last Active**: {stats.most_recent_session.strftime('%Y-%m-%d %H:%M') if stats.most_recent_session else 'unknown'}",
             "",
             "## Insights",
-        ]
+        ])
 
         # Add insights
         if stats.agent_sessions > stats.main_sessions:
@@ -955,6 +982,12 @@ def _generate_project_summary(stats: ProjectStats, output_format: str) -> str:
             f"  Total Duration: {stats.total_duration_str}",
             f"  Storage Size: {stats.total_size_mb:.1f} MB",
             f"  Avg Messages/Session: {stats.avg_messages_per_session:.1f}",
+        ]
+
+        if show_worktype:
+            lines.append(f"  Work Type: {get_work_type_name(stats.work_type)}")
+
+        lines.extend([
             "",
             "Session Breakdown:",
             f"  Main Sessions: {stats.main_sessions}",
@@ -963,7 +996,7 @@ def _generate_project_summary(stats: ProjectStats, output_format: str) -> str:
             f"  Last Active: {stats.most_recent_session.strftime('%Y-%m-%d %H:%M') if stats.most_recent_session else 'unknown'}",
             "",
             "Key Insights:",
-        ]
+        ])
 
         # Add insights
         if stats.agent_sessions > stats.main_sessions:
@@ -976,8 +1009,10 @@ def _generate_project_summary(stats: ProjectStats, output_format: str) -> str:
         return "\n".join(lines)
 
 
-def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
+def _generate_global_summary(stats: GlobalStats, output_format: str, show_worktype: bool = False) -> str:
     """Generate a comprehensive summary of all projects."""
+    from collections import defaultdict
+
     if output_format == "markdown":
         lines = [
             "# Claude Code Project Analysis Summary",
@@ -995,9 +1030,25 @@ def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
             f"**Largest Project**: {stats.largest_project}",
             f"**Most Recent Activity**: {stats.most_recent_activity.strftime('%Y-%m-%d %H:%M') if stats.most_recent_activity else 'unknown'}",
             "",
-            "## Project Breakdown",
-            "",
         ]
+
+        # Add work type distribution section
+        if show_worktype:
+            by_type = defaultdict(lambda: {"hours": 0.0, "projects": 0})
+            for p in stats.projects:
+                by_type[p.work_type]["hours"] += p.total_duration_minutes / 60
+                by_type[p.work_type]["projects"] += 1
+            total_hours = sum(d["hours"] for d in by_type.values())
+
+            lines.append("## Work Type Distribution")
+            lines.append("")
+            for wt, d in sorted(by_type.items(), key=lambda x: x[1]["hours"], reverse=True):
+                pct = 100 * d["hours"] / total_hours if total_hours else 0
+                lines.append(f"- **{get_work_type_name(wt)}**: {d['hours']:.1f}h ({pct:.1f}%) across {d['projects']} projects")
+            lines.append("")
+
+        lines.append("## Project Breakdown")
+        lines.append("")
 
         # Add project breakdown
         for proj_stats in sorted(
@@ -1012,6 +1063,8 @@ def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
             )
             lines.append(f"- **Duration**: {proj_stats.total_duration_str}")
             lines.append(f"- **Size**: {proj_stats.total_size_mb:.1f} MB")
+            if show_worktype:
+                lines.append(f"- **Work Type**: {get_work_type_name(proj_stats.work_type)}")
             lines.append("")
 
         # Add insights
@@ -1103,9 +1156,25 @@ def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
             f"Largest Project: {stats.largest_project}",
             f"Most Recent Activity: {stats.most_recent_activity.strftime('%Y-%m-%d %H:%M') if stats.most_recent_activity else 'unknown'}",
             "",
-            "Project Breakdown:",
-            "",
         ]
+
+        # Add work type distribution section
+        if show_worktype:
+            by_type = defaultdict(lambda: {"hours": 0.0, "projects": 0})
+            for p in stats.projects:
+                by_type[p.work_type]["hours"] += p.total_duration_minutes / 60
+                by_type[p.work_type]["projects"] += 1
+            total_hours = sum(d["hours"] for d in by_type.values())
+
+            lines.append("Work Type Distribution:")
+            lines.append("")
+            for wt, d in sorted(by_type.items(), key=lambda x: x[1]["hours"], reverse=True):
+                pct = 100 * d["hours"] / total_hours if total_hours else 0
+                lines.append(f"  • {get_work_type_name(wt)}: {d['hours']:.1f}h ({pct:.1f}%) - {d['projects']} projects")
+            lines.append("")
+
+        lines.append("Project Breakdown:")
+        lines.append("")
 
         # Add project breakdown
         for proj_stats in sorted(
@@ -1120,6 +1189,8 @@ def _generate_global_summary(stats: GlobalStats, output_format: str) -> str:
             )
             lines.append(f"    Duration: {proj_stats.total_duration_str}")
             lines.append(f"    Size: {proj_stats.total_size_mb:.1f} MB")
+            if show_worktype:
+                lines.append(f"    Work Type: {get_work_type_name(proj_stats.work_type)}")
             lines.append("")
 
         # Add insights

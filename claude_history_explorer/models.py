@@ -517,6 +517,7 @@ class ProjectStats:
         avg_messages_per_session: Mean messages per session
         longest_session_duration: Human-readable longest session
         most_recent_session: Timestamp of most recent activity
+        work_type: Classified work type (coding, writing, analysis, research, teaching, design)
 
     Properties:
         total_size_mb: Size in megabytes
@@ -534,6 +535,7 @@ class ProjectStats:
     avg_messages_per_session: float
     longest_session_duration: str
     most_recent_session: Optional[datetime]
+    work_type: str = "coding"
 
     @property
     def total_size_mb(self) -> float:

@@ -5,12 +5,24 @@ This module provides functions to calculate usage statistics:
 - calculate_global_stats(): Calculate aggregated stats across all projects
 """
 
+import re
 from typing import List, Optional
 
+from .constants import WORK_TYPE_PATTERNS
 from .models import GlobalStats, Project, ProjectStats
 from .parser import parse_session
 from .projects import find_project, list_projects
 from .utils import format_duration
+
+
+def _classify_project(path: str) -> str:
+    """Classify a project by its path."""
+    path_lower = path.lower()
+    for work_type, patterns in WORK_TYPE_PATTERNS.items():
+        for pattern in patterns:
+            if re.search(pattern, path_lower, re.IGNORECASE):
+                return work_type
+    return "coding"
 
 
 def calculate_project_stats(project: Project) -> ProjectStats:
@@ -83,6 +95,7 @@ def calculate_project_stats(project: Project) -> ProjectStats:
         avg_messages_per_session=avg_messages,
         longest_session_duration=format_duration(longest_duration_minutes),
         most_recent_session=most_recent_session,
+        work_type=_classify_project(project.path),
     )
 
 
