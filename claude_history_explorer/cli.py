@@ -17,12 +17,19 @@ Commands:
 
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 import click
 from rich.console import Console
+
+# Windows terminals default to cp1252 which can't render Unicode content
+# (emojis, em dashes, etc.) from Claude Code transcripts. Force UTF-8.
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from rich.table import Table
 from rich.panel import Panel
 from rich.syntax import Syntax
