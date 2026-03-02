@@ -41,6 +41,7 @@ from .constants import (
     DATETIME_FORMAT_FULL,
     WRAPPED_URL_DOMAIN,
 )
+from .frequency import compute_frequency, FrequencyResult
 from .history import (
     list_projects,
     find_project,
@@ -1453,6 +1454,129 @@ def _format_global_story(story: GlobalStory, format_type: str) -> str:
                 lines.append(f"   {timestamp.strftime('%m/%d %H:%M')} - {project_name}")
 
         return "\n".join(lines)
+
+
+@main.command()
+@click.option(
+    "--project", "-p", default=None, help="Scope to a specific project (partial match)"
+)
+@click.option("--limit", "-n", default=20, help="Max entries per table")
+@click.option("--min-count", default=3, help="Minimum occurrences to include")
+@click.option("--min-length", default=4, help="Minimum prompt character length")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format",
+)
+@click.option("--example", is_flag=True, help="Show usage examples")
+def frequency(
+    project: str,
+    limit: int,
+    min_count: int,
+    min_length: int,
+    output_format: str,
+    example: bool,
+):
+    """Surface repeated prompts and commands across your history."""
+    if example:
+        show_examples("frequency")
+        return
+    try:
+        result = compute_frequency(
+            project=project,
+            limit=limit,
+            min_count=min_count,
+            min_length=min_length,
+        )
+
+        if output_format == "json":
+            _display_frequency_json(result)
+        else:
+            _display_frequency_tables(result)
+
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+
+
+def _display_frequency_tables(result: FrequencyResult) -> None:
+    """Render frequency results as Rich tables."""
+    is_scoped = result.project_path is not None
+    scope_label = result.project_path or "global"
+
+    if not result.prompt_entries and not result.bash_entries:
+        console.print(
+            "[yellow]No repeated patterns found. "
+            "Try lowering --min-count or checking that history exists.[/yellow]"
+        )
+        return
+
+    # Prompt table
+    if result.prompt_entries:
+        title = f"Repeated Prompts ({scope_label})"
+        table = Table(title=title, show_lines=False)
+        table.add_column("Rank", style="dim", justify="right", width=4)
+        table.add_column("Prompt", min_width=30)
+        table.add_column("Count", justify="right")
+        if not is_scoped:
+            table.add_column("Projects", justify="right")
+
+        for i, entry in enumerate(result.prompt_entries, 1):
+            row = [str(i), entry.normalised, str(entry.count)]
+            if not is_scoped:
+                row.append(str(entry.project_spread))
+            table.add_row(*row)
+
+        console.print(table)
+        console.print()
+
+    # Bash table
+    if result.bash_entries:
+        title = f"Repeated Bash Commands ({scope_label})"
+        table = Table(title=title, show_lines=False)
+        table.add_column("Rank", style="dim", justify="right", width=4)
+        table.add_column("Command", min_width=30)
+        table.add_column("Count", justify="right")
+        if not is_scoped:
+            table.add_column("Projects", justify="right")
+
+        for i, entry in enumerate(result.bash_entries, 1):
+            row = [str(i), entry.normalised, str(entry.count)]
+            if not is_scoped:
+                row.append(str(entry.project_spread))
+            table.add_row(*row)
+
+        console.print(table)
+
+
+def _display_frequency_json(result: FrequencyResult) -> None:
+    """Render frequency results as JSON."""
+    data = {
+        "project": result.project_path,
+        "prompts": [
+            {
+                "normalised": e.normalised,
+                "count": e.count,
+                "project_spread": e.project_spread,
+                "projects": e.projects,
+                "examples": e.examples,
+            }
+            for e in result.prompt_entries
+        ],
+        "commands": [
+            {
+                "normalised": e.normalised,
+                "count": e.count,
+                "project_spread": e.project_spread,
+                "projects": e.projects,
+                "examples": e.examples,
+            }
+            for e in result.bash_entries
+        ],
+    }
+    console.print_json(data=data)
 
 
 @main.command()

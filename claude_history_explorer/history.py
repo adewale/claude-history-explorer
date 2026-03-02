@@ -77,6 +77,9 @@ from .utils import (
     format_timestamp,
 )
 
+# Frequency analysis
+from .frequency import FrequencyEntry, FrequencyResult, compute_frequency
+
 # Wrapped V3
 from .wrapped import (
     # Constants
@@ -182,6 +185,10 @@ __all__ = [
     "get_work_type_name",
     "WORK_TYPE_PATTERNS",
     "WORK_TYPE_INFO",
+    # Frequency analysis
+    "FrequencyEntry",
+    "FrequencyResult",
+    "compute_frequency",
     # V3 Wrapped functions
     "generate_wrapped_story_v3",
     "encode_wrapped_story_v3",
