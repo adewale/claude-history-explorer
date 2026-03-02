@@ -3,18 +3,14 @@
 ## Why this exists
 
 Every repeated prompt is a missing Skill. Every repeated Bash invocation is a missing
-tool or hook. This command mines your Claude history to surface those automation
-opportunities:
+tool or hook. This command mines your Claude history to surface those patterns:
 
-- **Repeated prompts** → candidates for **Skills** (slash commands) or
-  **CLAUDE.md instructions** that eliminate the need to ask at all
-- **Repeated Bash commands** → candidates for **hooks** (session-start, pre/post tool),
-  **MCP tools**, or built-in tool configurations
-- **Per-project patterns** → project-specific hooks or CLAUDE.md rules
-- **Cross-project patterns** → global Skills or `~/.claude/settings.json` additions
+- **Repeated prompts** per-project and globally
+- **Repeated Bash commands** per-project and globally
 
-The output isn't just a frequency table — it's an **actionable audit** of what you
-and Claude are doing by hand that could be automated.
+The command reports. The user interprets. A prompt you type 40 times across 12
+projects might be a Skill waiting to be born, or it might just be how you work. A
+Bash command Claude runs 100 times might deserve a hook — or not. That's your call.
 
 ---
 
@@ -24,61 +20,44 @@ and Claude are doing by hand that could be automated.
 claude-history frequency [--project/-p PROJECT] [--limit/-n 20] [--format/-f table|json] [--min-count 3] [--example]
 ```
 
-### Default output: two tables with an automation-hint column
+### Default output: two tables
 
 ```
-╭──────────────────────────────────────────────────────────────────────────╮
-│              Repeated Prompts — Skill & Instruction Candidates           │
-├──────┬───────────────────────────────┬───────┬───────┬──────────────────┤
-│ Rank │ Prompt (normalised)           │ Count │ Where │ Opportunity      │
-├──────┼───────────────────────────────┼───────┼───────┼──────────────────┤
-│  1   │ run the tests                 │  47   │ 12 pr │ Skill / Hook     │
-│  2   │ commit and push               │  28   │  9 pr │ Skill            │
-│  3   │ fix the lint errors           │  22   │  1 pr │ CLAUDE.md rule   │
-│  4   │ review this PR                │  18   │  7 pr │ Skill            │
-│  ...                                                                     │
-╰──────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────────────────────────────────────╮
+│                   Repeated Prompts (global)                    │
+├──────┬──────────────────────────────────┬───────┬─────────────┤
+│ Rank │ Prompt                           │ Count │ Projects    │
+├──────┼──────────────────────────────────┼───────┼─────────────┤
+│  1   │ run the tests                    │  47   │ 12          │
+│  2   │ commit and push                  │  28   │  9          │
+│  3   │ fix the lint errors              │  22   │  1          │
+│  4   │ review this PR                   │  18   │  7          │
+│  ...                                                           │
+╰───────────────────────────────────────────────────────────────╯
 
-╭──────────────────────────────────────────────────────────────────────────╮
-│            Repeated Bash Commands — Tool & Hook Candidates               │
-├──────┬───────────────────────────────┬───────┬───────┬──────────────────┤
-│ Rank │ Command (normalised)          │ Count │ Where │ Opportunity      │
-├──────┼───────────────────────────────┼───────┼───────┼──────────────────┤
-│  1   │ npm test                      │ 112   │ 5 pr  │ Hook             │
-│  2   │ git status                    │  89   │ 14 pr │ (built-in)       │
-│  3   │ python -m pytest              │  64   │ 3 pr  │ Hook             │
-│  4   │ eslint --fix                  │  41   │ 5 pr  │ Hook             │
-│  5   │ docker compose up             │  33   │ 2 pr  │ Session hook     │
-│  ...                                                                     │
-╰──────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────────────────────────────────────╮
+│                Repeated Bash Commands (global)                 │
+├──────┬──────────────────────────────────┬───────┬─────────────┤
+│ Rank │ Command                          │ Count │ Projects    │
+├──────┼──────────────────────────────────┼───────┼─────────────┤
+│  1   │ npm test                         │ 112   │  5          │
+│  2   │ git status                       │  89   │ 14          │
+│  3   │ python -m pytest                 │  64   │  3          │
+│  4   │ eslint --fix                     │  41   │  5          │
+│  5   │ docker compose up                │  33   │  2          │
+│  ...                                                           │
+╰───────────────────────────────────────────────────────────────╯
 ```
 
-The **"Where"** column shows project spread: `12 pr` = seen in 12 projects.
-Single-project patterns get `1 pr` — those are project-local hook candidates.
+**"Projects"** = how many distinct projects the pattern appears in. That's it — a
+fact, not a recommendation.
 
-The **"Opportunity"** column is a heuristic classification:
-- **Skill** — prompt appears across many projects → global slash command
-- **CLAUDE.md rule** — prompt is specific to one project → project instruction
-- **Hook** — Bash command runs repeatedly → automate via hook
-- **Session hook** — setup/infra command (docker, server starts) → session-start hook
-- **(built-in)** — already a Claude Code tool (git status, read, etc.) — noise, dimmed
+When `--project/-p` is supplied, the "Projects" column is dropped (it would always
+be 1).
 
-### With `--project/-p`: scoped view, different framing
-
-```
-╭──────────────────────────────────────────────────────────────────────────╮
-│    Repeated Prompts in my-web-app — CLAUDE.md & Skill Candidates         │
-├──────┬───────────────────────────────┬───────┬──────────────────────────┤
-│ Rank │ Prompt (normalised)           │ Count │ Suggestion               │
-├──────┼───────────────────────────────┼───────┼──────────────────────────┤
-│  1   │ run the tests                 │  12   │ Add to CLAUDE.md or hook │
-│  2   │ fix the lint errors           │  22   │ Pre-commit hook          │
-│  ...                                                                     │
-╰──────────────────────────────────────────────────────────────────────────╯
-```
-
-When scoped, "Where" is replaced by **"Suggestion"** — more specific advice since
-we know the project context.
+`--format json` emits the full `FrequencyEntry` objects including the `examples`
+list, so you can pipe it into other tools or inspect what raw prompts got bucketed
+together.
 
 ---
 
@@ -87,178 +66,306 @@ we know the project context.
 ### 1. New module: `frequency.py` (core logic, no I/O)
 
 ```python
-# claude_history_explorer/frequency.py
-
 @dataclass
 class FrequencyEntry:
     """A single row in the frequency table."""
-    normalised:   str              # the normalised prompt or command
-    count:        int              # total occurrences
-    project_spread: int            # how many distinct projects it appears in
-    projects:     list[str]        # which project paths (for drill-down)
-    opportunity:  str              # "skill" | "hook" | "session_hook" | "claude_md" | "built_in"
-    examples:     list[str]        # 2-3 raw (pre-normalisation) examples for context
+    normalised:     str          # the canonical form (what gets displayed)
+    count:          int          # total occurrences
+    project_spread: int          # distinct projects it appears in
+    projects:       list[str]    # which project paths
+    examples:       list[str]    # 2-3 raw (pre-normalisation) strings for context
 
 @dataclass
 class FrequencyResult:
     """Complete output of the frequency analysis."""
     prompt_entries:  list[FrequencyEntry]
     bash_entries:    list[FrequencyEntry]
-    project_path:    str | None       # None = global
+    project_path:    str | None    # None = global
 
 def compute_frequency(
     project: Project | None = None,
     limit: int = 20,
     min_count: int = 3,
 ) -> FrequencyResult:
-    """Walk sessions, tally prompts & bash commands, classify opportunities."""
+    """Walk sessions, tally prompts & bash commands, return ranked results."""
     ...
-```
-
-This function iterates over every session (via the existing `parse_session`), and for
-each message:
-
-- **User messages** → tally `msg.content` after normalisation
-- **Assistant messages** → inspect `msg.tool_uses` for `{"name": "Bash", ...}` and
-  tally `tool_use["input"]["command"]` after normalisation
-
-Then **classifies each entry** by opportunity type (see below) and returns a
-`FrequencyResult` with two ranked lists.
-
-### 2. Opportunity classification (the interesting part)
-
-After counting, each entry gets tagged with a heuristic opportunity type. This is
-what turns a frequency table into actionable output.
-
-```python
-# Bash commands that already map to built-in Claude Code tools — noise to dim
-BUILT_IN_COMMANDS = {
-    "git status", "git diff", "git log", "git add", "git commit",
-    "cat", "head", "tail", "ls", "find", "grep", "rg",
-}
-
-# Patterns that suggest session-start / environment setup
-SESSION_SETUP_PATTERNS = [
-    r"docker compose", r"docker run", r"npm start", r"npm run dev",
-    r"python -m \w+\.server", r"rails server", r"cargo build",
-    r"source .*/bin/activate", r"nvm use", r"export \w+=",
-]
-
-def classify_prompt_opportunity(entry) -> str:
-    """Classify a repeated prompt as a potential automation."""
-    if entry.project_spread >= 3:
-        return "skill"             # cross-project → global slash command
-    elif entry.project_spread == 1:
-        return "claude_md"         # single-project → project-level instruction
-    else:
-        return "skill"             # 2 projects — lean toward skill
-
-def classify_bash_opportunity(entry) -> str:
-    """Classify a repeated Bash command as a potential automation."""
-    cmd = entry.normalised
-    if cmd in BUILT_IN_COMMANDS:
-        return "built_in"          # already a tool, dim in output
-    for pattern in SESSION_SETUP_PATTERNS:
-        if re.match(pattern, cmd):
-            return "session_hook"  # runs at start of session
-    if entry.project_spread >= 3:
-        return "hook"              # cross-project → global hook
-    else:
-        return "hook"              # project-specific → project hook
-```
-
-The classification is intentionally simple and wrong-sometimes — the goal is to
-**prompt the user to think** about what to automate, not to be a perfect classifier.
-
-### 3. Normalisation functions
-
-Prompt normalisation is the crux of the problem. Raw user prompts have tons of
-variance ("run the tests", "Run tests", "can you run the tests please?", "please run
-tests again"). A simple exact-match counter would be nearly useless.
-
-**Layered approach — start simple, get fancier later:**
-
-#### Layer 0: Deterministic text cleanup (ship this first)
-```python
-def normalise_prompt(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r'\s+', ' ', text)           # collapse whitespace
-    text = text.strip('?.!,;:')                # strip trailing punctuation
-    # strip common filler prefixes
-    for prefix in ["can you ", "could you ", "please ", "go ahead and ",
-                    "now ", "ok ", "okay ", "also ", "then ", "next "]:
-        if text.startswith(prefix):
-            text = text[len(prefix):]
-    return text
-```
-
-#### Layer 1: Command-template extraction for Bash
-```python
-def normalise_bash(command: str) -> str:
-    """Collapse arguments so 'cat foo.py' and 'cat bar.py' both become 'cat <file>'."""
-    # Split on pipes first to handle pipelines
-    parts = command.split('|')
-    normalised_parts = []
-    for part in parts:
-        tokens = shlex.split(part.strip())
-        if not tokens:
-            continue
-        binary = tokens[0]                       # e.g. "npm", "git", "python"
-        # keep first subcommand if it looks like one (no leading -)
-        subcmd = tokens[1] if len(tokens) > 1 and not tokens[1].startswith('-') else None
-        normalised_parts.append(f"{binary} {subcmd}" if subcmd else binary)
-    return " | ".join(normalised_parts)
-```
-
-So `git diff --staged src/foo.py` → `git diff`, `npm run build` → `npm run`,
-`cat foo.py | grep error` → `cat | grep`.
-
-This is intentionally lossy — we want to cluster by *intent*, not exact args.
-
-#### Layer 2 (future, not in v1): Semantic clustering
-Use embeddings or an LLM to cluster prompts that mean the same thing. Out of scope
-for the first cut but the data structures are ready for it — just swap the normaliser.
-
-### 4. CLI layer: new command in `cli.py`
-
-```python
-@main.command()
-@click.option("--project", "-p", default=None, help="Scope to a specific project")
-@click.option("--limit", "-n", default=20, help="Number of entries to show")
-@click.option("--min-count", default=3, help="Minimum occurrences to show")
-@click.option("--format", "-f", type=click.Choice(["table", "json"]), default="table")
-@click.option("--example", is_flag=True, help="Show usage examples")
-def frequency(project, limit, min_count, format, example):
-    """Surface repeated prompts and commands — find missing Skills and hooks."""
-    ...
-```
-
-Follows the exact same Click pattern as `stats`, `search`, etc. Delegates to
-`compute_frequency()`, then renders with Rich tables. Entries classified as
-`built_in` are dimmed. The `examples` field is shown on hover / in `--format json`
-for context on what the normalised bucket actually captures.
-
-### 5. Wire up in `history.py` (public API)
-
-Add re-exports so the public API stays consistent:
-
-```python
-from .frequency import compute_frequency, FrequencyResult, FrequencyEntry
 ```
 
 ---
 
-## Key design decisions to make before implementation
+## Normalisation (the hard part)
 
-| Decision | Options | Recommendation |
-|----------|---------|----------------|
-| **Filter out very short prompts?** | Yes / No | Yes — skip prompts < 4 chars (e.g. "y", "ok") via `--min-length` |
-| **Filter out agent sessions?** | Yes / No | No — agent Bash commands are valuable signal too |
-| **How deep to normalise Bash?** | Binary only / Binary+subcmd / Full template | Binary+subcmd is the sweet spot (Layer 1 above) |
-| **Handle &&-chained Bash?** | Split on && / Keep whole | Split on `&&` and `;`, tally each segment separately |
-| **Prompt similarity threshold** | Exact-after-normalisation / Fuzzy | Exact-after-normalisation for v1; fuzzy is a follow-up |
-| **Show raw examples?** | Always / On flag / In JSON only | Store 2-3 examples always; show in table with `--verbose`, always in `--format json` |
-| **Dim built-in commands?** | Yes / Hide them / Show normally | Dim them — they're noise but still informative |
+The goal: collapse surface-level variation so that the same *intent* gets counted
+once. Zero new dependencies — everything below uses `re`, `shlex`, and
+`difflib` from the stdlib.
+
+### Prompt normalisation: three passes
+
+#### Pass 1 — Deterministic text cleanup
+
+```python
+def _clean_prompt(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r'\s+', ' ', text)           # collapse whitespace
+    text = text.strip('?.!,;:')                # trailing punctuation
+    # strip filler prefixes (applied repeatedly until stable)
+    changed = True
+    while changed:
+        changed = False
+        for prefix in FILLER_PREFIXES:
+            if text.startswith(prefix):
+                text = text[len(prefix):]
+                changed = True
+    return text
+
+FILLER_PREFIXES = [
+    "can you ", "could you ", "would you ", "please ",
+    "go ahead and ", "now ", "ok ", "okay ", "also ",
+    "then ", "next ", "hey ", "hi ", "so ",
+]
+```
+
+This handles "ok now please run the tests" → "run the tests".
+
+#### Pass 2 — First-sentence extraction
+
+Many user prompts are multi-line: an instruction followed by a pasted error trace,
+code block, or context. The repeated part is almost always the first sentence.
+
+```python
+def _extract_instruction(text: str) -> str:
+    """Pull out the actionable first sentence/line."""
+    # If it has a code fence, only keep what's before it
+    fence = text.find('```')
+    if fence > 0:
+        text = text[:fence]
+
+    # Take the first line if multi-line
+    first_line = text.split('\n')[0].strip()
+
+    # If the first line is very long (>150 chars), it's probably pasted
+    # content, not an instruction — fall back to first sentence
+    if len(first_line) > 150:
+        # Split on sentence-ending punctuation
+        m = re.match(r'^(.+?[.!?])\s', first_line)
+        if m:
+            return m.group(1)
+        return first_line[:150]
+
+    return first_line
+```
+
+This is the single biggest improvement. Without it, a prompt like:
+
+> run the tests
+>
+> ```
+> ERROR: test_foo failed at line 42...
+> (200 more lines)
+> ```
+
+Would never match the bare "run the tests". With it, both reduce to the same key.
+
+#### Pass 3 — Stopword removal + simple stemming
+
+No NLTK needed. A hardcoded stopword list and a minimal suffix stripper:
+
+```python
+STOPWORDS = {
+    "the", "a", "an", "this", "that", "these", "those",
+    "my", "your", "its", "our", "their",
+    "is", "are", "was", "were", "be", "been", "being",
+    "it", "for", "to", "in", "on", "of", "and", "or",
+    "i", "me", "we", "us",
+    "do", "does", "did",
+    "all", "any", "some", "just", "only",
+    "so", "if", "but", "not", "no",
+    "up", "out", "about",
+    "make", "sure",
+}
+
+def _remove_stopwords(text: str) -> str:
+    tokens = text.split()
+    kept = [t for t in tokens if t not in STOPWORDS]
+    return ' '.join(kept) if kept else text   # never return empty
+
+STEM_SUFFIXES = [
+    ("ting", 1),   # "committing" → "commit" (strip "ting", keep 1+ char)
+    ("ning", 1),   # "running" → "run"
+    ("sing", 1),   # "using" → "u" — caught by min-length, so harmless
+    ("ing", 1),    # "fixing" → "fix"
+    ("tion", 2),   # "creation" → "crea" — imperfect but clusters
+    ("sion", 2),   # "expression" → "expres"
+    ("ment", 2),   # "deployment" → "deploy"
+    ("ies", 1),    # "dependencies" → "dependenc"
+    ("es", 2),     # "fixes" → "fix"
+    ("ed", 2),     # "failed" → "fail"
+    ("s", 2),      # "tests" → "test"
+]
+
+def _stem(word: str) -> str:
+    for suffix, min_remaining in STEM_SUFFIXES:
+        if word.endswith(suffix) and len(word) - len(suffix) >= min_remaining:
+            return word[:-len(suffix)]
+    return word
+
+def _stem_tokens(text: str) -> str:
+    return ' '.join(_stem(t) for t in text.split())
+```
+
+Now "run the tests", "running tests", "please run test" all become `run test`.
+
+#### Full pipeline
+
+```python
+def normalise_prompt(text: str) -> str:
+    text = _extract_instruction(text)
+    text = _clean_prompt(text)
+    text = _remove_stopwords(text)
+    text = _stem_tokens(text)
+    return text
+```
+
+#### Pass 4 — Post-hoc merge with `difflib.SequenceMatcher`
+
+After counting, we have a dict of `{normalised_key: count}`. Some entries will
+still be near-duplicates that the deterministic passes didn't catch (e.g.,
+"fix build error" vs "fix build failure"). A final merge pass:
+
+```python
+from difflib import SequenceMatcher
+
+def _merge_similar(counter: Counter, threshold: float = 0.75) -> Counter:
+    """Merge counter keys that are similar above threshold.
+
+    O(n²) on number of distinct keys — fine because we only run this on
+    entries that survived min_count filtering (typically <100).
+    """
+    keys = list(counter.keys())
+    merged = {}          # canonical_key → total_count
+    canonical_for = {}   # key → canonical_key (union-find style)
+
+    for key in keys:
+        best_match = None
+        best_ratio = 0.0
+        for canon in merged:
+            ratio = SequenceMatcher(None, key, canon).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_match = canon
+        if best_match and best_ratio >= threshold:
+            merged[best_match] += counter[key]
+            canonical_for[key] = best_match
+        else:
+            merged[key] = counter[key]
+            canonical_for[key] = key
+
+    return Counter(merged), canonical_for
+```
+
+This is the "semantic" layer — no embeddings, no LLM, just `difflib`. It handles
+typos, synonym-ish variations, and minor wording differences. The threshold of 0.75
+is conservative enough to avoid false merges but catches things like:
+- "fix lint error" / "fix linting error" (0.88)
+- "run test" / "run test again" (0.80)
+- "commit push" / "commit and push" — already handled by stopword removal, but
+  SequenceMatcher would catch it too (0.86)
+
+The `canonical_for` mapping lets us populate `examples` correctly — we know which
+raw strings got bucketed into which canonical key.
+
+### Bash normalisation: two passes
+
+Bash commands have less natural-language variance but more structural variance.
+
+#### Pass 1 — Structural decomposition
+
+```python
+# Binaries where the subcommand is semantically important,
+# and how many tokens after the binary form the "identity"
+SUBCOMMAND_DEPTH = {
+    "git": 1,        # git diff, git commit, git push
+    "npm": 2,        # npm run test, npm run build
+    "npx": 1,        # npx tsc, npx jest
+    "yarn": 2,       # yarn run test
+    "pnpm": 2,       # pnpm run build
+    "cargo": 1,      # cargo build, cargo test
+    "docker": 1,     # docker build, docker run
+    "docker-compose": 1,  # docker-compose up
+    "kubectl": 1,    # kubectl get, kubectl apply
+    "python": 1,     # python -m pytest (special-cased below)
+    "go": 1,         # go build, go test
+    "make": 1,       # make build, make test
+    "gh": 2,         # gh pr create, gh issue list
+}
+
+def _normalise_single_command(cmd: str) -> str:
+    """Normalise a single command (no pipes, no &&)."""
+    try:
+        tokens = shlex.split(cmd.strip())
+    except ValueError:
+        tokens = cmd.strip().split()
+
+    if not tokens:
+        return cmd.strip()
+
+    binary = os.path.basename(tokens[0])   # /usr/bin/python → python
+    rest = tokens[1:]
+
+    # Special case: python -m <module> → python -m <module>
+    if binary == "python" and len(rest) >= 2 and rest[0] == "-m":
+        return f"python -m {rest[1]}"
+
+    # Look up how many subcommand tokens to keep
+    depth = SUBCOMMAND_DEPTH.get(binary, 0)
+    subcmd_tokens = []
+    for token in rest[:depth]:
+        if token.startswith('-'):
+            break                          # stop at flags
+        subcmd_tokens.append(token)
+
+    if subcmd_tokens:
+        return f"{binary} {' '.join(subcmd_tokens)}"
+    return binary
+```
+
+This keeps `npm run test` intact (3 tokens) instead of collapsing it to `npm run`.
+It also handles `python -m pytest` correctly, and strips full paths from binaries.
+
+#### Pass 2 — Compound command splitting
+
+```python
+def normalise_bash(command: str) -> list[str]:
+    """Split compound commands and normalise each segment.
+
+    Returns a list because `cmd1 && cmd2` produces TWO frequency entries,
+    not one entry for the combined string.
+    """
+    # Split on && and ; (but not inside quotes)
+    segments = re.split(r'\s*(?:&&|;)\s*', command)
+    # Split on | to handle pipelines — but keep the pipeline as one unit
+    results = []
+    for segment in segments:
+        if '|' in segment:
+            pipe_parts = segment.split('|')
+            normalised_pipe = ' | '.join(
+                _normalise_single_command(p) for p in pipe_parts
+            )
+            results.append(normalised_pipe)
+        else:
+            results.append(_normalise_single_command(segment))
+    return [r for r in results if r]
+```
+
+Key insight: `&&`-chained commands get split into separate frequency entries (because
+"git add . && git commit" is really two distinct actions), but pipelines stay together
+(because `grep foo | wc -l` is one conceptual operation).
+
+#### No SequenceMatcher merge for Bash
+
+Bash commands cluster well with just the structural decomposition. Fuzzy matching
+would over-merge: `npm run test` and `npm run build` should stay separate. So the
+merge pass is prompt-only.
 
 ---
 
@@ -276,28 +383,40 @@ from .frequency import compute_frequency, FrequencyResult, FrequencyEntry
   │  in session│
   └─────┬──────┘
         │
-   ┌────┴──────────────────────┐
-   │ role == "user"?            │──yes──▶ normalise_prompt(msg.content)
-   │                            │         prompt_counter[key] += 1
-   │                            │         prompt_projects[key].add(project_path)
-   │                            │         prompt_examples[key].append(raw)
-   │                            │
-   │ role == "assistant"        │──yes──▶ for tu in msg.tool_uses:
-   │   & has Bash tool_use      │           if tu["name"] == "Bash":
-   └────────────────────────────┘             normalise_bash(tu["input"]["command"])
-                                              bash_counter[key] += 1
-                                              bash_projects[key].add(project_path)
-                                              bash_examples[key].append(raw)
+   ┌────┴────────────────────────┐
+   │ role == "user"?              │   normalise_prompt(msg.content)
+   │                              │──▶  prompt_counter[key] += 1
+   │                              │     prompt_projects[key].add(project_path)
+   │                              │     prompt_examples[key].append(raw_first_line)
+   │                              │
+   │ role == "assistant"          │   for tu in msg.tool_uses:
+   │   & has Bash tool_use        │     for cmd in normalise_bash(tu["input"]["command"]):
+   │                              │──▶    bash_counter[cmd] += 1
+   └──────────────────────────────┘       bash_projects[cmd].add(project_path)
+                                          bash_examples[cmd].append(raw_command)
         │
         ▼
-  Counter.most_common(limit)
+  filter by min_count
         │
         ▼
-  classify_prompt_opportunity() / classify_bash_opportunity()
+  _merge_similar() on prompt keys   (difflib pass, prompts only)
         │
         ▼
-  FrequencyResult with FrequencyEntry list (count + spread + opportunity + examples)
+  Counter.most_common(limit) → build FrequencyEntry list → FrequencyResult
 ```
+
+---
+
+## Key design decisions to make before implementation
+
+| Decision | Options | Recommendation |
+|----------|---------|----------------|
+| **Filter out very short prompts?** | Yes / No | Yes — skip prompts < 4 chars (e.g. "y", "ok") via `--min-length` |
+| **Filter out agent sessions?** | Yes / No | No — agent Bash commands are valuable signal |
+| **Handle &&-chained Bash?** | Split / Keep whole | Split — each segment is a separate intent |
+| **SequenceMatcher threshold** | 0.7 / 0.75 / 0.8 | 0.75 — conservative but catches real duplicates |
+| **Show raw examples?** | Always / In JSON only | In `--format json` only — keeps the table clean |
+| **difflib merge: prompts only or Bash too?** | Prompts only / Both | Prompts only — Bash clusters well structurally |
 
 ---
 
@@ -305,34 +424,21 @@ from .frequency import compute_frequency, FrequencyResult, FrequencyEntry
 
 | File | New / Modified | ~Lines |
 |------|----------------|--------|
-| `frequency.py` | **New** | ~200 (models, normalisation, classification, compute) |
-| `cli.py` | Modified | ~80 (new command + Rich rendering with opportunity column) |
+| `frequency.py` | **New** | ~250 (models, normalisation, merge, compute) |
+| `cli.py` | Modified | ~60 (new command + Rich rendering) |
 | `history.py` | Modified | ~3 (re-exports) |
-| `tests/test_frequency.py` | **New** | ~120 |
-| **Total** | | **~400 lines** |
+| `tests/test_frequency.py` | **New** | ~150 (normalisation edge cases deserve good coverage) |
+| **Total** | | **~460 lines** |
 
 ---
 
 ## Edge cases to handle
 
 - **Empty prompts / whitespace-only** — skip
-- **Very long prompts (pasted code blocks)** — truncate to first 200 chars before normalising (these are rarely "repeated"; they're one-off pastes, not automation candidates)
-- **Bash commands with secrets** — the data is already on disk in JSONL, so no new exposure, but truncate display of env vars / tokens in rendered output
-- **shlex.split failures** (unbalanced quotes) — fall back to simple `.split()`
+- **Very long prompts (pasted code blocks)** — first-sentence extraction handles this; raw paste never becomes the key
+- **Bash commands with secrets** — data is already on disk in JSONL, no new exposure; truncate `export FOO=...` values in display
+- **shlex.split failures** (unbalanced quotes) — fall back to `.split()`
 - **No sessions found** — friendly "No history data found" message
-- **Single-occurrence prompts** — filtered by `--min-count 3` default so the table only shows genuinely repeated patterns
-
----
-
-## Future extensions (not in v1, but the data model supports them)
-
-1. **`--generate-skill`** — pick entry #N from the table, scaffold a Claude Code
-   Skill TOML file from it (pre-filled with the prompt pattern as the trigger)
-2. **`--generate-hook`** — pick entry #N from the Bash table, scaffold a hook config
-   for `settings.json` or `.claude/hooks/`
-3. **`--diff`** — compare frequency between two time windows ("what did I stop asking
-   after I added that hook last month?")
-4. **Semantic clustering (Layer 2)** — group "run tests", "execute the test suite",
-   "make sure tests pass" into one bucket using embeddings
-5. **Integration with `wrapped`** — surface top automation opportunities in the
-   year-end wrapped story
+- **Single-occurrence prompts** — filtered by `--min-count 3` default
+- **Stemmer producing nonsense** — the stem is only used as a grouping key; `examples` stores the original wording for display context in JSON output
+- **SequenceMatcher false merges** — the 0.75 threshold + post-stopword-removal input means the strings being compared are already short and semantically dense; false merges are rare but possible. `--format json` exposing `examples` makes misgroups inspectable
