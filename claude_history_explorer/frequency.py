@@ -250,6 +250,17 @@ def _normalise_single_command(cmd: str) -> str:
     binary = os.path.basename(tokens[0])
     rest = tokens[1:]
 
+    # Special case: export FOO=value → export FOO=... (truncate secrets)
+    if binary == "export" and rest:
+        parts = []
+        for token in rest:
+            if "=" in token:
+                var_name = token.split("=", 1)[0]
+                parts.append(f"{var_name}=...")
+            else:
+                parts.append(token)
+        return f"export {' '.join(parts)}"
+
     # Special case: python -m <module>
     if binary == "python" and len(rest) >= 2 and rest[0] == "-m":
         return f"python -m {rest[1]}"

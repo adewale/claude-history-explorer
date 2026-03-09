@@ -350,6 +350,25 @@ class TestNormaliseSingleCommand:
         result = _normalise_single_command("echo 'unbalanced")
         assert result == "echo"
 
+    def test_export_truncates_value(self):
+        assert _normalise_single_command("export FOO=bar") == "export FOO=..."
+
+    def test_export_truncates_secret(self):
+        assert (
+            _normalise_single_command("export API_KEY=sk-abc123xyz")
+            == "export API_KEY=..."
+        )
+
+    def test_export_multiple_vars(self):
+        assert (
+            _normalise_single_command("export A=1 B=2")
+            == "export A=... B=..."
+        )
+
+    def test_export_no_value(self):
+        # export with no = (just declaring) — kept as-is
+        assert _normalise_single_command("export PATH") == "export PATH"
+
 
 # =============================================================================
 # Bash normalisation: compound commands
@@ -916,7 +935,7 @@ class TestFrequencyCLI:
         ):
             result = runner.invoke(main, ["frequency"])
             assert result.exit_code == 0
-            assert "No repeated patterns" in result.output
+            assert "No history data found" in result.output
 
     def test_project_scope(self, runner):
         """--project flag should be passed through."""

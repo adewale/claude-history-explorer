@@ -221,6 +221,15 @@ Examples:
 Examples:
   claude-history info                        # Show storage location and stats
 """,
+    "frequency": """
+Examples:
+  claude-history frequency                       # Global frequency analysis
+  claude-history frequency -p myproject          # Frequency for specific project
+  claude-history frequency -n 10                 # Show top 10 entries per table
+  claude-history frequency --min-count 5         # Only show patterns with 5+ occurrences
+  claude-history frequency --min-length 10       # Skip short prompts (< 10 chars)
+  claude-history frequency -f json               # JSON output (includes examples field)
+""",
     "wrapped": """
 Examples:
   claude-history wrapped                     # Generate wrapped for current year
@@ -1507,10 +1516,7 @@ def _display_frequency_tables(result: FrequencyResult) -> None:
     scope_label = result.project_path or "global"
 
     if not result.prompt_entries and not result.bash_entries:
-        console.print(
-            "[yellow]No repeated patterns found. "
-            "Try lowering --min-count or checking that history exists.[/yellow]"
-        )
+        console.print("[yellow]No history data found.[/yellow]")
         return
 
     # Prompt table

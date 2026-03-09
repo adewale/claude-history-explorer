@@ -181,7 +181,7 @@ no intent signal. See `frequency.py` for the full list. If removal would produce
 an empty string, the original is returned.
 
 **Stemming** uses a pure-Python implementation of the Porter stemming algorithm
-(~80 lines, public domain). This is a proper implementation of the 5-step
+(~260 lines, public domain). This is a proper implementation of the 5-step
 algorithm, not a suffix table. Key improvements over naive suffix stripping:
 - "dependencies" → "depend" (not "dependenc")
 - "running" → "run" (not "runn")
@@ -333,7 +333,7 @@ After counting and merging:
 
 | File | New/Modified | Purpose |
 |------|-------------|---------|
-| `claude_history_explorer/stemmer.py` | **New** | Pure-Python Porter stemmer (~80 lines) |
+| `claude_history_explorer/stemmer.py` | **New** | Pure-Python Porter stemmer (~260 lines) |
 | `claude_history_explorer/frequency.py` | **New** | `FrequencyEntry`, `FrequencyResult`, normalisation, merge, `compute_frequency()` |
 | `claude_history_explorer/cli.py` | Modified | New `frequency` command + Rich rendering |
 | `claude_history_explorer/history.py` | Modified | Re-exports: `compute_frequency`, `FrequencyResult`, `FrequencyEntry` |
