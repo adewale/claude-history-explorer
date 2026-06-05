@@ -17,6 +17,7 @@ Commands:
 
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -65,6 +66,20 @@ from .history import (
 
 __all__ = ["main"]
 
+
+def _ensure_utf8_output():
+    """Reconfigure stdout/stderr to UTF-8 on Windows.
+
+    Windows terminals default to cp1252 which cannot render the Unicode
+    content (emoji, em-dashes, etc.) found in Claude Code transcripts.
+    """
+    if sys.platform == "win32":
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+_ensure_utf8_output()
 console = Console()
 
 
@@ -1119,7 +1134,7 @@ def _generate_global_summary(stats: GlobalStats, output_format: str, show_workty
             )
             bar = "█" * bar_length
             lines.append(
-                f"{proj_stats.project.path.split('/')[-1]:15} │{bar:30}│ {proj_stats.total_sessions}"
+                f"{proj_stats.project.short_name:15} │{bar:30}│ {proj_stats.total_sessions}"
             )
 
         # Message volume sparkline
@@ -1140,7 +1155,7 @@ def _generate_global_summary(stats: GlobalStats, output_format: str, show_workty
             stats.projects, key=lambda p: p.total_messages, reverse=True
         )[:5]:
             lines.append(
-                f"• {proj_stats.project.path.split('/')[-1]}: {proj_stats.total_messages} messages"
+                f"• {proj_stats.project.short_name}: {proj_stats.total_messages} messages"
             )
 
         return "\n".join(lines)

@@ -50,7 +50,7 @@ def list_projects() -> List[Project]:
 
     projects = []
     for item in projects_dir.iterdir():
-        if item.is_dir() and item.name.startswith("-"):
+        if item.is_dir() and not item.name.startswith("."):
             projects.append(Project.from_dir(item))
 
     # Sort by last modified

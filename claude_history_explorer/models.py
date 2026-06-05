@@ -319,29 +319,40 @@ class Project:
     def _decode_project_path(encoded_name: str) -> str:
         """Decode a Claude project directory name to the actual filesystem path.
 
-        Claude Code encodes paths by replacing '/' with '-', but also converts
-        '_' and '-' in folder names to '-'. This creates ambiguity that we
-        resolve by checking which path actually exists on disk.
+        Claude Code encodes paths by replacing every non-alphanumeric,
+        non-hyphen character with '-'.  This means '/', '\\', ':', '_', '.'
+        all become '-', which creates ambiguity.  We resolve it by probing the
+        filesystem; when no match exists (e.g. a Windows-origin path decoded
+        on Linux) we fall back to joining with '/'.
 
-        Args:
-            encoded_name: Directory name like '-Users-ade-projects-block-browser'
-
-        Returns:
-            Decoded path like '/Users/ade/projects/block_browser'
+        Handles three prefix patterns:
+          Unix:    -Users-ade-foo        → /Users/ade/foo
+          Windows: C--Users-Moho-foo     → C:/Users/Moho/foo
+          UNC:     --server-share-foo    → //server/share/foo
         """
-        # Split into components: '-Users-ade-foo-bar' -> ['', 'Users', 'ade', 'foo', 'bar']
         components = encoded_name.split("-")
-        start_index = 1 if components and components[0] == "" else 0
+
+        if (len(components) >= 2
+                and len(components[0]) == 1
+                and components[0].isalpha()
+                and components[1] == ""):
+            root = f"{components[0].upper()}:/"
+            start = 2
+        elif len(components) >= 2 and components[0] == "" and components[1] == "":
+            root = "//"
+            start = 2
+        else:
+            root = "/"
+            start = 1 if components[0] == "" else 0
 
         def decode_from(index: int, current_path: Path) -> Optional[Path]:
             if index >= len(components):
                 return current_path
 
-            # Prefer longer existing components first. This handles real folders
-            # such as "my-five-part-long-folder" even when the encoded name has
-            # many hyphen-separated tokens.
             for end in range(len(components), index, -1):
                 parts = components[index:end]
+                if not any(parts):
+                    continue
                 candidate_names = ["-".join(parts)]
                 underscore_name = "_".join(parts)
                 if underscore_name not in candidate_names:
@@ -357,27 +368,30 @@ class Project:
 
             return None
 
-        decoded = decode_from(start_index, Path("/"))
+        decoded = decode_from(start, Path(root))
         if decoded is not None:
-            return str(decoded)
+            return str(decoded).replace("\\", "/")
 
-        # Path doesn't exist on disk, fall back to simple slash replacement.
-        return str(Path("/") / "/".join(components[start_index:]))
+        remaining = "/".join(c for c in components[start:] if c)
+        result = str(Path(root) / remaining) if remaining else str(Path(root))
+        return result.replace("\\", "/")
 
     @property
     def session_count(self) -> int:
         return len(self.session_files)
 
     @property
-    def short_name(self) -> str:
-        """Get the short name (last path component) of the project, prettified.
+    def basename(self) -> str:
+        """Last component of the decoded project path, separator-agnostic."""
+        return self.path.replace("\\", "/").rsplit("/", 1)[-1]
 
-        Converts folder names like 'block_browser' or 'my-project' to
-        'Block Browser' or 'My Project' for display.
+    @property
+    def short_name(self) -> str:
+        """Last path component, prettified for display.
+
+        'block_browser' → 'Block Browser', 'my-project' → 'My Project'.
         """
-        raw_name = self.path.split("/")[-1]
-        # Replace underscores and hyphens with spaces, then title case
-        prettified = raw_name.replace("_", " ").replace("-", " ")
+        prettified = self.basename.replace("_", " ").replace("-", " ")
         return prettified.title()
 
     @property
