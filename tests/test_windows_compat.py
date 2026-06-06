@@ -167,15 +167,17 @@ class TestDecodeProjectPath:
         target = tmp_path / "foo.bar"
         target.mkdir()
         encoded = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in str(target))
+        expected = str(target).replace("\\", "/")
 
-        assert Project._decode_project_path(encoded) == str(target)
+        assert Project._decode_project_path(encoded) == expected
 
     def test_existing_spaced_path_component_is_preserved(self, tmp_path):
         target = tmp_path / "foo bar"
         target.mkdir()
         encoded = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in str(target))
+        expected = str(target).replace("\\", "/")
 
-        assert Project._decode_project_path(encoded) == str(target)
+        assert Project._decode_project_path(encoded) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +291,7 @@ class TestCliDisplayAbstraction:
 
     def test_no_raw_path_split_in_cli(self):
         cli_path = Path(__file__).parent.parent / "claude_history_explorer" / "cli.py"
-        source = cli_path.read_text()
+        source = cli_path.read_text(encoding="utf-8")
         matches = re.findall(r"""\.path\.split\s*\(\s*['"]\/['"]\s*\)""", source)
         assert matches == [], (
             f"Found {len(matches)} raw path.split('/') call(s) in cli.py — "

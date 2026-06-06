@@ -1,6 +1,7 @@
 """Test configuration and fixtures for claude-history-explorer."""
 
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,17 @@ def require_wrapped_node_deps() -> None:
         if os.environ.get("CI"):
             pytest.fail(message)
         pytest.skip(message)
+
+
+def npx_command() -> str:
+    """Return a Windows-safe npx executable path for subprocess calls."""
+    executable = shutil.which("npx.cmd" if os.name == "nt" else "npx") or shutil.which("npx")
+    if executable:
+        return executable
+    message = "npx not found; install Node.js before running TypeScript bridge tests"
+    if os.environ.get("CI"):
+        pytest.fail(message)
+    pytest.skip(message)
 
 
 def pytest_configure():

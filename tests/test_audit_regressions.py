@@ -381,4 +381,4 @@ def test_decode_project_path_handles_long_hyphenated_existing_component(tmp_path
     target.mkdir()
     encoded = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in str(target))
 
-    assert Project._decode_project_path(encoded) == str(target)
+    assert Project._decode_project_path(encoded) == str(target).replace("\\", "/")
