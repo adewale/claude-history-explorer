@@ -1,7 +1,7 @@
 # Claude Code Wrapped - UX Specification
 
 > **Note**: This document describes the original card-based Story Mode which has been removed.
-> As of December 2024, Print view is the only view. This document is retained for historical reference.
+> Current implementation is V3-only Print view at `/wrapped?d=...` on `wrapped-claude-codes.adewale-883.workers.dev`. The old `wrapped.claude.codes/{year}/{data}` path, Story Mode, Framer Motion transitions, and "no query params" decisions below are historical/proposal content, not current behavior.
 
 ## Overview
 
@@ -374,11 +374,11 @@ When hovering/tapping share buttons:
 ┌────────────────────────────────────────┐
 │  Share on X                            │
 │                                        │
-│  Only shares: message count, hours,    │
-│  projects, and personality traits.     │
+│  Shares: aggregate counts, short       │
+│  project names, and style metrics.     │
 │                                        │
-│  Never shares: project names, file     │
-│  contents, or conversation details.    │
+│  Never shares: file contents, full     │
+│  paths, tool inputs, or conversations. │
 └────────────────────────────────────────┘
 ```
 

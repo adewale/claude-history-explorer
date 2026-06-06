@@ -9,14 +9,14 @@ These tests verify that:
 Run with: uv run pytest tests/test_integration.py -v
 """
 
-import json
 import subprocess
-import tempfile
 from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
 import pytest
+
+from conftest import require_wrapped_node_deps
 
 from claude_history_explorer.history import (
     WrappedStoryV3,
@@ -171,7 +171,7 @@ class TestPythonEncodeDecode:
 class TestCrossLanguageCompatibility:
     """Test that Python-encoded stories can be decoded by TypeScript."""
 
-    def test_typescript_decode(self):
+    def test_typescript_decode(self, tmp_path):
         """Test that TypeScript can decode Python-encoded story."""
         # Create a story in Python using compact array format for tp, te, sf
         # tp format: [name, messages, hours, days, sessions, agent_ratio]
@@ -212,8 +212,7 @@ class TestCrossLanguageCompatibility:
 
         # Create a test script for TypeScript
         ts_test_script = f'''
-import msgpack from 'msgpack-lite';
-import {{ decodeWrappedStoryV3, validateStoryV3 }} from '../src/decoder';
+import {{ decodeWrappedStoryV3, validateStoryV3 }} from '{(Path(__file__).parent.parent / "wrapped-website" / "src" / "decoder.ts").as_uri()}';
 
 const encoded = "{encoded}";
 
@@ -265,30 +264,28 @@ try {{
 }}
 '''
 
-        # Write and run the TypeScript test
+        require_wrapped_node_deps()
+
+        # Write and run the TypeScript test outside the repo tree so tests do
+        # not create transient source files under wrapped-website/tests.
         wrapped_dir = Path(__file__).parent.parent / "wrapped-website"
-        test_file = wrapped_dir / "tests" / "cross_language_test.ts"
+        test_file = tmp_path / "cross_language_test.ts"
 
         test_file.write_text(ts_test_script)
-        try:
-            result = subprocess.run(
-                ["npx", "tsx", str(test_file)],
-                cwd=str(wrapped_dir),
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
+        result = subprocess.run(
+            ["npx", "tsx", str(test_file)],
+            cwd=str(wrapped_dir),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
 
-            if result.returncode != 0:
-                print("STDOUT:", result.stdout)
-                print("STDERR:", result.stderr)
-                pytest.fail(f"TypeScript decode failed: {result.stderr}")
+        if result.returncode != 0:
+            print("STDOUT:", result.stdout)
+            print("STDERR:", result.stderr)
+            pytest.fail(f"TypeScript decode failed: {result.stderr}")
 
-            assert "All cross-language checks passed!" in result.stdout
-        finally:
-            # Clean up
-            if test_file.exists():
-                test_file.unlink()
+        assert "All cross-language checks passed!" in result.stdout
 
 
 class TestGenerateWrappedStoryV3Integration:
@@ -520,7 +517,7 @@ class TestWrappedURLTruncationBug:
         # Record actual lengths for documentation
         print(f"\nEncoded data length: {len(encoded)} chars")
         print(f"Full URL length: {len(url)} chars")
-        print(f"Standard terminal width: 80 chars")
+        print("Standard terminal width: 80 chars")
         print(f"Data exceeds terminal by: {len(url) - 80} chars")
 
     def test_truncated_encoded_data_fails_to_decode(self):

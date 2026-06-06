@@ -39,7 +39,7 @@ def parse_session(file_path: Path, project_path: str = "") -> Session:
     end_time = None
     slug = None
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -139,14 +139,16 @@ def search_sessions(
             matching_messages: List[Message] = []
 
             for msg in session.messages:
-                if regex.search(msg.content):
+                matched = bool(regex.search(msg.content))
+                # Also search tool inputs, but append each message at most once.
+                if not matched:
+                    for tool_use in msg.tool_uses:
+                        tool_input = json.dumps(tool_use.get("input", {}))
+                        if regex.search(tool_input):
+                            matched = True
+                            break
+                if matched:
                     matching_messages.append(msg)
-                # Also search tool inputs
-                for tool_use in msg.tool_uses:
-                    tool_input = json.dumps(tool_use.get("input", {}))
-                    if regex.search(tool_input):
-                        matching_messages.append(msg)
-                        break
 
             if matching_messages:
                 yield session, matching_messages

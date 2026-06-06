@@ -87,25 +87,27 @@ def generate_project_story(project: Project) -> ProjectStory:
             if gap_days > 1:
                 break_periods.append((sorted_days[i - 1], sorted_days[i], gap_days))
 
-    # Detect concurrent Claude instances
-    # Look for sessions with overlapping timestamps
-    concurrent_claude_instances = 0
+    # Detect concurrent Claude instances by counting sessions whose start times
+    # cluster within the concurrency window. Include the session itself so three
+    # simultaneous starts are reported as 3 instances, not 2 overlaps.
+    concurrent_claude_instances = 1 if sessions else 0
 
-    for i, session1 in enumerate(sessions):
-        overlapping_sessions = 0
-        for j, session2 in enumerate(sessions):
-            if i != j and session1.start_time and session2.start_time:
-                # Check if sessions overlap (suggests concurrent use)
-                time_diff = abs(
-                    (session1.start_time - session2.start_time).total_seconds() / 60
-                )
-                if time_diff < CONCURRENT_WINDOW_MINUTES:
-                    overlapping_sessions += 1
-
-        if overlapping_sessions > 2:  # Session overlaps with 2+ others
-            concurrent_claude_instances = max(
-                concurrent_claude_instances, overlapping_sessions
+    for session1 in sessions:
+        if not session1.start_time:
+            continue
+        clustered_sessions = 0
+        for session2 in sessions:
+            if not session2.start_time:
+                continue
+            time_diff = abs(
+                (session1.start_time - session2.start_time).total_seconds() / 60
             )
+            if time_diff < CONCURRENT_WINDOW_MINUTES:
+                clustered_sessions += 1
+
+        concurrent_claude_instances = max(
+            concurrent_claude_instances, clustered_sessions
+        )
 
     # Generate insights about concurrent usage
     concurrent_insights: List[str] = []
@@ -119,10 +121,10 @@ def generate_project_story(project: Project) -> ProjectStory:
         )
     elif concurrent_claude_instances > 1:
         concurrent_insights.append(
-            "Occasional multi-instance workflow for complex tasks"
+            f"Occasional multi-instance workflow - used up to {concurrent_claude_instances} Claude instances"
         )
 
-    if concurrent_claude_instances == 0:
+    if concurrent_claude_instances <= 1:
         concurrent_insights.append(
             "Sequential workflow - used one Claude instance at a time"
         )

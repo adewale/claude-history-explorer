@@ -1,13 +1,18 @@
 # JSON Schema Documentation
 
-This document describes the JSON output formats for commands that support `--format json`.
+This document describes the JSON output formats for commands that emit JSON (`--format json`, `--raw`, or `show --raw`).
 
 ## Commands with JSON Output
 
 | Command | Flag | Description |
 |---------|------|-------------|
 | `stats` | `--format json` | Statistics for all projects or a specific project |
+| `stats` | `--format json --show-worktype` | Adds optional `work_type` and `work_type_name` fields |
 | `export` | `--format json` | Full session export with messages |
+| `wrapped` | `--raw` | Wrapped V3 aggregate payload; see `docs/WRAPPED_V3_SPEC.md` |
+| `show` | `--raw` | Newline-separated per-message JSON |
+
+`wrapped --raw` emits the `WrappedStoryV3.to_dict()` shape documented in [WRAPPED_V3_SPEC.md](WRAPPED_V3_SPEC.md) and [DOMAIN_MODEL.md](DOMAIN_MODEL.md). `show --raw` prints one JSON object per displayed message with `role`, `content`, `timestamp`, and `tool_uses`.
 
 ---
 
@@ -35,7 +40,9 @@ This document describes the JSON output formats for commands that support `--for
       "sessions": 15,
       "messages": 1480,
       "size_mb": 9.85,
-      "duration_str": "63h 24m"
+      "duration_str": "63h 24m",
+      "work_type": "coding",
+      "work_type_name": "Software Development"
     }
   ]
 }
@@ -68,6 +75,8 @@ This document describes the JSON output formats for commands that support `--for
 | `messages` | integer | Total messages |
 | `size_mb` | float | Storage in megabytes |
 | `duration_str` | string | Human-readable total duration |
+| `work_type` | string | Optional when `--show-worktype` is used |
+| `work_type_name` | string | Optional human-readable work type name |
 
 ---
 
@@ -88,7 +97,9 @@ This document describes the JSON output formats for commands that support `--for
   "total_size_mb": 11.94,
   "avg_messages_per_session": 81.0,
   "longest_session_duration": "86h 23m",
-  "most_recent_session": "2025-12-06T12:46:32.438000+00:00"
+  "most_recent_session": "2025-12-06T12:46:32.438000+00:00",
+  "work_type": "coding",
+  "work_type_name": "Software Development"
 }
 ```
 
@@ -108,6 +119,8 @@ This document describes the JSON output formats for commands that support `--for
 | `avg_messages_per_session` | float | Mean messages per session |
 | `longest_session_duration` | string | Duration of longest session |
 | `most_recent_session` | string | ISO 8601 timestamp |
+| `work_type` | string | Optional when `--show-worktype` is used |
+| `work_type_name` | string | Optional human-readable work type name |
 
 ---
 

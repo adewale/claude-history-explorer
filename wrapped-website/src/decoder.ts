@@ -30,17 +30,32 @@ import {
   TRAIT_HIGH_THRESHOLD,
   TRAIT_LOW_DESCRIPTIONS,
   TRAIT_HIGH_DESCRIPTIONS,
+  HEATMAP_QUANT_SCALE,
   HEATMAP_SIZE,
   HEATMAP_DAYS,
   HEATMAP_HOURS,
   MONTHS_SHORT,
-  DAYS_SHORT,
+  MAX_PROJECTS,
+  MAX_COOCCURRENCE_EDGES,
+  MAX_TIMELINE_EVENTS,
+  MAX_SESSION_FINGERPRINTS,
+  MAX_PROJECT_NAME_LENGTH,
+  MAX_DISPLAY_NAME_LENGTH,
+  TRAIT_CODES,
 } from './constants';
+
+const MAX_ENCODED_LENGTH = 100_000;
+const MAX_DECODED_BYTES = 75_000;
+const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
 
 /**
  * Decode Base64URL string (without padding) to Uint8Array
  */
 function base64UrlDecode(str: string): Uint8Array {
+  if (!str || str.length > MAX_ENCODED_LENGTH || !BASE64URL_RE.test(str)) {
+    throw new Error('Invalid or oversized encoded data');
+  }
+
   // Add padding if needed
   const paddingNeeded = (4 - (str.length % 4)) % 4;
   const padded = str + '='.repeat(paddingNeeded);
@@ -50,6 +65,9 @@ function base64UrlDecode(str: string): Uint8Array {
 
   // Decode
   const binaryString = atob(base64);
+  if (binaryString.length > MAX_DECODED_BYTES) {
+    throw new Error('Decoded data is too large');
+  }
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
@@ -245,11 +263,20 @@ export interface TokenStats {
 /**
  * Decode run-length encoded data
  */
-export function rleDecode(encoded: number[]): number[] {
+export function rleDecode(encoded: number[], maxOutput = Number.POSITIVE_INFINITY): number[] {
+  if (!Array.isArray(encoded)) {
+    throw new Error('Invalid RLE data');
+  }
   const result: number[] = [];
   for (let i = 0; i < encoded.length; i += 2) {
     const value = encoded[i];
-    const count = encoded[i + 1] || 1;
+    const count = encoded[i + 1] ?? 1;
+    if (!Number.isFinite(value) || !Number.isInteger(count) || count < 0) {
+      throw new Error('Invalid RLE value or count');
+    }
+    if (result.length + count > maxOutput) {
+      throw new Error('RLE heatmap exceeds expected size');
+    }
     for (let j = 0; j < count; j++) {
       result.push(value);
     }
@@ -266,20 +293,20 @@ export function rleDecode(encoded: number[]): number[] {
  * NOT objects! If you're creating test data manually, use arrays not {n: "...", m: ...}
  * The Python encoder (wrapped.py) creates this compact format for URL efficiency.
  */
-function decodeProject(arr: any[]): TopProjectV3 {
+function decodeProject(value: unknown): TopProjectV3 {
   // Validate input is actually an array (catches common mistake of using object format)
-  if (arr && typeof arr === 'object' && !Array.isArray(arr)) {
-    console.warn('decodeProject received object instead of array - using object format directly');
-    const obj = arr as any;
-    return { n: obj.n || '', m: obj.m || 0, h: obj.h || 0, d: obj.d || 0, s: obj.s || 0, ar: obj.ar || 0 };
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    return { n: (obj.n || '') as string, m: (obj.m || 0) as number, h: (obj.h || 0) as number, d: (obj.d || 0) as number, s: (obj.s || 0) as number, ar: (obj.ar || 0) as number };
   }
+  const arr = Array.isArray(value) ? value : [];
   return {
-    n: arr[0] || '',
-    m: arr[1] || 0,
-    h: arr[2] || 0,
-    d: arr[3] || 0,
-    s: arr[4] || 0,
-    ar: arr[5] || 0,
+    n: (arr[0] || '') as string,
+    m: (arr[1] || 0) as number,
+    h: (arr[2] || 0) as number,
+    d: (arr[3] || 0) as number,
+    s: (arr[4] || 0) as number,
+    ar: (arr[5] || 0) as number,
   };
 }
 
@@ -291,18 +318,18 @@ function decodeProject(arr: any[]): TopProjectV3 {
  *
  * Types: 0=peak_day, 1=streak_start, 2=streak_end, 3=new_project, 4=milestone, 5=gap_start, 6=gap_end
  */
-function decodeEvent(arr: any[]): TimelineEvent {
+function decodeEvent(value: unknown): TimelineEvent {
   // Handle object format gracefully (for manually created test data)
-  if (arr && typeof arr === 'object' && !Array.isArray(arr)) {
-    console.warn('decodeEvent received object instead of array - using object format directly');
-    return arr as TimelineEvent;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as TimelineEvent;
   }
+  const arr = Array.isArray(value) ? value : [];
   const event: TimelineEvent = {
-    d: arr[0] || 0,
-    t: arr[1] || 0,
+    d: (arr[0] || 0) as number,
+    t: (arr[1] || 0) as number,
   };
-  if (arr[2] !== -1 && arr[2] !== undefined) event.v = arr[2];
-  if (arr[3] !== -1 && arr[3] !== undefined) event.p = arr[3];
+  if (arr[2] !== -1 && arr[2] !== undefined) event.v = arr[2] as number;
+  if (arr[3] !== -1 && arr[3] !== undefined) event.p = arr[3] as number;
   return event;
 }
 
@@ -314,23 +341,23 @@ function decodeEvent(arr: any[]): TimelineEvent {
  *
  * fp0-fp7 are the session "shape" fingerprint values (0-100 each)
  */
-function decodeFingerprint(arr: any[]): SessionFingerprint {
+function decodeFingerprint(value: unknown): SessionFingerprint {
   // Handle object format gracefully (for manually created test data)
-  if (arr && typeof arr === 'object' && !Array.isArray(arr)) {
-    console.warn('decodeFingerprint received object instead of array - using object format directly');
-    return arr as SessionFingerprint;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as SessionFingerprint;
   }
+  const arr = Array.isArray(value) ? value : [];
   // Get fingerprint values, pad to 8 elements if needed
-  const rawFp = arr.slice(6, 14);
+  const rawFp = arr.slice(6, 14) as number[];
   const fp = rawFp.length >= 8 ? rawFp : [...rawFp, ...Array(8 - rawFp.length).fill(0)];
 
   return {
-    d: arr[0] || 0,
-    m: arr[1] || 0,
+    d: (arr[0] || 0) as number,
+    m: (arr[1] || 0) as number,
     a: arr[2] === 1,
-    h: arr[3] || 0,
-    w: arr[4] || 0,
-    pi: arr[5] || 0,
+    h: (arr[3] || 0) as number,
+    w: (arr[4] || 0) as number,
+    pi: (arr[5] || 0) as number,
     fp,
   };
 }
@@ -341,47 +368,54 @@ function decodeFingerprint(arr: any[]): SessionFingerprint {
 export function decodeWrappedStoryV3(encoded: string): WrappedStoryV3 {
   try {
     const bytes = base64UrlDecode(encoded);
-    const raw = msgpack.decode(bytes);
+    const raw = msgpack.decode(bytes) as Record<string, unknown>;
+    if (!raw || typeof raw !== 'object' || raw.v !== 3) {
+      throw new Error(`Unsupported Wrapped version: ${raw?.v ?? 'missing'}`);
+    }
 
-    // RLE decode heatmap if flagged
-    let heatmap = raw.hm || [];
+    // RLE decode heatmap if flagged. Heatmaps are fixed 7×24 grids, so reject
+    // compressed payloads that expand beyond or below that size.
+    let heatmap = (Array.isArray(raw.hm) ? raw.hm : []) as number[];
     if (raw.hm_rle && raw.hm) {
-      heatmap = rleDecode(raw.hm);
+      heatmap = rleDecode(raw.hm as number[], HEATMAP_SIZE);
+    }
+    if (heatmap.length !== HEATMAP_SIZE) {
+      throw new Error(`Invalid heatmap size: ${heatmap.length}`);
     }
 
     // Decode compact array formats to objects
-    const tp = (raw.tp || []).map((arr: any[]) => decodeProject(arr));
-    const te = (raw.te || []).map((arr: any[]) => decodeEvent(arr));
-    const sf = (raw.sf || []).map((arr: any[]) => decodeFingerprint(arr));
+    const tp = (Array.isArray(raw.tp) ? raw.tp : []).map((item) => decodeProject(item));
+    const te = (Array.isArray(raw.te) ? raw.te : []).map((item) => decodeEvent(item));
+    const sf = (Array.isArray(raw.sf) ? raw.sf : []).map((item) => decodeFingerprint(item));
 
     return {
-      v: 3,
-      y: raw.y,
-      n: raw.n,
-      p: raw.p || 0,
-      s: raw.s || 0,
-      m: raw.m || 0,
-      h: raw.h || 0,
-      d: raw.d || 0,
+      v: raw.v,
+      y: raw.y as number,
+      n: typeof raw.n === 'string' ? raw.n : undefined,
+      p: (raw.p || 0) as number,
+      s: (raw.s || 0) as number,
+      m: (raw.m || 0) as number,
+      h: (raw.h || 0) as number,
+      d: (raw.d || 0) as number,
       hm: heatmap,
-      ma: raw.ma || [],
-      mh: raw.mh || [],
-      ms: raw.ms || [],
-      sd: raw.sd || [],
-      ar: raw.ar || [],
-      ml: raw.ml || [],
-      ts: raw.ts || {
+      ma: (Array.isArray(raw.ma) ? raw.ma : []) as number[],
+      mh: (Array.isArray(raw.mh) ? raw.mh : []) as number[],
+      ms: (Array.isArray(raw.ms) ? raw.ms : []) as number[],
+      sd: (Array.isArray(raw.sd) ? raw.sd : []) as number[],
+      ar: (Array.isArray(raw.ar) ? raw.ar : []) as number[],
+      ml: (Array.isArray(raw.ml) ? raw.ml : []) as number[],
+      ts: (raw.ts || {
         ad: 50, sp: 50, fc: 50, cc: 50, wr: 50,
         bs: 50, cs: 50, mv: 50, td: 50, ri: 50
-      },
+      }) as TraitScores,
       tp,
-      pc: raw.pc || [],
+      pc: (Array.isArray(raw.pc) ? raw.pc : []) as [number, number, number][],
       te,
       sf,
-      ls: raw.ls || 0,
-      sk: raw.sk || [0, 0, 0, 0],
-      tk: raw.tk || { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
-      yoy: raw.yoy,
+      ls: (raw.ls || 0) as number,
+      sk: (Array.isArray(raw.sk) ? raw.sk : [0, 0, 0, 0]) as number[],
+      tk: (raw.tk || { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} }) as TokenStats,
+      yoy: raw.yoy as YearOverYear | undefined,
     };
   } catch (error) {
     throw new Error(`Failed to decode V3 wrapped story: ${error}`);
@@ -394,13 +428,6 @@ export function decodeWrappedStoryV3(encoded: string): WrappedStoryV3 {
  */
 export function decodeWrappedStoryAuto(encoded: string): WrappedStoryV3 {
   try {
-    const bytes = base64UrlDecode(encoded);
-    const raw = msgpack.decode(bytes);
-    const version = raw.v || 1;
-
-    if (version < 3) {
-      throw new Error(`Legacy V${version} format is no longer supported. Please regenerate your Wrapped URL.`);
-    }
     return decodeWrappedStoryV3(encoded);
   } catch (error) {
     throw new Error(`Failed to decode wrapped story: ${error}`);
@@ -558,24 +585,87 @@ export function calcYoyChange(current: number, previous: number): { value: numbe
   };
 }
 
+function isFiniteNumber(value: unknown, min = 0, max = Number.POSITIVE_INFINITY): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function validateNumberArray(name: string, value: unknown, length: number, max = Number.POSITIVE_INFINITY): string | null {
+  if (!Array.isArray(value) || value.length !== length) return `Invalid ${name} size`;
+  return value.every((item) => isFiniteNumber(item, 0, max)) ? null : `Invalid ${name} values`;
+}
+
 /**
  * Validate a V3 story
  */
 export function validateStoryV3(story: WrappedStoryV3): { valid: boolean; error?: string } {
-  if (story.v !== 3) {
+  if (!story || typeof story !== 'object' || story.v !== 3) {
     return { valid: false, error: 'Not a V3 story' };
   }
-  if (!story.y || typeof story.y !== 'number') {
-    return { valid: false, error: 'Missing or invalid year' };
-  }
-  if (story.y < 2024 || story.y > new Date().getFullYear() + 1) {
+  const currentYear = new Date().getFullYear();
+  if (!Number.isInteger(story.y) || story.y < 2024 || story.y > currentYear + 1) {
     return { valid: false, error: `Invalid year: ${story.y}` };
   }
-  if (typeof story.m !== 'number' || story.m < 0) {
-    return { valid: false, error: 'Missing or invalid message count' };
+
+  for (const [name, value] of Object.entries({ p: story.p, s: story.s, m: story.m, h: story.h, d: story.d })) {
+    if (!isFiniteNumber(value, 0)) return { valid: false, error: `Invalid ${name}` };
   }
-  if (story.hm && story.hm.length !== 168) {
-    return { valid: false, error: `Invalid heatmap size: ${story.hm.length} (expected 168)` };
+  if (story.d > 366) return { valid: false, error: 'Invalid days active' };
+
+  const arrayChecks = [
+    validateNumberArray('heatmap', story.hm, HEATMAP_SIZE, HEATMAP_QUANT_SCALE),
+    validateNumberArray('monthly activity', story.ma, 12),
+    validateNumberArray('monthly hours', story.mh, 12),
+    validateNumberArray('monthly sessions', story.ms, 12),
+    validateNumberArray('session duration distribution', story.sd, 10),
+    validateNumberArray('agent ratio distribution', story.ar, 10),
+    validateNumberArray('message length distribution', story.ml, 8),
+    validateNumberArray('streak stats', story.sk, 4),
+  ].find(Boolean);
+  if (arrayChecks) return { valid: false, error: arrayChecks };
+
+  if (!story.ts || typeof story.ts !== 'object') {
+    return { valid: false, error: 'Invalid trait scores' };
   }
+  for (const code of TRAIT_CODES) {
+    if (!isFiniteNumber((story.ts as unknown as Record<string, unknown>)[code], 0, 100)) {
+      return { valid: false, error: `Invalid trait score: ${code}` };
+    }
+  }
+
+  if (!Array.isArray(story.tp) || story.tp.length > MAX_PROJECTS) {
+    return { valid: false, error: 'Invalid top projects' };
+  }
+  for (const project of story.tp) {
+    if (!project || typeof project.n !== 'string' || project.n.length > MAX_PROJECT_NAME_LENGTH) return { valid: false, error: 'Invalid project name' };
+    if (![project.m, project.h, project.d, project.s].every((value) => isFiniteNumber(value, 0))) return { valid: false, error: 'Invalid project stats' };
+    if (!isFiniteNumber(project.ar, 0, 100)) return { valid: false, error: 'Invalid project agent ratio' };
+  }
+
+  if (!Array.isArray(story.pc) || story.pc.length > MAX_COOCCURRENCE_EDGES || !story.pc.every((edge) => Array.isArray(edge) && edge.length === 3 && edge.every((value) => isFiniteNumber(value, 0)))) {
+    return { valid: false, error: 'Invalid project co-occurrence' };
+  }
+  if (!Array.isArray(story.te) || story.te.length > MAX_TIMELINE_EVENTS || !story.te.every((event) => event && isFiniteNumber(event.d, 1, 366) && isFiniteNumber(event.t, 0, EVENT_TYPES.length - 1) && (event.v === undefined || isFiniteNumber(event.v, 0)) && (event.p === undefined || isFiniteNumber(event.p, 0)))) {
+    return { valid: false, error: 'Invalid timeline events' };
+  }
+  if (!Array.isArray(story.sf) || story.sf.length > MAX_SESSION_FINGERPRINTS || !story.sf.every((fp) => fp && isFiniteNumber(fp.d, 0) && isFiniteNumber(fp.m, 0) && typeof fp.a === 'boolean' && isFiniteNumber(fp.h, 0, 23) && isFiniteNumber(fp.w, 0, 6) && isFiniteNumber(fp.pi, 0) && validateNumberArray('fingerprint', fp.fp, 8, 100) === null)) {
+    return { valid: false, error: 'Invalid session fingerprints' };
+  }
+  if (!isFiniteNumber(story.ls, 0)) {
+    return { valid: false, error: 'Invalid longest session' };
+  }
+  if (story.n !== undefined && (typeof story.n !== 'string' || story.n.length > MAX_DISPLAY_NAME_LENGTH)) {
+    return { valid: false, error: 'Invalid display name' };
+  }
+  if (!story.tk || typeof story.tk !== 'object') {
+    return { valid: false, error: 'Invalid token stats' };
+  }
+  for (const value of [story.tk.total, story.tk.input, story.tk.output, story.tk.cache_read, story.tk.cache_create]) {
+    if (!isFiniteNumber(value, 0)) return { valid: false, error: 'Invalid token count' };
+  }
+  if (!story.tk.models || typeof story.tk.models !== 'object') return { valid: false, error: 'Invalid token models' };
+  for (const [model, tokens] of Object.entries(story.tk.models)) {
+    if (model.length > 80 || !isFiniteNumber(tokens, 0)) return { valid: false, error: 'Invalid token model entry' };
+  }
+
   return { valid: true };
 }

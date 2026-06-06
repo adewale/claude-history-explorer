@@ -38,7 +38,6 @@ from .constants import (
     DEFAULT_SHOW_LIMIT,
     DEFAULT_SEARCH_LIMIT,
     DATETIME_FORMAT,
-    DATETIME_FORMAT_FULL,
     WRAPPED_URL_DOMAIN,
 )
 from .history import (
@@ -56,9 +55,7 @@ from .history import (
     generate_wrapped_story_v3,
     encode_wrapped_story_v3,
     decode_wrapped_story_v3,
-    classify_project,
     get_work_type_name,
-    WORK_TYPE_INFO,
     ProjectStats,
     GlobalStats,
     ProjectStory,
@@ -88,17 +85,20 @@ def _sanitize_output_path(output: str) -> Path:
     """
     path = Path(output)
 
-    # For relative paths, check for parent directory traversal
+    # For relative paths, check for parent directory traversal.
+    # Use Path.relative_to rather than string-prefix checks so sibling paths like
+    # ../project2 are not mistaken for children of ../project.
     if not path.is_absolute():
         try:
-            # Resolve to catch traversal attempts like foo/../../../etc/passwd
-            resolved = (Path.cwd() / path).resolve()
-            if not str(resolved).startswith(str(Path.cwd().resolve())):
-                raise click.ClickException(
-                    f"Path escapes current directory: {output}\n"
-                    "Use a path within the current directory."
-                )
-        except (OSError, ValueError) as e:
+            cwd = Path.cwd().resolve()
+            resolved = (cwd / path).resolve()
+            resolved.relative_to(cwd)
+        except ValueError:
+            raise click.ClickException(
+                f"Path escapes current directory: {output}\n"
+                "Use a path within the current directory."
+            )
+        except OSError as e:
             raise click.ClickException(f"Invalid output path: {output} ({e})")
 
     return path
@@ -486,42 +486,45 @@ def search(
     console.print()
 
     results_count = 0
-    for session, messages in search_sessions(pattern, proj, case_sensitive):
-        if results_count >= limit:
-            break
+    try:
+        for session, messages in search_sessions(pattern, proj, case_sensitive):
+            if results_count >= limit:
+                break
 
-        console.print(
-            Panel(
-                f"[bold]Session:[/bold] {session.session_id[:12]}...\n"
-                f"[bold]Project:[/bold] {session.project_path}\n"
-                f"[bold]Matches:[/bold] {len(messages)}",
-                title="Match Found",
-                border_style="green",
+            console.print(
+                Panel(
+                    f"[bold]Session:[/bold] {session.session_id[:12]}...\n"
+                    f"[bold]Project:[/bold] {session.project_path}\n"
+                    f"[bold]Matches:[/bold] {len(messages)}",
+                    title="Match Found",
+                    border_style="green",
+                )
             )
-        )
 
-        for msg in messages[:3]:  # Show first 3 matching messages
-            role_style = "blue" if msg.role == "user" else "green"
-            console.print(f"[{role_style}]{msg.role.upper()}:[/{role_style}]")
+            for msg in messages[:3]:  # Show first 3 matching messages
+                role_style = "blue" if msg.role == "user" else "green"
+                console.print(f"[{role_style}]{msg.role.upper()}:[/{role_style}]")
 
-            # Show context around match
-            content = msg.content
-            flags = 0 if case_sensitive else re.IGNORECASE
-            match = re.search(pattern, content, flags)
-            if match:
-                start = max(0, match.start() - context)
-                end = min(len(content), match.end() + context)
-                snippet = content[start:end]
-                if start > 0:
-                    snippet = "..." + snippet
-                if end < len(content):
-                    snippet = snippet + "..."
-                console.print(f"  {snippet}")
-            else:
-                console.print(f"  {truncate(content, SEARCH_TRUNCATION_LIMIT)}")
+                # Show context around match
+                content = msg.content
+                flags = 0 if case_sensitive else re.IGNORECASE
+                match = re.search(pattern, content, flags)
+                if match:
+                    start = max(0, match.start() - context)
+                    end = min(len(content), match.end() + context)
+                    snippet = content[start:end]
+                    if start > 0:
+                        snippet = "..." + snippet
+                    if end < len(content):
+                        snippet = snippet + "..."
+                    console.print(f"  {snippet}")
+                else:
+                    console.print(f"  {truncate(content, SEARCH_TRUNCATION_LIMIT)}")
 
-        console.print()
-        results_count += 1
+            console.print()
+            results_count += 1
+    except (ValueError, re.error) as e:
+        raise click.ClickException(f"Invalid regex: {e}")
 
     if results_count == 0:
         console.print("[yellow]No matches found.[/yellow]")
@@ -800,7 +803,7 @@ def info(example: bool):
 
         size_mb = total_size / (1024 * 1024)
 
-        console.print(f"\n[bold]Statistics:[/bold]")
+        console.print("\n[bold]Statistics:[/bold]")
         console.print(f"  Projects: {len(all_projects)}")
         console.print(f"  Sessions: {total_sessions}")
         console.print(f"  Total size: {size_mb:.1f} MB")
@@ -1109,7 +1112,11 @@ def _generate_global_summary(stats: GlobalStats, output_format: str, show_workty
         for proj_stats in sorted(
             stats.projects, key=lambda p: p.total_sessions, reverse=True
         ):
-            bar_length = int((proj_stats.total_sessions / max_sessions) * 30)
+            bar_length = (
+                int((proj_stats.total_sessions / max_sessions) * 30)
+                if max_sessions
+                else 0
+            )
             bar = "█" * bar_length
             lines.append(
                 f"{proj_stats.project.path.split('/')[-1]:15} │{bar:30}│ {proj_stats.total_sessions}"
@@ -1322,18 +1329,18 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
         lines.extend(
             [
                 "",
-                f"🤖 Collaboration Pattern:",
+                "🤖 Collaboration Pattern:",
                 f"   Main Sessions: {story.main_sessions} (your direct work)",
                 f"   Agent Sessions: {story.agent_sessions} (delegated tasks)",
                 f"   Style: {story.collaboration_style}",
                 "",
-                f"⚡ Work Intensity:",
+                "⚡ Work Intensity:",
                 f"   Total Messages: {story.total_messages}",
                 f"   Development Time: {story.dev_time_hours:.1f} hours",
                 f"   Message Rate: {story.message_rate:.1f} messages/hour",
                 f"   Pace: {story.work_pace}",
                 "",
-                f"⏱️  Session Patterns:",
+                "⏱️  Session Patterns:",
                 f"   Average Session: {story.avg_session_hours:.1f} hours",
                 f"   Longest Session: {story.longest_session_hours:.1f} hours",
                 f"   Style: {story.session_style}",
@@ -1345,7 +1352,7 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
         if story.concurrent_claude_instances > 1:
             lines.extend(
                 [
-                    f"🔀 Parallel Workflow:",
+                    "🔀 Parallel Workflow:",
                     f"   Max concurrent instances: {story.concurrent_claude_instances}",
                     f"   Pattern: {'Heavy multi-tasking' if story.concurrent_claude_instances > 3 else 'Moderate parallelism'}",
                     "",
@@ -1354,10 +1361,10 @@ def _format_project_story(story: ProjectStory, format_type: str) -> str:
 
         lines.extend(
             [
-                f"🎭 Project Personality:",
+                "🎭 Project Personality:",
                 f"   {', '.join(story.personality_traits)}",
                 "",
-                f"💡 Key Insights:",
+                "💡 Key Insights:",
             ]
         )
 
@@ -1417,14 +1424,14 @@ def _format_global_story(story: GlobalStory, format_type: str) -> str:
             "🌍 Your Development Journey",
             "=" * 30,
             "",
-            f"📊 Overview:",
+            "📊 Overview:",
             f"   Total Projects: {story.total_projects}",
             f"   Total Messages: {story.total_messages}",
             f"   Total Development Time: {story.total_dev_time:.1f} hours",
             f"   Average Agent Ratio: {story.avg_agent_ratio:.1f}x",
             f"   Average Session Length: {story.avg_session_length:.1f} hours",
             "",
-            f"🎭 Your Development Personality:",
+            "🎭 Your Development Personality:",
         ]
 
         for trait, count in story.common_traits:
@@ -1486,10 +1493,10 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
     # Validate year range (Claude Code didn't exist before 2024)
     current_year = dt.datetime.now().year
     if year < 2024:
-        console.print(f"[red]Error: Year must be 2024 or later (Claude Code was released in 2024)[/red]")
+        console.print("[red]Error: Year must be 2024 or later (Claude Code was released in 2024)[/red]")
         return
     if year > current_year + 1:
-        console.print(f"[red]Error: Year cannot be more than 1 year in the future[/red]")
+        console.print("[red]Error: Year cannot be more than 1 year in the future[/red]")
         return
 
     # Early January suggestion
@@ -1557,7 +1564,7 @@ def _decode_wrapped_url(url_or_data: str) -> None:
     try:
         story = decode_wrapped_story_v3(encoded_data)
     except ValueError as e:
-        console.print(f"[red]Error: Failed to decode Wrapped URL[/red]")
+        console.print("[red]Error: Failed to decode Wrapped URL[/red]")
         console.print(f"[dim]{e}[/dim]")
         return
 
@@ -1620,8 +1627,8 @@ def _decode_wrapped_url(url_or_data: str) -> None:
 
     console.print("━" * 50)
     console.print()
-    console.print("[green]✓ This URL contains only aggregate statistics.[/green]")
-    console.print("[dim]  No conversation content, code, or file paths.[/dim]")
+    console.print("[green]✓ This URL contains aggregate statistics and short project names.[/green]")
+    console.print("[dim]  No conversation content, code, full file paths, or tool inputs.[/dim]")
 
 
 def _display_wrapped_summary(story: WrappedStoryV3, url: str, year: int) -> None:

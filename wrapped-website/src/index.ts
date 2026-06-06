@@ -4,13 +4,13 @@
  * Routes:
  * - GET /           - Landing page
  * - GET /wrapped?d= - Wrapped page (Print view)
- * - GET /og/:year/:data.png - Open Graph image
+ * - GET /og/:year/:data.svg - Open Graph SVG image
  */
 
 import { Hono } from 'hono';
 import { renderLandingPage } from './pages/landing';
 import { renderPrintPage, renderErrorPage } from './pages/print';
-import { decodeWrappedStoryAuto, validateStory, validateStoryV3, isV3Story } from './decoder';
+import { decodeWrappedStoryAuto, validateStoryV3 } from './decoder';
 import { generateOgImage, getOgImageContentType } from './og';
 
 type Bindings = {
@@ -19,22 +19,48 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+const SECURITY_HEADERS = {
+  'Cache-Control': 'no-store',
+  'Referrer-Policy': 'no-referrer',
+  'X-Content-Type-Options': 'nosniff',
+  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+};
+
+function withSecurityHeaders(response: Response, extra: Record<string, string> = {}): Response {
+  for (const [key, value] of Object.entries({ ...SECURITY_HEADERS, ...extra })) {
+    response.headers.set(key, value);
+  }
+  return response;
+}
+
+function parseStrictYear(value: string): number | null {
+  if (!/^\d{4}$/.test(value)) return null;
+  const year = Number(value);
+  const currentYear = new Date().getFullYear();
+  return year >= 2024 && year <= currentYear + 1 ? year : null;
+}
+
+function isBase64Url(value: string): boolean {
+  return BASE64URL_RE.test(value);
+}
+
 // Landing page
 app.get('/', (c) => {
-  return c.html(renderLandingPage());
+  return withSecurityHeaders(c.html(renderLandingPage()));
 });
 
 // Health check
 app.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+  return withSecurityHeaders(c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 });
 
 // Wrapped page with query parameter
 app.get('/wrapped', (c) => {
   const encodedData = c.req.query('d');
 
-  if (!encodedData) {
-    return c.html(renderErrorPage('Missing data parameter. URL should include ?d=encodedData'), 400);
+  if (!encodedData || !isBase64Url(encodedData)) {
+    return withSecurityHeaders(c.html(renderErrorPage('Missing or invalid data parameter. URL should include ?d=encodedData'), 400));
   }
 
   // Decode story (auto-detects version)
@@ -42,29 +68,34 @@ app.get('/wrapped', (c) => {
   try {
     story = decodeWrappedStoryAuto(encodedData);
   } catch (error) {
-    return c.html(renderErrorPage('Invalid Wrapped URL. The data could not be decoded.'), 400);
+    return withSecurityHeaders(c.html(renderErrorPage('Invalid Wrapped URL. The data could not be decoded.'), 400));
   }
 
-  // Validate story based on version
-  const validation = isV3Story(story) ? validateStoryV3(story) : validateStory(story);
+  const validation = validateStoryV3(story);
   if (!validation.valid) {
-    return c.html(renderErrorPage(validation.error || 'Invalid data'), 400);
+    return withSecurityHeaders(c.html(renderErrorPage(validation.error || 'Invalid data'), 400));
   }
 
   const year = story.y;
+  const origin = new URL(c.req.url).origin;
 
-  return c.html(renderPrintPage({ story, year, encodedData }));
+  return withSecurityHeaders(c.html(renderPrintPage({ story, year, encodedData, origin })));
 });
 
 // OG Image endpoint
 app.get('/og/:year/:data', async (c) => {
-  const year = parseInt(c.req.param('year'));
-  const encodedData = c.req.param('data').replace(/\.png$/, '');
+  const year = parseStrictYear(c.req.param('year'));
+  const dataParam = c.req.param('data');
+  if (dataParam.endsWith('.png')) {
+    return withSecurityHeaders(c.text('OG previews are SVG; use .svg', 400));
+  }
+  const encodedData = dataParam.replace(/\.svg$/, '');
 
-  // Validate year
-  const currentYear = new Date().getFullYear();
-  if (isNaN(year) || year < 2024 || year > currentYear + 1) {
-    return c.text('Invalid year', 400);
+  if (year === null) {
+    return withSecurityHeaders(c.text('Invalid year', 400));
+  }
+  if (!isBase64Url(encodedData)) {
+    return withSecurityHeaders(c.text('Invalid data', 400));
   }
 
   // Decode story (auto-detects version)
@@ -72,66 +103,60 @@ app.get('/og/:year/:data', async (c) => {
   try {
     story = decodeWrappedStoryAuto(encodedData);
   } catch (error) {
-    return c.text('Invalid data', 400);
+    return withSecurityHeaders(c.text('Invalid data', 400));
+  }
+
+  const validation = validateStoryV3(story);
+  if (!validation.valid) {
+    return withSecurityHeaders(c.text(validation.error || 'Invalid data', 400));
   }
 
   // Validate year matches
   if (story.y !== year) {
-    return c.text('Year mismatch', 400);
-  }
-
-  // Check cache first
-  const cacheKey = new Request(c.req.url);
-  const cachedResponse = await caches.default.match(cacheKey);
-  if (cachedResponse) {
-    return cachedResponse;
+    return withSecurityHeaders(c.text('Year mismatch', 400));
   }
 
   try {
-    // Generate image
-    const png = await generateOgImage(story, year);
-
-    const response = new Response(png, {
+    const svg = await generateOgImage(story, year);
+    return withSecurityHeaders(new Response(svg, {
       headers: {
         'Content-Type': getOgImageContentType(),
-        'Cache-Control': 'public, max-age=31536000, immutable',
       },
+    }), {
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox",
     });
-
-    // Cache the response
-    c.executionCtx.waitUntil(caches.default.put(cacheKey, response.clone()));
-
-    return response;
   } catch (error) {
     console.error('OG image generation failed:', error);
-    return c.text('Failed to generate image', 500);
+    return withSecurityHeaders(c.text('Failed to generate image', 500));
   }
 });
 
 // Legacy route - redirect to /wrapped with query param
 app.get('/:year/:data', (c) => {
-  const year = parseInt(c.req.param('year'));
+  const year = parseStrictYear(c.req.param('year'));
   const encodedData = c.req.param('data');
 
-  // Validate year format
-  const currentYear = new Date().getFullYear();
-  if (isNaN(year) || year < 2024 || year > currentYear + 1) {
-    return c.html(renderErrorPage(`Invalid year. Claude Code Wrapped is available for 2024-${currentYear}.`), 400);
+  if (year === null) {
+    const currentYear = new Date().getFullYear();
+    return withSecurityHeaders(c.html(renderErrorPage(`Invalid year. Claude Code Wrapped is available for 2024-${currentYear}.`), 400));
+  }
+  if (!isBase64Url(encodedData)) {
+    return withSecurityHeaders(c.html(renderErrorPage('Invalid data parameter.'), 400));
   }
 
   // Redirect to new URL format
-  return c.redirect(`/wrapped?d=${encodedData}`);
+  return c.redirect(`/wrapped?d=${encodeURIComponent(encodedData)}`);
 });
 
 // 404 handler
 app.notFound((c) => {
-  return c.html(renderErrorPage('Page not found'), 404);
+  return withSecurityHeaders(c.html(renderErrorPage('Page not found'), 404));
 });
 
 // Error handler
 app.onError((err, c) => {
   console.error('Error:', err);
-  return c.html(renderErrorPage('An unexpected error occurred'), 500);
+  return withSecurityHeaders(c.html(renderErrorPage('An unexpected error occurred'), 500));
 });
 
 export default app;

@@ -1,5 +1,7 @@
 # Wrapped Architecture
 
+> **Current implementation note:** The live implementation is V3-only and uses `/wrapped?d=...` on `wrapped-claude-codes.adewale-883.workers.dev`. Historical examples in this document that use `wrapped.claude.codes/{year}/{data}`, KV counters, Queues/R2, Durable Objects, Browser Rendering, or generated PNG storage are proposal/future architecture notes, not current behavior.
+
 ## End-to-End Flow
 
 ```
