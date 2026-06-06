@@ -1,4 +1,7 @@
 # Claude History Explorer
+
+[![CI](https://github.com/adewale/claude-history-explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/adewale/claude-history-explorer/actions/workflows/ci.yml)
+
 A Python CLI tool to explore, search and visualise your Claude Code conversation history.
 The history is stored locally at `~/.claude/projects/` and this tool turns raw JSONL files into searchable conversations and insights about your coding journey.
 
