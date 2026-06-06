@@ -203,29 +203,32 @@ def mock_global_story(mock_project_story):
 class TestProjectsCommand:
     """Tests for the 'projects' command."""
 
-    def test_projects_with_data(self, runner, mock_project):
+    def test_projects_with_data(self, runner, mock_project, tmp_path):
         """Test projects command with existing projects."""
-        with patch('claude_history_explorer.cli.list_projects', return_value=[mock_project]):
-            result = runner.invoke(main, ['projects'])
+        with patch('claude_history_explorer.cli.get_projects_dir', return_value=tmp_path):
+            with patch('claude_history_explorer.cli.list_projects', return_value=[mock_project]):
+                result = runner.invoke(main, ['projects'])
 
-            assert result.exit_code == 0
-            assert 'myproject' in result.output or 'Projects' in result.output
+                assert result.exit_code == 0
+                assert 'myproject' in result.output or 'Projects' in result.output
 
-    def test_projects_empty(self, runner):
+    def test_projects_empty(self, runner, tmp_path):
         """Test projects command with no projects."""
-        with patch('claude_history_explorer.cli.list_projects', return_value=[]):
-            result = runner.invoke(main, ['projects'])
+        with patch('claude_history_explorer.cli.get_projects_dir', return_value=tmp_path):
+            with patch('claude_history_explorer.cli.list_projects', return_value=[]):
+                result = runner.invoke(main, ['projects'])
 
-            assert result.exit_code == 0
-            assert 'No projects found' in result.output or '0 total' in result.output
+                assert result.exit_code == 0
+                assert 'No projects found' in result.output or '0 total' in result.output
 
-    def test_projects_with_limit(self, runner, mock_project):
+    def test_projects_with_limit(self, runner, mock_project, tmp_path):
         """Test projects command with --limit option."""
         projects = [mock_project] * 10
-        with patch('claude_history_explorer.cli.list_projects', return_value=projects):
-            result = runner.invoke(main, ['projects', '-n', '5'])
+        with patch('claude_history_explorer.cli.get_projects_dir', return_value=tmp_path):
+            with patch('claude_history_explorer.cli.list_projects', return_value=projects):
+                result = runner.invoke(main, ['projects', '-n', '5'])
 
-            assert result.exit_code == 0
+                assert result.exit_code == 0
 
     def test_projects_example_flag(self, runner):
         """Test projects command with --example flag."""

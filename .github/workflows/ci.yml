@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.13']
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Node.js for cross-language tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: wrapped-website/package-lock.json
+
+      - name: Install Wrapped website dependencies
+        working-directory: wrapped-website
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: uv sync --locked --dev --python '${{ matrix.python-version }}'
+
+      - name: Lint Python
+        run: uv run --locked ruff check .
+
+      - name: Test Python
+        run: uv run --locked pytest -q
+
+  wrapped-website:
+    name: Wrapped website
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: wrapped-website/package-lock.json
+
+      - name: Install dependencies
+        working-directory: wrapped-website
+        run: npm ci
+
+      - name: Test
+        working-directory: wrapped-website
+        run: npm test
+
+      - name: Typecheck
+        working-directory: wrapped-website
+        run: npm run typecheck
+
+      - name: Audit production dependencies
+        working-directory: wrapped-website
+        run: npm audit --omit=dev
+
+      - name: Audit all dependencies
+        working-directory: wrapped-website
+        run: npm audit
