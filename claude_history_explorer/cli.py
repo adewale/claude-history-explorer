@@ -310,10 +310,9 @@ def projects(limit: int, example: bool):
 @main.command()
 @click.argument("project_search", required=False)
 @click.option("--limit", "-n", default=DEFAULT_SESSIONS_LIMIT, help="Maximum number of sessions to show")
-@click.option("--head", is_flag=True, default=True, is_eager=True, help="Show most recent sessions (default)")
 @click.option("--tail", "-t", is_flag=True, help="Show oldest sessions instead of most recent")
 @click.option("--example", is_flag=True, help="Show usage examples")
-def sessions(project_search: str, limit: int, head: bool, tail: bool, example: bool):
+def sessions(project_search: str, limit: int, tail: bool, example: bool):
     """List sessions for a project.
 
     PROJECT_SEARCH can be a partial path match (e.g., 'myproject' or 'Documents/work')
@@ -371,11 +370,10 @@ def sessions(project_search: str, limit: int, head: bool, tail: bool, example: b
 @click.argument("session_id", required=False)
 @click.option("--project", "-p", default=None, help="Project path to search in")
 @click.option("--limit", "-n", default=DEFAULT_SHOW_LIMIT, help="Maximum messages to show")
-@click.option("--head", is_flag=True, default=True, is_eager=True, help="Show first N messages (default)")
 @click.option("--tail", "-t", is_flag=True, help="Show last N messages instead of first")
 @click.option("--raw", is_flag=True, help="Show raw JSON output")
 @click.option("--example", is_flag=True, help="Show usage examples")
-def show(session_id: str, project: str, limit: int, head: bool, tail: bool, raw: bool, example: bool):
+def show(session_id: str, project: str, limit: int, tail: bool, raw: bool, example: bool):
     """Show messages from a specific session.
 
     SESSION_ID can be a partial match of the session ID.
@@ -502,7 +500,7 @@ def search(
 
     results_count = 0
     try:
-        for session, messages in search_sessions(pattern, proj, case_sensitive):
+        for session, messages, compiled_re in search_sessions(pattern, proj, case_sensitive):
             if results_count >= limit:
                 break
 
@@ -516,14 +514,12 @@ def search(
                 )
             )
 
-            for msg in messages[:3]:  # Show first 3 matching messages
+            for msg in messages[:3]:
                 role_style = "blue" if msg.role == "user" else "green"
                 console.print(f"[{role_style}]{msg.role.upper()}:[/{role_style}]")
 
-                # Show context around match
                 content = msg.content
-                flags = 0 if case_sensitive else re.IGNORECASE
-                match = re.search(pattern, content, flags)
+                match = compiled_re.search(content)
                 if match:
                     start = max(0, match.start() - context)
                     end = min(len(content), match.end() + context)
@@ -1544,8 +1540,12 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
     encoded = encode_wrapped_story_v3(story)
     url = f"https://{WRAPPED_URL_DOMAIN}/wrapped?d={encoded}"
 
-    # Display summary
     _display_wrapped_summary(story, url, year)
+
+    console.print(
+        "\n[dim]Note: The URL contains your project names and activity data "
+        "in a reversible encoding (base64). Anyone with the link can decode it.[/dim]"
+    )
 
     # Copy to clipboard
     if not no_copy:

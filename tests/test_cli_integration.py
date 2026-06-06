@@ -11,6 +11,7 @@ Run with: uv run pytest tests/test_cli_integration.py -v
 """
 
 import json
+import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -437,7 +438,7 @@ class TestSearchCommand:
             Message(role="user", content="Help with Python code", timestamp=datetime(2025, 12, 15, 10, 0)),
             Message(role="assistant", content="I can help with Python!", timestamp=datetime(2025, 12, 15, 10, 1)),
         ]
-        search_results = [(mock_session, matching_messages)]
+        search_results = [(mock_session, matching_messages, re.compile("."))]
 
         with patch('claude_history_explorer.cli.search_sessions', return_value=search_results):
             result = runner.invoke(main, ['search', 'Python'])
@@ -457,7 +458,7 @@ class TestSearchCommand:
         matching_messages = [
             Message(role="user", content="test content", timestamp=datetime(2025, 12, 15, 10, 0)),
         ]
-        search_results = [(mock_session, matching_messages)]
+        search_results = [(mock_session, matching_messages, re.compile("."))]
 
         with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
             with patch('claude_history_explorer.cli.search_sessions', return_value=search_results):
@@ -477,7 +478,8 @@ class TestSearchCommand:
         matching_messages = [
             Message(role="user", content="test content", timestamp=datetime(2025, 12, 15, 10, 0)),
         ]
-        search_results = [(mock_session, matching_messages)] * 20
+        dummy_re = re.compile(".")
+        search_results = [(mock_session, matching_messages, dummy_re)] * 20
 
         with patch('claude_history_explorer.cli.search_sessions', return_value=search_results):
             result = runner.invoke(main, ['search', 'test', '-n', '5'])

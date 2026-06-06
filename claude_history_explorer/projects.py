@@ -73,7 +73,7 @@ def find_project(search: str) -> Optional[Project]:
         '/Users/foo/Documents/myproject'
     """
     projects = list_projects()
-    search_lower = search.lower()
+    search_lower = search.replace("\\", "/").lower()
 
     for project in projects:
         if search_lower in project.path.lower() or search_lower in project.name.lower():

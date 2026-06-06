@@ -296,6 +296,8 @@ class TestGenerateWrappedStoryV3Integration:
         # Create mock project
         mock_project = MagicMock()
         mock_project.short_name = "IntegrationProject"
+        mock_project.basename = "IntegrationProject"
+        mock_project.name = "IntegrationProject"
         mock_project.path = "/test/integration"
         mock_project.session_files = [Path("/test/session1.jsonl"), Path("/test/session2.jsonl")]
 

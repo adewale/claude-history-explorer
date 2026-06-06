@@ -86,32 +86,31 @@ def classify(value: float, thresholds: list[tuple[float, str]], default: str) ->
     return default
 
 
-# ReDoS-vulnerable patterns: nested quantifiers like (a+)+, (a*)*
-_REDOS_PATTERN = re.compile(r"\([^)]*[+*][^)]*\)[+*]")
+_REDOS_PATTERNS = [
+    re.compile(r"\([^)]*[+*][^)]*\)[+*{]"),
+    re.compile(r"\([^)]*\|[^)]*\)[+*{]"),
+    re.compile(r"\(\.\*[^)]*\)\{"),
+]
+
+MAX_PATTERN_LENGTH = 200
 
 
 def _compile_regex_safe(pattern: str, flags: int = 0) -> re.Pattern:
-    """Compile a regex pattern with basic ReDoS protection.
-
-    Checks for patterns that could cause catastrophic backtracking and
-    raises a descriptive error if found.
-
-    Args:
-        pattern: Regular expression pattern to compile
-        flags: Regex flags (e.g., re.IGNORECASE)
-
-    Returns:
-        Compiled regex pattern
+    """Compile a regex pattern with ReDoS protection.
 
     Raises:
         ValueError: If pattern contains ReDoS-vulnerable constructs
         re.error: If pattern is not a valid regex
     """
-    # Check for nested quantifiers that can cause catastrophic backtracking
-    if _REDOS_PATTERN.search(pattern):
+    if len(pattern) > MAX_PATTERN_LENGTH:
         raise ValueError(
-            f"Pattern may cause slow matching (nested quantifiers): {pattern}"
+            f"Pattern too long ({len(pattern)} chars, max {MAX_PATTERN_LENGTH})"
         )
+    for redos_re in _REDOS_PATTERNS:
+        if redos_re.search(pattern):
+            raise ValueError(
+                f"Pattern may cause slow matching (nested quantifiers): {pattern}"
+            )
     return re.compile(pattern, flags)
 
 

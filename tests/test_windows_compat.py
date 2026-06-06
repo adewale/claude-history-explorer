@@ -14,8 +14,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from claude_history_explorer.models import Project
 from claude_history_explorer.projects import list_projects
 
@@ -109,10 +107,9 @@ class TestDecodeProjectPath:
         assert result[1] == ":"
 
     def test_fallback_does_not_use_hardcoded_slash(self):
-        """When no components exist on disk, the fallback path must still
-        be a valid, parseable path — not a mix of / and \\."""
         result = Project._decode_project_path("C--NoSuchDir-child")
-        assert "\\" not in result or "/" not in result
+        assert result.startswith("C:/"), f"Expected C:/ prefix, got {result}"
+        assert "\\" not in result, f"Unexpected backslash in {result}"
 
     def test_unix_still_works(self):
         """Existing Unix behavior must not regress."""
@@ -124,6 +121,18 @@ class TestDecodeProjectPath:
         result = Project._decode_project_path("--server-share-project")
         assert "server" in result
         assert "share" in result
+
+    def test_empty_string(self):
+        result = Project._decode_project_path("")
+        assert result  # should not crash or return empty
+
+    def test_single_component(self):
+        result = Project._decode_project_path("project")
+        assert "project" in result
+
+    def test_trailing_dash(self):
+        result = Project._decode_project_path("-Users-ade-project-")
+        assert "project" in result
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +171,18 @@ class TestProjectNameExtraction:
         p = Project(name="x", path="C:\\Users\\Moho\\my_project",
                     dir_path=Path("."), session_files=[])
         assert p.basename == "my_project"
+
+    def test_basename_root_path(self):
+        p = Project(name="x", path="/", dir_path=Path("."), session_files=[])
+        assert p.basename  # should not be empty
+
+    def test_basename_empty_path(self):
+        p = Project(name="x", path="", dir_path=Path("."), session_files=[])
+        assert p.basename  # should fall back to encoded name
+
+    def test_short_name_empty_path(self):
+        p = Project(name="encoded-name", path="", dir_path=Path("."), session_files=[])
+        assert p.short_name  # should not be empty
 
 
 # ---------------------------------------------------------------------------

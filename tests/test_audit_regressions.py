@@ -59,7 +59,7 @@ def test_search_sessions_deduplicates_message_matching_content_and_tool_input(tm
     results = list(search_sessions("needle"))
 
     assert len(results) == 1
-    _, messages = results[0]
+    _, messages, _regex = results[0]
     assert len(messages) == 1
     assert messages[0].content == "needle in content"
 

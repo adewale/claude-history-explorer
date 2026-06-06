@@ -50,6 +50,11 @@ MAX_COOCCURRENCE_EDGES = 20
 MAX_TIMELINE_EVENTS = 25
 MAX_SESSION_FINGERPRINTS = 20
 
+HEATMAP_SIZE = 168
+MAX_RLE_OUTPUT = 1024
+
+MODEL_FAMILIES = {"opus", "sonnet", "haiku"}
+
 # Heatmap quantization scale (0-15 for compact encoding)
 HEATMAP_QUANT_SCALE = 15
 
@@ -430,11 +435,11 @@ def compute_session_fingerprint(session: Session) -> List[int]:
 
     # Divide session into 4 quarters by message index
     total_messages = len(session.messages)
-    quarter_size = max(1, total_messages // 4)
 
+    boundaries = [total_messages * i // 4 for i in range(1, 5)]
     quarter_counts = [0, 0, 0, 0]
-    for i, msg in enumerate(session.messages):
-        quarter = min(3, i // quarter_size)
+    for i in range(total_messages):
+        quarter = min(3, bisect_right(boundaries, i))
         quarter_counts[quarter] += 1
 
     # Normalize quarters to 0-1
@@ -479,7 +484,7 @@ def compute_session_fingerprint(session: Session) -> List[int]:
 
 def get_top_session_fingerprints(
     sessions: List[SessionInfoV3],
-    session_file_map: Dict[str, Path],
+    session_file_map: Dict[str, Session],
     project_names: List[str],
     limit: int = MAX_SESSION_FINGERPRINTS,
 ) -> List[List]:
@@ -487,7 +492,7 @@ def get_top_session_fingerprints(
 
     Args:
         sessions: List of SessionInfoV3 with project_name set
-        session_file_map: Mapping of session_id to file path for loading
+        session_file_map: Mapping of session_id to already-parsed Session objects
         project_names: Ordered list of project names for indexing
         limit: Max fingerprints to return
 
@@ -510,17 +515,15 @@ def get_top_session_fingerprints(
 
     fingerprints = []
     for _, info in scored[:limit]:
-        # Load full session if file path available
+        # Load full session if available
         fp = [25, 50, 75, 100, 50, 10, 30, 20]  # Default fallback (quantized 0-100)
 
         if info.session_id in session_file_map:
             try:
-                full_session = parse_session(
-                    session_file_map[info.session_id], info.project_path
-                )
+                full_session = session_file_map[info.session_id]
                 fp = compute_session_fingerprint(full_session)
-            except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError, KeyError):
-                pass  # Use default fingerprint on parse/compute error
+            except (ValueError, KeyError):
+                pass  # Use default fingerprint on compute error
 
         # Compact array format: [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
         fingerprints.append(
@@ -570,12 +573,18 @@ def rle_encode(values: List[int]) -> List[int]:
     return result
 
 
-def rle_decode(encoded: List[int]) -> List[int]:
+def rle_decode(encoded: List[int], max_output: int = MAX_RLE_OUTPUT) -> List[int]:
     """Decode run-length encoded data."""
+    if len(encoded) % 2 != 0:
+        raise ValueError("RLE data must have even length")
     result = []
     for i in range(0, len(encoded), 2):
         value = encoded[i]
-        count = encoded[i + 1] if i + 1 < len(encoded) else 1
+        count = encoded[i + 1]
+        if count < 0:
+            raise ValueError(f"RLE count must be non-negative, got {count}")
+        if len(result) + count > max_output:
+            raise ValueError(f"RLE output exceeds max size {max_output}")
         result.extend([value] * count)
     return result
 
@@ -737,7 +746,7 @@ def generate_wrapped_story_v3(
 
     # Collect all sessions with project info
     all_sessions: List[SessionInfoV3] = []
-    session_file_map: Dict[str, Path] = {}  # For fingerprint computation
+    session_file_map: Dict[str, Session] = {}  # For fingerprint computation
 
     # Also collect message lengths, tools, and token usage for the target year
     all_message_lengths: List[int] = []
@@ -758,11 +767,11 @@ def generate_wrapped_story_v3(
             session = parse_session(session_file, project.path)
             is_agent = session_file.name.startswith("agent-")
             info = SessionInfoV3.from_session_with_project(
-                session, is_agent, project.short_name, project.path
+                session, is_agent, project.basename, project.path
             )
             if info is not None:
                 all_sessions.append(info)
-                session_file_map[session.session_id] = session_file
+                session_file_map[session.session_id] = session
 
                 # Collect message lengths, tools, and tokens if in target year
                 if info.start_time and info.start_time.year == year:
@@ -782,10 +791,10 @@ def generate_wrapped_story_v3(
                             token_stats["cache_create"] += tu.cache_creation_tokens
                             token_stats["total"] += tu.total_tokens
                             if tu.model:
-                                # Simplify model name for display
-                                model_short = (
-                                    tu.model.split("-")[1] if "-" in tu.model else tu.model
-                                )
+                                model_short = tu.model
+                                if "-" in tu.model:
+                                    parts = tu.model.split("-")
+                                    model_short = next((p for p in parts if p in MODEL_FAMILIES), parts[1] if len(parts) > 1 else tu.model)
                                 token_stats["models"][model_short] += tu.total_tokens
 
     # Filter to requested year

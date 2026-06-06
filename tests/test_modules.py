@@ -243,38 +243,36 @@ class TestParser:
         """Test parsing an empty session file."""
         from claude_history_explorer.parser import parse_session
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".jsonl", mode="w", delete=False
-        ) as f:
-            f.write("")
-            f.flush()
-            session = parse_session(Path(f.name), "/test")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir) / "session.jsonl"
+            f.write_text("")
+            session = parse_session(f, "/test")
             assert session.message_count == 0
 
     def test_parse_session_with_messages(self):
         """Test parsing a session with messages."""
         from claude_history_explorer.parser import parse_session
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".jsonl", mode="w", delete=False
-        ) as f:
-            f.write('{"type": "user", "message": {"content": "hello"}}\n')
-            f.write('{"type": "assistant", "message": {"content": [{"type": "text", "text": "hi"}]}}\n')
-            f.flush()
-            session = parse_session(Path(f.name), "/test")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir) / "session.jsonl"
+            f.write_text(
+                '{"type": "user", "message": {"content": "hello"}}\n'
+                '{"type": "assistant", "message": {"content": [{"type": "text", "text": "hi"}]}}\n'
+            )
+            session = parse_session(f, "/test")
             assert session.message_count == 2
 
     def test_parse_session_extracts_slug(self):
         """Test that session slug is extracted."""
         from claude_history_explorer.parser import parse_session
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".jsonl", mode="w", delete=False
-        ) as f:
-            f.write('{"slug": "test-session"}\n')
-            f.write('{"type": "user", "message": {"content": "hello"}}\n')
-            f.flush()
-            session = parse_session(Path(f.name), "/test")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir) / "session.jsonl"
+            f.write_text(
+                '{"slug": "test-session"}\n'
+                '{"type": "user", "message": {"content": "hello"}}\n'
+            )
+            session = parse_session(f, "/test")
             assert session.slug == "test-session"
 
     def test_search_sessions_with_pattern(self):
@@ -299,7 +297,7 @@ class TestParser:
             ):
                 results = list(search_sessions("NEEDLE"))
                 assert len(results) == 1
-                session, matches = results[0]
+                session, matches, _regex = results[0]
                 assert len(matches) == 1
 
 
