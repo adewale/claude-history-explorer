@@ -8,6 +8,7 @@ Usage:
     python tests/generate_schema_test_cases.py
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -19,7 +20,6 @@ from claude_history_explorer.history import (
     WrappedStoryV3,
     encode_wrapped_story_v3,
     quantize_heatmap,
-    HEATMAP_QUANT_SCALE,
 )
 
 
@@ -135,9 +135,9 @@ def generate_test_cases() -> list[dict]:
         ma=[0] * 12,
         mh=[0] * 12,
         ms=[0] * 12,
-        sd=[],
-        ar=[],
-        ml=[],
+        sd=[0] * 10,
+        ar=[0] * 10,
+        ml=[0] * 8,
         ts={"ad": 50, "sp": 50, "fc": 50, "cc": 50, "wr": 50,
             "bs": 50, "cs": 50, "mv": 50, "td": 50, "ri": 50},
         tp=[["Test", 10, 1, 1, 1, 50]],  # name, msgs, hours, days, sessions, ratio
@@ -226,15 +226,15 @@ def generate_test_cases() -> list[dict]:
         ma=[10] * 12,
         mh=[1] * 12,
         ms=[1] * 12,
-        sd=[],
-        ar=[],
-        ml=[],
+        sd=[0] * 10,
+        ar=[0] * 10,
+        ml=[0] * 8,
         ts={"ad": 50, "sp": 50, "fc": 50, "cc": 50, "wr": 50,
             "bs": 50, "cs": 50, "mv": 50, "td": 50, "ri": 50},
         tp=[
-            ["Emoji Project", 30, 3, 2, 3, 40],
-            ["Cafe Project", 35, 4, 2, 4, 50],
-            ["Nihongo Project", 35, 3, 1, 3, 60],
+            ["Emoji ☕ Project", 30, 3, 2, 3, 40],
+            ["Café Project", 35, 4, 2, 4, 50],
+            ["日本語プロジェクト", 35, 3, 1, 3, 60],
         ],
         pc=[],
         te=[],
@@ -265,9 +265,9 @@ def generate_test_cases() -> list[dict]:
         ma=[0] * 12,
         mh=[0] * 12,
         ms=[0] * 12,
-        sd=[],
-        ar=[],
-        ml=[],
+        sd=[0] * 10,
+        ar=[0] * 10,
+        ml=[0] * 8,
         ts={"ad": 0, "sp": 100, "fc": 0, "cc": 100, "wr": 0,
             "bs": 100, "cs": 0, "mv": 100, "td": 0, "ri": 100},
         tp=[],
@@ -288,8 +288,8 @@ def generate_test_cases() -> list[dict]:
 
     # =========================================================================
     # Test Case 5: Empty optional arrays (tp, te, sf, pc can be empty)
-    # Note: ts, sk, tk need values because empty {} and [] are truthy in JS,
-    # so the decoder won't apply defaults for them.
+    # Fixed-size temporal/distribution arrays must still be present at their
+    # canonical lengths because production validation enforces them.
     # =========================================================================
     empty_optional = WrappedStoryV3(
         y=2025,
@@ -298,13 +298,13 @@ def generate_test_cases() -> list[dict]:
         m=50,
         h=5,
         d=3,
-        hm=[],  # Empty heatmap (allowed)
-        ma=[],
-        mh=[],
-        ms=[],
-        sd=[],
-        ar=[],
-        ml=[],
+        hm=[0] * 168,
+        ma=[0] * 12,
+        mh=[0] * 12,
+        ms=[0] * 12,
+        sd=[0] * 10,
+        ar=[0] * 10,
+        ml=[0] * 8,
         ts={"ad": 50, "sp": 50, "fc": 50, "cc": 50, "wr": 50,
             "bs": 50, "cs": 50, "mv": 50, "td": 50, "ri": 50},
         tp=[],  # No projects - valid
@@ -375,9 +375,9 @@ def generate_test_cases() -> list[dict]:
         ma=[20] * 12,
         mh=[2] * 12,
         ms=[2] * 12,
-        sd=[],
-        ar=[],
-        ml=[],
+        sd=[0] * 10,
+        ar=[0] * 10,
+        ml=[0] * 8,
         ts={"ad": 50, "sp": 50, "fc": 50, "cc": 50, "wr": 50,
             "bs": 50, "cs": 50, "mv": 50, "td": 50, "ri": 50},
         tp=[
@@ -400,7 +400,7 @@ def generate_test_cases() -> list[dict]:
     )
     cases.append({
         "id": "all_event_types",
-        "description": "All 5 timeline event types",
+        "description": "All 7 timeline event types",
         "encoded": encode_wrapped_story_v3(all_events),
         "expected": story_to_expected_json(all_events),
     })
@@ -419,9 +419,9 @@ def generate_test_cases() -> list[dict]:
         ma=[10] * 12,
         mh=[1] * 12,
         ms=[1] * 12,
-        sd=[],
-        ar=[],
-        ml=[],
+        sd=[0] * 10,
+        ar=[0] * 10,
+        ml=[0] * 8,
         ts={"ad": 50, "sp": 50, "fc": 50, "cc": 50, "wr": 50,
             "bs": 50, "cs": 50, "mv": 50, "td": 50, "ri": 50},
         tp=[["Test Project", 100, 10, 5, 5, 50]],
@@ -462,9 +462,9 @@ def generate_test_cases() -> list[dict]:
         ma=[50] * 12,
         mh=[5] * 12,
         ms=[5] * 12,
-        sd=[],
-        ar=[],
-        ml=[],
+        sd=[0] * 10,
+        ar=[0] * 10,
+        ml=[0] * 8,
         ts={"ad": 50, "sp": 50, "fc": 50, "cc": 50, "wr": 50,
             "bs": 50, "cs": 50, "mv": 50, "td": 50, "ri": 50},
         tp=[["RLE Test", 500, 50, 20, 50, 50]],
@@ -497,9 +497,9 @@ def generate_test_cases() -> list[dict]:
         ma=[0] * 12,
         mh=[0] * 12,
         ms=[0] * 12,
-        sd=[],
-        ar=[],
-        ml=[],
+        sd=[0] * 10,
+        ar=[0] * 10,
+        ml=[0] * 8,
         ts={"ad": 50, "sp": 50, "fc": 50, "cc": 50, "wr": 50,
             "bs": 50, "cs": 50, "mv": 50, "td": 50, "ri": 50},
         tp=[["Float Test", 10, 1, 1, 1, 50]],
@@ -533,8 +533,16 @@ def write_test_cases(output_path: Path) -> None:
 
 def main():
     """Main entry point."""
-    output_path = Path(__file__).parent / "fixtures" / "schema_test_cases.json"
-    write_test_cases(output_path)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path(__file__).parent / "fixtures" / "schema_test_cases.json",
+        help="Path to write generated schema cases",
+    )
+    args = parser.parse_args()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    write_test_cases(args.output)
 
 
 if __name__ == "__main__":

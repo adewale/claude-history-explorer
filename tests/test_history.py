@@ -3,8 +3,8 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, mock_open, MagicMock
-from datetime import datetime
+from unittest.mock import patch, MagicMock
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -28,6 +28,17 @@ from claude_history_explorer.history import (
     encode_wrapped_story_v3,
     decode_wrapped_story_v3,
     MESSAGE_LENGTH_BUCKETS,
+    rle_encode,
+    rle_decode,
+    rle_encode_if_smaller,
+    compute_activity_heatmap,
+    compute_distribution,
+    compute_session_duration_distribution,
+    compute_agent_ratio_distribution,
+    compute_project_cooccurrence,
+    detect_timeline_events,
+    SESSION_DURATION_BUCKETS,
+    AGENT_RATIO_BUCKETS,
 )
 
 
@@ -551,6 +562,8 @@ class TestReadOnlyBehavior:
             # Test all functions that work with files
             project = Project.from_dir(temp_path)
             session = history.parse_session(test_file, "/test")
+            assert project.session_count == 1
+            assert session.message_count == 1
             
             # Verify no files were created or modified
             original_files = list(temp_path.rglob("*"))
@@ -732,12 +745,9 @@ class TestErrorHandling:
             with open(session_file, "wb") as f:
                 f.write(b'\x80\x81\x82\x83')
 
-            # Should handle encoding errors gracefully
-            try:
-                session = history.parse_session(session_file, "/test")
-                # May succeed with empty messages or raise an error
-            except UnicodeDecodeError:
-                pass  # Expected for invalid encoding
+            # Should handle encoding errors gracefully by skipping invalid lines
+            session = history.parse_session(session_file, "/test")
+            assert session.message_count == 0
 
     def test_content_extraction_fallbacks(self):
         """G9: Test content extraction from various message formats."""
@@ -761,9 +771,17 @@ class TestErrorHandling:
             ]}},
         ]
 
-        for data in test_cases:
-            message = Message.from_json(data)
-            # Should not crash on any of these formats
+        messages = [Message.from_json(data) for data in test_cases]
+        assert [msg.content if msg else None for msg in messages] == [
+            "Simple string",
+            "From list",
+            None,
+            None,
+            None,
+            "Part 1\nPart 2",
+        ]
+        assert messages[-1] is not None
+        assert messages[-1].tool_uses == [{"name": "test", "input": {}}]
 
     def test_malformed_message_structure(self):
         """Test handling of malformed message structures."""
@@ -776,32 +794,9 @@ class TestErrorHandling:
         ]
 
         for data in test_cases:
-            message = Message.from_json(data)
-            # Should return None for invalid structures, not crash
-            # (some may return None, some may extract partial data)
+            assert Message.from_json(data) is None
 
 
-from datetime import datetime, timedelta
-from claude_history_explorer.history import (
-    SessionInfoV3,
-    ProjectStatsV3,
-    WrappedStoryV3,
-    rle_encode,
-    rle_decode,
-    rle_encode_if_smaller,
-    compute_activity_heatmap,
-    compute_distribution,
-    compute_session_duration_distribution,
-    compute_agent_ratio_distribution,
-    compute_trait_scores,
-    compute_project_cooccurrence,
-    detect_timeline_events,
-    compute_session_fingerprint,
-    encode_wrapped_story_v3,
-    decode_wrapped_story_v3,
-    SESSION_DURATION_BUCKETS,
-    AGENT_RATIO_BUCKETS,
-)
 
 
 class TestRLEEncoding:
@@ -2226,7 +2221,7 @@ class TestIntegerHours:
         )
 
         for proj in story.tp:
-            assert isinstance(proj['h'], int), f"tp project h should be int"
+            assert isinstance(proj['h'], int), "tp project h should be int"
 
     def test_encode_decode_preserves_integer_types(self):
         """Test that encoding and decoding preserves integer types for hours and trait scores."""
@@ -2252,7 +2247,7 @@ class TestIntegerHours:
         decoded = decode_wrapped_story_v3(encoded)
 
         # Verify integer types preserved
-        assert isinstance(decoded.h, int), f"decoded.h should be int"
+        assert isinstance(decoded.h, int), "decoded.h should be int"
         for i, v in enumerate(decoded.mh):
             assert isinstance(v, int), f"decoded.mh[{i}] should be int"
         for trait, v in decoded.ts.items():
@@ -2295,7 +2290,7 @@ class TestGenerateProjectStory:
     def test_generate_project_story_basic(self):
         """Test basic project story generation."""
         from datetime import timedelta
-        from claude_history_explorer.history import generate_project_story, parse_session
+        from claude_history_explorer.history import generate_project_story
 
         base_time = datetime(2025, 12, 1, 10, 0)
         sessions_data = [
@@ -2386,7 +2381,6 @@ class TestGenerateProjectStory:
 
     def test_generate_project_story_work_pace_classification(self):
         """Test work pace classification based on message rate."""
-        from datetime import timedelta
         from claude_history_explorer.history import generate_project_story
 
         base_time = datetime(2025, 12, 1, 10, 0)

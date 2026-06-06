@@ -1,6 +1,5 @@
 """Tests for work type classification."""
 
-import pytest
 from claude_history_explorer.history import (
     classify_project,
     get_work_type_name,

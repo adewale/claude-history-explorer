@@ -3,7 +3,7 @@
  * Tufte-inspired with high information density
  */
 
-import { WrappedStoryV3, formatNumber, getTraitDescription, TokenStats } from '../decoder';
+import { WrappedStoryV3, formatNumber } from '../decoder';
 import { HEATMAP_QUANT_SCALE } from '../constants';
 
 function escapeHtml(str: string): string {
@@ -16,11 +16,18 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function formatTokens(tokens: number): string {
-  if (tokens >= 1000000000) return (tokens / 1000000000).toFixed(1) + 'B';
-  if (tokens >= 1000000) return (tokens / 1000000).toFixed(1) + 'M';
-  if (tokens >= 1000) return (tokens / 1000).toFixed(1) + 'K';
-  return tokens.toString();
+function safeNumber(value: unknown, fallback = 0, min = 0, max = Number.POSITIVE_INFINITY): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback;
+}
+
+function formatTokens(tokens: unknown): string {
+  const safeTokens = safeNumber(tokens);
+  if (safeTokens >= 1000000000) return (safeTokens / 1000000000).toFixed(1) + 'B';
+  if (safeTokens >= 1000000) return (safeTokens / 1000000).toFixed(1) + 'M';
+  if (safeTokens >= 1000) return (safeTokens / 1000).toFixed(1) + 'K';
+  return safeTokens.toString();
 }
 
 function getModelDisplayName(model: string): string {
@@ -44,7 +51,7 @@ function renderHeatmapSvg(hm: number[]): string {
   for (let d = 0; d < 7; d++) {
     cells += `<text x="0" y="${d * (cellSize + gap) + cellSize - 1}" fill="#333" font-size="8" font-family="sans-serif">${days[d]}</text>`;
     for (let h = 0; h < 24; h++) {
-      const value = hm[d * 24 + h] || 0;
+      const value = safeNumber(hm[d * 24 + h], 0, 0, HEATMAP_QUANT_SCALE);
       const opacity = value / HEATMAP_QUANT_SCALE;
       const x = labelWidth + h * (cellSize + gap);
       const y = d * (cellSize + gap);
@@ -64,12 +71,13 @@ function renderHeatmapSvg(hm: number[]): string {
 
 function renderSparkline(data: number[]): string {
   if (!data || data.length === 0) return '';
+  const safeData = data.map((value) => safeNumber(value));
   const width = 280;
   const height = 56;
-  const max = Math.max(...data, 1);
-  const barWidth = (width / data.length) - 2;
+  const max = Math.max(...safeData, 1);
+  const barWidth = (width / safeData.length) - 2;
 
-  const bars = data.map((val, i) => {
+  const bars = safeData.map((val, i) => {
     const barHeight = Math.max((val / max) * height, 1);
     const x = i * (barWidth + 2);
     const y = height - barHeight;
@@ -85,11 +93,13 @@ interface RenderOptions {
   story: WrappedStoryV3;
   year: number;
   encodedData: string;
+  origin?: string;
 }
 
-export function renderPrintPage({ story, year, encodedData }: RenderOptions): string {
-  const displayName = story.n || 'Developer';
-  const monthlyActivity = story.ma;
+export function renderPrintPage({ story, year, encodedData, origin = '' }: RenderOptions): string {
+  const displayName = typeof story.n === 'string' ? story.n : 'Developer';
+  const monthlyActivity = Array.isArray(story.ma) ? story.ma : [];
+  const ogImageUrl = `${origin}/og/${year}/${encodeURIComponent(encodedData)}.svg`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -97,9 +107,13 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(displayName)}'s Unofficial Claude Code Wrapped ${year}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+  <meta name="description" content="${escapeHtml(displayName)}'s Unofficial Claude Code Wrapped ${year}">
+  <meta property="og:title" content="Unofficial Claude Code Wrapped ${year}">
+  <meta property="og:description" content="${escapeHtml(displayName)}'s year in review with Claude Code">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="${escapeHtml(ogImageUrl)}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="${escapeHtml(ogImageUrl)}">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -115,7 +129,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     }
 
     body {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: Georgia, 'Times New Roman', serif;
       color: var(--text);
       background: white;
       max-width: 960px;
@@ -363,19 +377,19 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
 
   <div class="summary">
     <div class="summary-item">
-      <div class="summary-value">${formatNumber(story.m)}</div>
+      <div class="summary-value">${formatNumber(safeNumber(story.m))}</div>
       <div class="summary-label">Messages</div>
     </div>
     <div class="summary-item">
-      <div class="summary-value">${Math.round(story.h)}</div>
+      <div class="summary-value">${Math.round(safeNumber(story.h))}</div>
       <div class="summary-label">Hours</div>
     </div>
     <div class="summary-item">
-      <div class="summary-value">${story.p}</div>
+      <div class="summary-value">${formatNumber(safeNumber(story.p))}</div>
       <div class="summary-label">Projects</div>
     </div>
     <div class="summary-item">
-      <div class="summary-value">${story.d}</div>
+      <div class="summary-value">${formatNumber(safeNumber(story.d, 0, 0, 366))}</div>
       <div class="summary-label">Days Active</div>
     </div>
   </div>
@@ -384,7 +398,7 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
     <div>
       <div class="section">
         <div class="section-title">Monthly Activity</div>
-        ${renderSparkline(monthlyActivity || [])}
+        ${renderSparkline(monthlyActivity)}
         <div class="months-label">
           <span>J</span><span>F</span><span>M</span><span>A</span><span>M</span><span>J</span>
           <span>J</span><span>A</span><span>S</span><span>O</span><span>N</span><span>D</span>
@@ -393,17 +407,17 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
 
       <div class="section">
         <div class="section-title">Weekly Rhythm</div>
-        ${renderHeatmapSvg(story.hm)}
+        ${renderHeatmapSvg(Array.isArray(story.hm) ? story.hm : [])}
       </div>
 
       <div class="section">
         <div class="section-title">Top Projects</div>
         <table class="project-table">
           <tr><th>Project</th><th>Messages</th></tr>
-          ${story.tp.slice(0, 6).map((p: any) => `
+          ${(Array.isArray(story.tp) ? story.tp : []).slice(0, 6).map((p: { n?: unknown; m?: unknown }) => `
             <tr>
-              <td>${escapeHtml(p.n)}</td>
-              <td>${formatNumber(p.m)}</td>
+              <td>${escapeHtml(typeof p.n === 'string' ? p.n : '')}</td>
+              <td>${formatNumber(safeNumber(p.m))}</td>
             </tr>
           `).join('')}
         </table>
@@ -421,7 +435,10 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
             ['bs', 'Burst'],
             ['ri', 'Intensity'],
           ].map(([key, label]) => {
-            const value = (story.ts as any)[key] || 50;
+            const rawValue = story.ts && typeof story.ts === 'object'
+              ? (story.ts as unknown as Record<string, unknown>)[key]
+              : undefined;
+            const value = safeNumber(rawValue, 50, 0, 100);
             return `
               <div class="trait-row">
                 <span class="trait-name">${label}</span>
@@ -433,36 +450,36 @@ export function renderPrintPage({ story, year, encodedData }: RenderOptions): st
         </div>
       </div>
 
-      ${story.tk?.total > 0 ? `
+      ${safeNumber(story.tk?.total) > 0 ? `
       <div class="section">
         <div class="section-title">Token Usage</div>
         <table class="token-table">
           <tr><td>Total</td><td>${formatTokens(story.tk.total)}</td></tr>
           <tr><td>Input</td><td>${formatTokens(story.tk.input)}</td></tr>
           <tr><td>Output</td><td>${formatTokens(story.tk.output)}</td></tr>
-          ${story.tk.cache_read > 0 ? `<tr><td>Cache Read</td><td>${formatTokens(story.tk.cache_read)}</td></tr>` : ''}
+          ${safeNumber(story.tk.cache_read) > 0 ? `<tr><td>Cache Read</td><td>${formatTokens(story.tk.cache_read)}</td></tr>` : ''}
           ${Object.entries(story.tk.models || {}).slice(0, 3).map(([model, count]) => `
-            <tr><td>${getModelDisplayName(model)}</td><td>${formatTokens(count as number)}</td></tr>
+            <tr><td>${escapeHtml(getModelDisplayName(model))}</td><td>${formatTokens(count)}</td></tr>
           `).join('')}
         </table>
       </div>
       ` : ''}
 
-      ${story.sk?.[0] > 0 ? `
+      ${safeNumber(story.sk?.[0]) > 0 ? `
       <div class="section">
         <div class="section-title">Streaks</div>
-        <div class="streak-row"><span>Total Streaks</span><span>${story.sk[0]}</span></div>
-        <div class="streak-row"><span>Longest</span><span>${story.sk[1]} days</span></div>
-        <div class="streak-row"><span>Current</span><span>${story.sk[2]} days</span></div>
-        <div class="streak-row"><span>Average</span><span>${story.sk[3]} days</span></div>
+        <div class="streak-row"><span>Total Streaks</span><span>${formatNumber(safeNumber(story.sk[0]))}</span></div>
+        <div class="streak-row"><span>Longest</span><span>${formatNumber(safeNumber(story.sk[1]))} days</span></div>
+        <div class="streak-row"><span>Current</span><span>${formatNumber(safeNumber(story.sk[2]))} days</span></div>
+        <div class="streak-row"><span>Average</span><span>${formatNumber(safeNumber(story.sk[3]))} days</span></div>
       </div>
       ` : ''}
 
       <div class="section">
         <div class="section-title">Session Stats</div>
-        <div class="streak-row"><span>Total Sessions</span><span>${story.s}</span></div>
-        <div class="streak-row"><span>Longest Session</span><span>${story.ls.toFixed(1)}h</span></div>
-        <div class="streak-row"><span>Avg per Day</span><span>${(story.h / (story.d || 1)).toFixed(1)}h</span></div>
+        <div class="streak-row"><span>Total Sessions</span><span>${formatNumber(safeNumber(story.s))}</span></div>
+        <div class="streak-row"><span>Longest Session</span><span>${safeNumber(story.ls).toFixed(1)}h</span></div>
+        <div class="streak-row"><span>Avg per Day</span><span>${(safeNumber(story.h) / Math.max(1, safeNumber(story.d, 1))).toFixed(1)}h</span></div>
       </div>
     </div>
   </div>

@@ -8,7 +8,7 @@ The history is stored locally at `~/.claude/projects/` and this tool turns raw J
 - **Concurrent Claude Detection** - Identifies when you've used multiple Claude instances in parallel
 - **Rich Terminal UI** - Tables, panels, sparklines, and syntax highlighting
 - **Multiple Export Formats** - JSON, Markdown, plain text
-- **Regex Search** - Search across all conversations with full regex support
+- **Regex Search** - Search across conversations with Python regex plus a basic ReDoS safety guard
 - **Read-Only by Design** - Never modifies your Claude history files ([why trust this?](TRUST.md))
 - **Streaming JSONL** - Line-by-line parsing handles large files efficiently
 
@@ -75,6 +75,8 @@ claude-history sessions "Documents/work" -n 5
 | Option | Description |
 |--------|-------------|
 | `-n, --limit` | Maximum sessions to show (default: 20) |
+| `--head` | Show most recent sessions (default) |
+| `-t, --tail` | Show oldest sessions |
 
 ### show
 
@@ -91,6 +93,8 @@ claude-history show e5c477f0 -p myproject
 |--------|-------------|
 | `-p, --project` | Limit search to specific project |
 | `-n, --limit` | Maximum messages to show (default: 50) |
+| `--head` | Show first messages (default) |
+| `-t, --tail` | Show last messages |
 | `--raw` | Output raw JSON |
 
 ### search
@@ -151,6 +155,7 @@ claude-history stats -f json
 |--------|-------------|
 | `-p, --project` | Show stats for specific project only |
 | `-f, --format` | Output format: `table`, `json` (default: table) |
+| `--show-worktype` | Include work type classification |
 
 ### summary
 
@@ -167,6 +172,7 @@ claude-history summary -f markdown -o report.md
 | `-p, --project` | Generate summary for specific project |
 | `-f, --format` | Output format: `text`, `markdown` (default: text) |
 | `-o, --output` | Output file (default: stdout) |
+| `--show-worktype` | Include work type distribution |
 
 ### story
 
@@ -189,7 +195,7 @@ Generates narrative insights including project lifecycle, collaboration style, w
 
 ### wrapped
 
-Generate a shareable Wrapped URL containing your year's stats. All data is encoded in the URL—nothing is stored on any server.
+Generate a shareable Wrapped URL containing your year's aggregate stats. The CLI encodes data into the URL and makes no network calls; the website decodes the URL to render it and uses `no-store` responses.
 
 ```bash
 claude-history wrapped
@@ -234,8 +240,17 @@ git clone <repo>
 cd claude-history-explorer
 uv sync
 
-# Run tests
+# Run Python tests/lint
 uv run pytest
+uv run ruff check .
+
+# Run Wrapped website tests/typecheck/audit
+cd wrapped-website
+npm ci
+npm test
+npm run typecheck
+npm audit
+cd ..
 
 # Run the CLI
 uv run claude-history --help

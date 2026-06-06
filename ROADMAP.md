@@ -1,6 +1,6 @@
 # Claude Code Wrapped - Implementation Roadmap
 
-This document breaks down the implementation of the "Claude Code Wrapped" feature into verifiable phases. Each phase has clear deliverables, acceptance criteria, and dependencies.
+This document is a roadmap/proposal, not a statement of current behavior. Current implementation is V3-only, print-view-first, with canonical URLs like `https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=...`; `/{year}/{data}` is legacy redirect compatibility. PNG social cards, Satori/resvg, Story Mode, KV counters, PDF export, queues, R2, Durable Objects, and Framer Motion are future/proposed items unless code and tests say otherwise.
 
 ---
 

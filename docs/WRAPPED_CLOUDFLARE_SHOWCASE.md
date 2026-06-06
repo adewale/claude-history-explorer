@@ -1,6 +1,6 @@
 # Claude Code Wrapped - Cloudflare Platform Showcase Spec
 
-> **Note**: This file documents how Claude Code Wrapped can showcase Cloudflare Developer Platform primitives.
+> **Note**: This file is a future/proposal showcase for Cloudflare primitives. The current Worker does not implement KV view counters, Durable Objects presence, Queues/R2 async image storage, Browser Rendering PDF export, or year-in-path canonical URLs. Current canonical URLs use `/wrapped?d=...` and render a print view plus SVG social preview.
 
 ## Overview
 

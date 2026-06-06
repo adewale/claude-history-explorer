@@ -105,6 +105,17 @@ interface WrappedStoryV3 {
                                  //  tool_density, error_rate, edit_ratio, thinking_ratio]
   }>;
 
+  ls: number;                    // Longest session in hours
+  sk: number[];                  // Streak stats: [count, longest_days, current_days, avg_days]
+  tk: {                          // Aggregate token stats
+    total: number;
+    input: number;
+    output: number;
+    cache_read: number;
+    cache_create: number;
+    models: Record<string, number>;
+  };
+
   // === YEAR-OVER-YEAR (if previous year data exists) ===
   yoy?: {
     pm: number;                  // Previous year messages
@@ -1771,10 +1782,10 @@ The mobile card layouts are a planned feature for swipeable card-based presentat
 - [ ] Implement `encode_wrapped_story_v3()` with RLE
 - [ ] Implement `decode_wrapped_story_v3()`
 - [ ] Update `generate_wrapped_story()` to produce V3
-- [ ] Add `--format v2|v3` flag to wrapped command
-- [ ] Add `--print` flag for print-optimized output
+- [x] V3 is the only supported Wrapped format in the current CLI
+- [x] Print view is the only supported website view
 - [ ] Collect year-over-year comparison data
-- [ ] Enforce hard limits (12 projects, 20 edges, 15 events)
+- [x] Enforce hard limits (12 projects, 20 edges, 25 events, 20 fingerprints)
 - [ ] Write comprehensive unit tests
 
 ### 5.2 TypeScript Website Updates

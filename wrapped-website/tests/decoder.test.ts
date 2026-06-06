@@ -327,7 +327,7 @@ function testValidateStory() {
   const invalidVersion = { ...validStory, v: 2 as any };
   const versionResult = validateStoryV3(invalidVersion);
   assertFalse(versionResult.valid, 'invalid version fails');
-  assertTrue(versionResult.error?.includes('Not a V3'), 'error mentions version');
+  assertTrue(Boolean(versionResult.error?.includes('Not a V3')), 'error mentions version');
 
   // Invalid year
   const invalidYear = { ...validStory, y: 2020 };
@@ -702,7 +702,7 @@ function testSampleUrlValidation() {
   assertEqual(story.y, 2025, 'sample URL is for year 2025');
 
   // Basic story validation
-  assertTrue(story.n.length > 0, 'sample URL has display name');
+  assertTrue(Boolean(story.n && story.n.length > 0), 'sample URL has display name');
   assertTrue(story.m > 0, 'sample URL has messages');
   assertTrue(story.h > 0, 'sample URL has hours');
   assertTrue(story.d > 0, 'sample URL has days active');

@@ -10,11 +10,14 @@ produce consistent results by:
 Run with: pytest tests/test_schema_alignment.py -v
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from conftest import require_wrapped_node_deps
 
 # Get paths relative to this file
 TESTS_DIR = Path(__file__).parent
@@ -23,19 +26,21 @@ FIXTURES_DIR = TESTS_DIR / "fixtures"
 WRAPPED_WEBSITE_DIR = PROJECT_ROOT / "wrapped-website"
 
 
-def test_generate_schema_test_cases():
-    """Test that the schema test case generator runs successfully."""
+def test_generate_schema_test_cases(tmp_path):
+    """Test that the schema test case generator runs without dirtying fixtures."""
+    output = tmp_path / "schema_test_cases.json"
     result = subprocess.run(
-        [sys.executable, str(TESTS_DIR / "generate_schema_test_cases.py")],
+        [sys.executable, str(TESTS_DIR / "generate_schema_test_cases.py"), "--output", str(output)],
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT,
     )
     assert result.returncode == 0, f"Generator failed:\n{result.stderr}"
-    assert (FIXTURES_DIR / "schema_test_cases.json").exists(), "Test cases file not created"
+    assert output.exists(), "Test cases file not created"
+    assert output.read_text() == (FIXTURES_DIR / "schema_test_cases.json").read_text()
 
 
-def test_typescript_decodes_python_encoding():
+def test_typescript_decodes_python_encoding(tmp_path):
     """Verify TypeScript decoder correctly decodes Python-encoded data.
 
     This is the main schema alignment test. It:
@@ -45,9 +50,12 @@ def test_typescript_decodes_python_encoding():
 
     This test requires Node.js and npx to be available.
     """
-    # First, regenerate test cases to ensure they're fresh
+    require_wrapped_node_deps()
+
+    # First, regenerate test cases into a temp file to ensure they're fresh
+    generated_cases = tmp_path / "schema_test_cases.json"
     gen_result = subprocess.run(
-        [sys.executable, str(TESTS_DIR / "generate_schema_test_cases.py")],
+        [sys.executable, str(TESTS_DIR / "generate_schema_test_cases.py"), "--output", str(generated_cases)],
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT,
@@ -60,6 +68,7 @@ def test_typescript_decodes_python_encoding():
         capture_output=True,
         text=True,
         cwd=WRAPPED_WEBSITE_DIR,
+        env={**os.environ, "SCHEMA_TEST_CASES": str(generated_cases)},
     )
 
     # Print output for debugging

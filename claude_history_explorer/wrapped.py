@@ -8,6 +8,7 @@ This module provides functions for generating and encoding wrapped stories:
 """
 
 import json
+import math
 from bisect import bisect_right
 from collections import defaultdict
 from datetime import date, datetime
@@ -172,13 +173,13 @@ def compute_trait_scores(
         scores["fc"] = 0.5
 
     # === CIRCADIAN CONSISTENCY (cc) ===
-    # Low variance in start hours = high consistency
+    # Hours are circular: 23:00 and 00:00 are one hour apart, not 23 hours.
     start_hours = [s.start_time.hour for s in sessions if s.start_time]
     if len(start_hours) > 1:
-        mean_hour = sum(start_hours) / len(start_hours)
-        variance = sum((h - mean_hour) ** 2 for h in start_hours) / len(start_hours)
-        # Variance of 36 (std=6 hours) = inconsistent
-        scores["cc"] = max(0.0, 1 - variance / 36)
+        angles = [(hour / 24) * 2 * math.pi for hour in start_hours]
+        mean_sin = sum(math.sin(angle) for angle in angles) / len(angles)
+        mean_cos = sum(math.cos(angle) for angle in angles) / len(angles)
+        scores["cc"] = min(1.0, (mean_sin**2 + mean_cos**2) ** 0.5)
     else:
         scores["cc"] = 0.5
 
@@ -736,7 +737,6 @@ def generate_wrapped_story_v3(
 
     # Collect all sessions with project info
     all_sessions: List[SessionInfoV3] = []
-    project_sessions: Dict[str, List[SessionInfoV3]] = defaultdict(list)
     session_file_map: Dict[str, Path] = {}  # For fingerprint computation
 
     # Also collect message lengths, tools, and token usage for the target year
@@ -762,7 +762,6 @@ def generate_wrapped_story_v3(
             )
             if info is not None:
                 all_sessions.append(info)
-                project_sessions[project.short_name].append(info)
                 session_file_map[session.session_id] = session_file
 
                 # Collect message lengths, tools, and tokens if in target year

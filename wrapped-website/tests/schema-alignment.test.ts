@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 
 import {
   decodeWrappedStoryV3,
+  validateStoryV3,
   type WrappedStoryV3,
   type TopProjectV3,
   type TimelineEvent,
@@ -123,7 +124,7 @@ function runTests() {
   console.log('Verifying Python encoder output matches TypeScript decoder expectations\n');
 
   // Load test cases
-  const testCasesPath = path.join(__dirname, '../../tests/fixtures/schema_test_cases.json');
+  const testCasesPath = process.env.SCHEMA_TEST_CASES || path.join(__dirname, '../../tests/fixtures/schema_test_cases.json');
 
   if (!fs.existsSync(testCasesPath)) {
     console.error(`Test cases file not found: ${testCasesPath}`);
@@ -142,7 +143,11 @@ function runTests() {
 
     try {
       const decoded = decodeWrappedStoryV3(tc.encoded);
-      const matches = assertDeepEqual(decoded, tc.expected);
+      const validation = validateStoryV3(decoded);
+      if (!validation.valid) {
+        errors.push(`  validation: ${validation.error || 'Invalid data'}`);
+      }
+      const matches = validation.valid && assertDeepEqual(decoded, tc.expected);
 
       if (matches) {
         console.log(`  ✓ Passed\n`);

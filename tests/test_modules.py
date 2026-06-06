@@ -7,7 +7,7 @@ and that imports work as expected after the module split.
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -18,18 +18,9 @@ class TestModuleImports:
     def test_import_models(self):
         """Test importing from models module."""
         from claude_history_explorer.models import (
-            GlobalStats,
-            GlobalStory,
             Message,
             Project,
-            ProjectStats,
-            ProjectStatsV3,
-            ProjectStory,
             Session,
-            SessionInfo,
-            SessionInfoV3,
-            TokenUsage,
-            WrappedStoryV3,
         )
 
         # Verify classes are importable
@@ -40,11 +31,8 @@ class TestModuleImports:
     def test_import_utils(self):
         """Test importing from utils module."""
         from claude_history_explorer.utils import (
-            _active_duration_minutes,
-            _compile_regex_safe,
             classify,
             format_duration,
-            format_timestamp,
         )
 
         assert format_duration is not None
@@ -54,8 +42,6 @@ class TestModuleImports:
         """Test importing from projects module."""
         from claude_history_explorer.projects import (
             find_project,
-            get_claude_dir,
-            get_projects_dir,
             list_projects,
         )
 
@@ -65,7 +51,6 @@ class TestModuleImports:
     def test_import_parser(self):
         """Test importing from parser module."""
         from claude_history_explorer.parser import (
-            get_session_by_id,
             parse_session,
             search_sessions,
         )
@@ -97,9 +82,7 @@ class TestModuleImports:
         """Test importing from wrapped module."""
         from claude_history_explorer.wrapped import (
             compute_activity_heatmap,
-            decode_wrapped_story_v3,
             encode_wrapped_story_v3,
-            generate_wrapped_story_v3,
         )
 
         assert compute_activity_heatmap is not None
@@ -108,17 +91,9 @@ class TestModuleImports:
     def test_backward_compat_import_from_history(self):
         """Test that imports from history still work."""
         from claude_history_explorer.history import (
-            GlobalStats,
             Message,
-            Project,
-            Session,
-            calculate_global_stats,
-            calculate_project_stats,
-            find_project,
-            generate_project_story,
             list_projects,
             parse_session,
-            search_sessions,
         )
 
         assert Message is not None
@@ -210,7 +185,6 @@ class TestUtils:
 
     def test_active_duration_minutes_empty(self):
         """Test active duration with no messages."""
-        from claude_history_explorer.models import Message
         from claude_history_explorer.utils import _active_duration_minutes
 
         assert _active_duration_minutes([]) == 0

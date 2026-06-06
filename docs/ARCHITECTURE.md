@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude History Explorer is a command-line tool designed to read and analyze Claude Code conversation history stored locally. The architecture follows a clean separation of concerns with three main layers: data models, core business logic, and CLI interface.
+Claude History Explorer is a command-line tool designed to read and analyze Claude Code conversation history stored locally. The architecture follows a clean separation of concerns with data models, parsing/project discovery, statistics/story generation, Wrapped encoding, and CLI display kept in separate modules. `history.py` is now a backwards-compatible re-export facade, not the monolithic implementation.
 
 ## High-Level Architecture
 
@@ -50,15 +50,21 @@ Claude History Explorer is a command-line tool designed to read and analyze Clau
 
 ```
 claude_history_explorer/
-├── __init__.py      # Package metadata
-├── cli.py           # CLI commands and display formatting
-├── history.py       # Data models, parsing, statistics, story generation
-└── constants.py     # Thresholds for story personality analysis
+├── __init__.py      # Package metadata and convenience exports
+├── constants.py     # Thresholds, defaults, work-type patterns
+├── models.py        # Dataclasses for messages, sessions, stats, Wrapped V3
+├── parser.py        # JSONL parsing, session lookup, regex search
+├── projects.py      # Claude project discovery and path decoding
+├── stats.py         # Project/global statistics
+├── stories.py       # Narrative/story generation
+├── wrapped.py       # Wrapped V3 metrics, encoding, decoding
+├── history.py       # Backwards-compatible public re-export facade
+└── cli.py           # CLI commands and display formatting
 ```
 
 ## Core Components
 
-### 1. Data Models (`history.py`)
+### 1. Data Models (`models.py`, re-exported by `history.py`)
 
 #### Message Class
 ```python
@@ -171,7 +177,7 @@ ACTIVITY_INTENSITY_HIGH = 300
 ACTIVITY_INTENSITY_MEDIUM = 100
 ```
 
-### 3. Business Logic (`history.py`)
+### 3. Business Logic (`projects.py`, `parser.py`, `stats.py`, `stories.py`, `wrapped.py`)
 
 #### Core Functions
 
@@ -341,9 +347,11 @@ Result: /Users/username/Documents/my/project
 
 ### Core Dependencies
 ```
-click>=8.1.0      # CLI framework
-rich>=13.0.0      # Terminal formatting
-sparklines>=0.5.0 # Activity visualization
+click>=8.1.0       # CLI framework
+rich>=13.0.0       # Terminal formatting
+sparklines>=0.4.0  # Activity visualization
+msgpack>=1.0.0     # Wrapped URL encoding
+pyperclip>=1.8.0   # Optional clipboard copy
 ```
 
 ### Runtime Requirements
@@ -355,7 +363,7 @@ sparklines>=0.5.0 # Activity visualization
 
 The Claude History Explorer architecture emphasizes:
 
-1. **Simplicity**: Clear separation of concerns across 3 modules
+1. **Simplicity**: Clear separation of concerns across focused modules
 2. **Safety**: Read-only design with comprehensive testing
 3. **Performance**: Efficient streaming and lazy loading
 4. **Insight**: Story generation with personality analysis

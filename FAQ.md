@@ -10,17 +10,17 @@ Yes. See [TRUST.md](TRUST.md) for the complete trust model. The short version:
 
 | Guarantee | How It's Enforced |
 |-----------|-------------------|
-| **Read-only** | No write operations in code, verified by tests |
-| **No network calls** | No HTTP libraries, works offline |
-| **Auditable** | Open source, ~2,600 lines of Python |
-| **Minimal deps** | Only `click`, `rich`, `sparklines` |
+| **History read-only** | Never modifies `~/.claude/projects`; verified by tests |
+| **No CLI network calls** | No HTTP client dependencies; works offline |
+| **Auditable** | Open source Python modules plus a small Wrapped Worker |
+| **Minimal deps** | `click`, `rich`, `sparklines`, `msgpack`, `pyperclip` |
 
-Your conversation data stays on your machine. Nothing is sent to any server.
+Your conversation data stays on your machine unless you choose to share a Wrapped URL. Explicit `--output` options write files you request, and `wrapped` copies the URL to the clipboard unless `--no-copy` is used.
 
 **Don't trust us—verify it yourself:**
 
 ```bash
-# Check for write operations (should find none)
+# Check for writes to Claude history (output-file writes are explicit CLI features)
 grep -r "open.*'w'" claude_history_explorer/
 
 # Check for network libraries (should find none)
@@ -82,20 +82,18 @@ The tool detects when you were running multiple Claude Code sessions simultaneou
 
 Run:
 ```bash
-claude-history story
+claude-history wrapped
 ```
 
-For a specific project:
+Common options:
 ```bash
-claude-history story -p myproject
+claude-history wrapped --year 2025
+claude-history wrapped --name "Alice"
+claude-history wrapped --raw       # inspect raw aggregate JSON
+claude-history wrapped --no-copy   # do not copy to clipboard
 ```
 
-Different formats:
-```bash
-claude-history story --format brief
-claude-history story --format detailed
-claude-history story --format timeline
-```
+For a terminal narrative instead of a shareable Wrapped URL, use `claude-history story`.
 
 ## Can I export my conversations?
 

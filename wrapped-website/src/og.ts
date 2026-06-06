@@ -2,19 +2,18 @@
  * OG Image Generator
  *
  * Generates SVG images for social sharing.
- * The SVG is returned as a PNG-compatible format that social platforms can render.
  */
 
-import { WrappedStory, WrappedStoryV3, formatNumber, generateSparkline, isV3Story, getTraitDescription } from './decoder';
+import { WrappedStoryV3, formatNumber, generateSparkline, getTraitDescription } from './decoder';
 
 /**
- * Generate an OG image as SVG (social platforms will render it)
+ * Generate an OG image as SVG.
  */
 export async function generateOgImage(story: WrappedStoryV3, year: number): Promise<Uint8Array> {
   const displayName = story.n || 'Someone';
   // V3 uses story.ma for monthly activity
-  const monthlyActivity = story.ma;
-  const sparkline = generateSparkline(monthlyActivity || []);
+  const monthlyActivity = Array.isArray(story.ma) ? story.ma : [];
+  const sparkline = generateSparkline(monthlyActivity.map((value) => safeNumber(value)));
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
@@ -43,19 +42,19 @@ export async function generateOgImage(story: WrappedStoryV3, year: number): Prom
 
   <!-- Stats Row -->
   <!-- Messages -->
-  <text x="300" y="270" fill="#d4a574" font-family="Inter, sans-serif" font-size="56" font-weight="700" text-anchor="middle">${formatNumber(story.m)}</text>
+  <text x="300" y="270" fill="#d4a574" font-family="Inter, sans-serif" font-size="56" font-weight="700" text-anchor="middle">${escapeXml(formatNumber(safeNumber(story.m)))}</text>
   <text x="300" y="305" fill="#a0a0a0" font-family="Inter, sans-serif" font-size="20" text-anchor="middle">messages</text>
 
   <!-- Projects -->
-  <text x="600" y="270" fill="#d4a574" font-family="Inter, sans-serif" font-size="56" font-weight="700" text-anchor="middle">${story.p}</text>
+  <text x="600" y="270" fill="#d4a574" font-family="Inter, sans-serif" font-size="56" font-weight="700" text-anchor="middle">${escapeXml(formatNumber(safeNumber(story.p)))}</text>
   <text x="600" y="305" fill="#a0a0a0" font-family="Inter, sans-serif" font-size="20" text-anchor="middle">projects</text>
 
   <!-- Hours -->
-  <text x="900" y="270" fill="#d4a574" font-family="Inter, sans-serif" font-size="56" font-weight="700" text-anchor="middle">${Math.round(story.h)}</text>
+  <text x="900" y="270" fill="#d4a574" font-family="Inter, sans-serif" font-size="56" font-weight="700" text-anchor="middle">${escapeXml(formatNumber(Math.round(safeNumber(story.h))))}</text>
   <text x="900" y="305" fill="#a0a0a0" font-family="Inter, sans-serif" font-size="20" text-anchor="middle">hours</text>
 
   <!-- Sparkline -->
-  <text x="600" y="390" fill="#d4a574" font-family="Inter, sans-serif" font-size="36" text-anchor="middle" letter-spacing="4">${sparkline}</text>
+  <text x="600" y="390" fill="#d4a574" font-family="Inter, sans-serif" font-size="36" text-anchor="middle" letter-spacing="4">${escapeXml(sparkline)}</text>
 
   <!-- Month Labels -->
   <text x="600" y="420" fill="#666666" font-family="Inter, sans-serif" font-size="12" text-anchor="middle" letter-spacing="28">J F M A M J J A S O N D</text>
@@ -69,6 +68,12 @@ export async function generateOgImage(story: WrappedStoryV3, year: number): Prom
 
   // Return as UTF-8 encoded bytes
   return new TextEncoder().encode(svg);
+}
+
+function safeNumber(value: unknown, fallback = 0, min = 0, max = Number.POSITIVE_INFINITY): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback;
 }
 
 function escapeXml(str: string): string {

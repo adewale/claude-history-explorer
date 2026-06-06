@@ -331,51 +331,38 @@ class Project:
         """
         # Split into components: '-Users-ade-foo-bar' -> ['', 'Users', 'ade', 'foo', 'bar']
         components = encoded_name.split("-")
+        start_index = 1 if components and components[0] == "" else 0
 
-        # Start with root
-        current_path = Path("/")
-        i = 1  # Skip empty first component from leading '-'
+        def decode_from(index: int, current_path: Path) -> Optional[Path]:
+            if index >= len(components):
+                return current_path
 
-        while i < len(components):
-            component = components[i]
-            candidate = current_path / component
+            # Prefer longer existing components first. This handles real folders
+            # such as "my-five-part-long-folder" even when the encoded name has
+            # many hyphen-separated tokens.
+            for end in range(len(components), index, -1):
+                parts = components[index:end]
+                candidate_names = ["-".join(parts)]
+                underscore_name = "_".join(parts)
+                if underscore_name not in candidate_names:
+                    candidate_names.append(underscore_name)
 
-            if candidate.exists():
-                # This component exists as-is, use it
-                current_path = candidate
-                i += 1
-            else:
-                # Try combining with subsequent components using '_' or '-'
-                found = False
-                # Try combining up to 4 components (reasonable limit for folder names)
-                for j in range(i + 1, min(i + 5, len(components) + 1)):
-                    combined_parts = components[i:j]
+                for candidate_name in candidate_names:
+                    candidate = current_path / candidate_name
+                    if not candidate.exists():
+                        continue
+                    decoded = decode_from(end, candidate)
+                    if decoded is not None:
+                        return decoded
 
-                    # Try underscore separator
-                    underscore_name = "_".join(combined_parts)
-                    underscore_candidate = current_path / underscore_name
-                    if underscore_candidate.exists():
-                        current_path = underscore_candidate
-                        i = j
-                        found = True
-                        break
+            return None
 
-                    # Try hyphen separator
-                    hyphen_name = "-".join(combined_parts)
-                    hyphen_candidate = current_path / hyphen_name
-                    if hyphen_candidate.exists():
-                        current_path = hyphen_candidate
-                        i = j
-                        found = True
-                        break
+        decoded = decode_from(start_index, Path("/"))
+        if decoded is not None:
+            return str(decoded)
 
-                if not found:
-                    # Path doesn't exist on disk, fall back to simple slash replacement
-                    # for the remaining components
-                    remaining = "/".join(components[i:])
-                    return str(current_path / remaining)
-
-        return str(current_path)
+        # Path doesn't exist on disk, fall back to simple slash replacement.
+        return str(Path("/") / "/".join(components[start_index:]))
 
     @property
     def session_count(self) -> int:

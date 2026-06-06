@@ -6,10 +6,10 @@
     "strict": true,
     "skipLibCheck": true,
     "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types"],
+    "types": ["@cloudflare/workers-types", "node"],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests/**/*.ts"],
   "exclude": ["node_modules"]
 }

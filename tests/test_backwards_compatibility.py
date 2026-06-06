@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from claude_history_explorer.history import decode_wrapped_story_v3
+from conftest import require_wrapped_node_deps
 
 # Get paths relative to this file
 TESTS_DIR = Path(__file__).parent
@@ -171,6 +172,7 @@ class TestTypeScriptBackwardsCompatibility:
 
     def test_typescript_decodes_golden_urls(self):
         """Verify TypeScript decoder handles all golden URLs."""
+        require_wrapped_node_deps()
         result = subprocess.run(
             ["npx", "tsx", "tests/backwards-compat.test.ts"],
             capture_output=True,

@@ -15,9 +15,6 @@ export function renderLandingPage(): string {
   <meta property="og:description" content="Your year in code with Claude. See your development journey.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -33,7 +30,7 @@ export function renderLandingPage(): string {
     }
 
     body {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: Georgia, 'Times New Roman', serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -99,23 +96,6 @@ export function renderLandingPage(): string {
 
     .command-box code {
       flex: 1;
-    }
-
-    .copy-btn {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text-light);
-      cursor: pointer;
-      padding: 0.35rem 0.5rem;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      transition: all 0.2s;
-    }
-
-    .copy-btn:hover {
-      color: var(--text);
-      border-color: var(--text);
     }
 
     .feature-list {
@@ -213,7 +193,6 @@ export function renderLandingPage(): string {
       <div class="section-title">Generate</div>
       <div class="command-box">
         <code>claude-history wrapped</code>
-        <button class="copy-btn" onclick="copyCommand()">Copy</button>
       </div>
     </div>
 
@@ -245,21 +224,6 @@ export function renderLandingPage(): string {
     </footer>
   </div>
 
-  <script>
-    function copyCommand() {
-      navigator.clipboard.writeText('claude-history wrapped');
-      const btn = document.querySelector('.copy-btn');
-      const original = btn.textContent;
-      btn.textContent = 'Copied';
-      btn.style.borderColor = '#1a1a1a';
-      btn.style.color = '#1a1a1a';
-      setTimeout(() => {
-        btn.textContent = original;
-        btn.style.borderColor = '';
-        btn.style.color = '';
-      }, 2000);
-    }
-  </script>
 </body>
 </html>`;
 }
