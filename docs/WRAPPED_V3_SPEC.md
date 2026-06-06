@@ -1,5 +1,7 @@
 # Claude Code Wrapped V3: Tufte Edition
 
+> **Current implementation note:** V3 data types live in `claude_history_explorer/models.py`, generation/encoding/decoding lives in `claude_history_explorer/wrapped.py`, and the website renders Print view at `/wrapped?d=...` with SVG social preview. Historical checklist snippets below may mention older file locations.
+
 ## Executive Summary
 
 A complete redesign of the Wrapped visualization system, replacing narrative "personality labels" with **data integrity**: actual distributions, continuous metrics, and information-dense visualizations that reward close inspection. Inspired by Edward Tufte's principles: maximize data-ink ratio, show the data, enable micro/macro readings.
@@ -174,7 +176,7 @@ These limits ensure URL size stays under 2KB:
 ### 1.1 Required Type Definitions
 
 ```python
-# In history.py - add to existing types
+# In models.py / wrapped.py - current implementation location
 
 @dataclass
 class SessionInfoV3(SessionInfo):
@@ -1768,7 +1770,7 @@ The mobile card layouts are a planned feature for swipeable card-based presentat
 
 - [ ] Create `SessionInfoV3` dataclass with `project_name` field
 - [ ] Create `ProjectStats` dataclass
-- [ ] Add `compute_activity_heatmap()` to history.py
+- [x] Add `compute_activity_heatmap()` to `claude_history_explorer/wrapped.py`
 - [ ] Add `compute_distribution()` with `bisect_right`
 - [ ] Add `compute_session_duration_distribution()`
 - [ ] Add `compute_agent_ratio_distribution()`
@@ -1876,6 +1878,9 @@ Print view is the only view. The page renders a Tufte-inspired, information-dens
 ---
 
 ## Appendix: References
+
+- [Wrapped Architecture](WRAPPED_ARCHITECTURE.md)
+- [Lessons Learned](LESSONS_LEARNED.md)
 
 - Tufte, E. (2001). *The Visual Display of Quantitative Information*
 - Tufte, E. (1997). *Visual Explanations*

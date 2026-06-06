@@ -410,6 +410,9 @@ This document provides a visual overview of the Claude History Explorer's domain
 
 ### Design Principles
 1. **Read-only**: Never modifies any Claude Code history files
-2. **Streaming**: Parses JSONL line-by-line for memory efficiency
+2. **Streaming**: Parses JSONL line-by-line for memory efficiency, with explicit line-size bounds before decoding
 3. **Graceful degradation**: Skips malformed lines, handles missing data
 4. **Privacy-first**: Wrapped URLs contain only aggregate statistics, no content
+5. **Cross-platform path handling**: Treats Claude project directory names as ambiguous encoded paths and preserves real filesystem components when possible
+
+See [Lessons Learned](LESSONS_LEARNED.md) for the audit history behind these principles.

@@ -108,7 +108,10 @@ Out of scope: malware on your machine, someone with shell access to your account
 ```bash
 uv run pytest -q
 uv run ruff check .
-cd wrapped-website && npm test && npm run typecheck && npm audit
+uv run python scripts/smoketest_local_corpus.py
+cd wrapped-website && npm test && npm run typecheck && npm run lint && npm audit
 ```
+
+See [docs/LESSONS_LEARNED.md](docs/LESSONS_LEARNED.md) for the audit lessons behind these checks.
 
 The bottom line: you do not have to trust claims. Read the code, run the checks, and decode any Wrapped URL before sharing it.

@@ -1,7 +1,7 @@
 /**
  * Unit tests for the V3 decoder
  *
- * Run with: npx tsx tests/decoder.test.ts
+ * Run with: npx vitest run tests/decoder.test.ts
  */
 
 import { describe, expect, it } from 'vitest';

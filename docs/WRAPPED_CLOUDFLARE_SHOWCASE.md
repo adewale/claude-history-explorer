@@ -791,8 +791,10 @@ This turns every Wrapped view into a mini-lesson on edge computing.
 
 ## Next Steps
 
-1. **CLI command first**: Implement `claude-history wrapped --year YYYY` (see WRAPPED_SPEC.md)
-2. **Basic website**: Set up Cloudflare Pages with `/:year/<data>` routing
+These are future/proposal steps. Current implementation notes and audit lessons live in [WRAPPED_ARCHITECTURE.md](WRAPPED_ARCHITECTURE.md), [WRAPPED_V3_SPEC.md](WRAPPED_V3_SPEC.md), and [LESSONS_LEARNED.md](LESSONS_LEARNED.md).
+
+1. **CLI command first**: Implement `claude-history wrapped --year YYYY` (see [WRAPPED_V3_SPEC.md](WRAPPED_V3_SPEC.md))
+2. **Basic website**: Set up Cloudflare Pages with `/wrapped?d=...` routing, retaining `/:year/<data>` only as legacy redirect compatibility if needed
 3. **KV counter**: Add year-namespaced view counting (`{year}:views:{id}`)
 4. **Durable Objects presence**: Real-time viewers with year-prefixed instances
 5. **Queues + R2**: Async image generation with `{year}/` storage prefixes

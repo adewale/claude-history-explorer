@@ -60,6 +60,9 @@ claude_history_explorer/
 ├── wrapped.py       # Wrapped V3 metrics, encoding, decoding
 ├── history.py       # Backwards-compatible public re-export facade
 └── cli.py           # CLI commands and display formatting
+
+scripts/
+└── smoketest_local_corpus.py  # Privacy-preserving end-to-end smoke test against local Claude history
 ```
 
 ## Core Components
@@ -346,6 +349,14 @@ falls back to a normalized slash-separated display path.
 2. **Integration Tests**: Command execution and data flow
 3. **Security Tests**: Read-only behavior verification
 4. **Error Handling Tests**: Edge cases and failure modes
+5. **Cross-Language Contract Tests**: Python Wrapped encoder ↔ TypeScript decoder/schema alignment
+6. **Local-Corpus Smoke Test**: `scripts/smoketest_local_corpus.py` exercises every CLI command family against real local Claude history without printing transcript content
+
+## Documentation & Maintenance Notes
+
+- [Domain model](DOMAIN_MODEL.md) documents entities and invariants.
+- [JSON schemas](JSON_SCHEMAS.md) documents command outputs used by scripts.
+- [Lessons learned](LESSONS_LEARNED.md) records audit and maintenance lessons that should influence future changes.
 
 ## Dependencies
 

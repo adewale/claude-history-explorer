@@ -5,7 +5,7 @@
  * as we make changes to the decoder. This prevents breaking changes that would
  * make old URLs unusable.
  *
- * Run with: npx tsx tests/backwards-compat.test.ts
+ * Run with: npx vitest run tests/backwards-compat.test.ts
  */
 
 import { describe, expect, it } from 'vitest';

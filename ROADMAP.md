@@ -1,6 +1,6 @@
 # Claude Code Wrapped - Implementation Roadmap
 
-This document is a roadmap/proposal, not a statement of current behavior. Current implementation is V3-only, print-view-first, with canonical URLs like `https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=...`; `/{year}/{data}` is legacy redirect compatibility. PNG social cards, Satori/resvg, Story Mode, KV counters, PDF export, queues, R2, Durable Objects, and Framer Motion are future/proposed items unless code and tests say otherwise.
+This document is a roadmap/proposal, not a statement of current behavior. Current implementation is V3-only, print-view-first, with canonical URLs like `https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=...`; `/{year}/{data}` is legacy redirect compatibility. SVG social previews are implemented; PNG social cards, Satori/resvg, Story Mode, KV counters, PDF export, queues, R2, Durable Objects, and Framer Motion are future/proposed items unless code and tests say otherwise. See [docs/LESSONS_LEARNED.md](docs/LESSONS_LEARNED.md) for maintenance lessons from reconciling proposal docs with implementation.
 
 ---
 
@@ -25,7 +25,7 @@ The foundation. Everything starts with generating the wrapped data locally.
 **Goal**: Generate a `WrappedStory` from local history and encode it to a URL.
 
 **Deliverables**:
-1. `WrappedStory` dataclass in `history.py`
+1. `WrappedStoryV3` dataclass in `claude_history_explorer/models.py` and generation/encoding in `claude_history_explorer/wrapped.py`
 2. `filter_sessions_by_year()` function
 3. `generate_wrapped_story()` function
 4. MessagePack + Base64URL encoding/decoding utilities
@@ -34,7 +34,7 @@ The foundation. Everything starts with generating the wrapped data locally.
 **Implementation Details**:
 
 ```python
-# New dataclass in history.py
+# Current implementation lives in models.py / wrapped.py
 @dataclass
 class WrappedStory:
     y: int                    # year
@@ -58,7 +58,7 @@ class WrappedStory:
 
 **Verification Criteria**:
 - [ ] `claude-history wrapped --raw` outputs valid JSON matching the schema
-- [ ] `claude-history wrapped` outputs a URL starting with `https://wrapped-claude-codes.adewale-883.workers.dev/YYYY/`
+- [x] `claude-history wrapped` outputs a URL starting with `https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=`
 - [ ] Year filtering works (sessions outside year are excluded)
 - [ ] Test: encode → decode round-trip preserves all data
 - [ ] Test: sessions spanning year boundary assigned to start year
@@ -67,7 +67,8 @@ class WrappedStory:
 
 **Files to modify**:
 - `pyproject.toml` (add msgpack dependency)
-- `claude_history_explorer/history.py` (add WrappedStory, filter functions)
+- `claude_history_explorer/models.py` (WrappedStoryV3 dataclass)
+- `claude_history_explorer/wrapped.py` (generation, filtering, encoding, decoding)
 - `claude_history_explorer/cli.py` (add wrapped command)
 
 ---
@@ -92,7 +93,7 @@ class WrappedStory:
 - [ ] Can decode anyone's URL (not just your own)
 - [ ] URL is copied to clipboard by default (unless `--no-copy`)
 - [ ] In early January, suggests previous year if it has more data
-- [ ] Output matches the styled format from WRAPPED_SPEC.md
+- [x] Output matches the current V3/print-view format from `docs/WRAPPED_V3_SPEC.md`
 
 **Files to modify**:
 - `pyproject.toml` (add pyperclip dependency)
@@ -110,10 +111,10 @@ A minimal Cloudflare Pages site that renders wrapped URLs.
 
 **Deliverables**:
 1. Cloudflare Pages project at `wrapped-claude-codes.adewale-883.workers.dev`
-2. `/:year/<data>` route handling
+2. `/wrapped?d=<data>` route handling, with `/:year/<data>` retained only as legacy redirect compatibility if needed
 3. Landing page with "Get your own" CTA
-4. Client-side URL decoder (Base64URL → MessagePack → JSON)
-5. Year validation (path year must match data.y)
+4. Worker/website decoder (Base64URL → MessagePack → JSON)
+5. Year validation against decoded `story.y`
 
 **Tech Stack**:
 - Cloudflare Workers
@@ -137,7 +138,7 @@ wrapped-website/
 
 **Verification Criteria**:
 - [ ] `wrapped-claude-codes.adewale-883.workers.dev/` shows landing page with CLI command
-- [ ] `wrapped-claude-codes.adewale-883.workers.dev/2025/<valid-data>` renders the wrapped card
+- [x] `wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=<valid-data>` renders the print view
 - [ ] Invalid year (e.g., 2030) shows error page
 - [ ] Mismatched year (path vs data.y) shows error page
 - [ ] Works on mobile browsers

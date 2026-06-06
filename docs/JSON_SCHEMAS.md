@@ -226,7 +226,8 @@ claude-history stats --format json | jq -r '.projects[].path'
 ## Notes
 
 - All timestamps are in ISO 8601 format with timezone information
-- Paths are decoded from the Claude Code storage format (e.g., `-Users-foo-bar` becomes `/Users/foo/bar`)
+- Paths are decoded from Claude Code's encoded project-directory format. Unix, Windows drive-letter, and UNC shapes are supported; when the original path exists, decoding probes filesystem components to preserve dots, spaces, underscores, and hyphenated names.
 - The `tool_uses` array is empty for user messages
 - The `input` field in tool uses varies by tool type
 - Duration strings use the format `Xh Ym` (hours and minutes)
+- See [Lessons Learned](LESSONS_LEARNED.md) for schema and decoder maintenance lessons.
