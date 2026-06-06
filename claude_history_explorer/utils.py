@@ -90,6 +90,7 @@ _REDOS_PATTERNS = [
     re.compile(r"\([^)]*[+*][^)]*\)[+*{]"),
     re.compile(r"\([^)]*\|[^)]*\)[+*{]"),
     re.compile(r"\(\.\*[^)]*\)\{"),
+    re.compile(r"\([^)]*\?[^)]*\)\{\d"),
 ]
 
 MAX_PATTERN_LENGTH = 200

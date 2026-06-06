@@ -47,6 +47,7 @@ from .history import (
     parse_session,
     search_sessions,
     get_session_by_id,
+    _compile_regex_safe,
     get_claude_dir,
     get_projects_dir,
     calculate_project_stats,
@@ -310,9 +311,10 @@ def projects(limit: int, example: bool):
 @main.command()
 @click.argument("project_search", required=False)
 @click.option("--limit", "-n", default=DEFAULT_SESSIONS_LIMIT, help="Maximum number of sessions to show")
+@click.option("--head", is_flag=True, help="Show most recent sessions (default)")
 @click.option("--tail", "-t", is_flag=True, help="Show oldest sessions instead of most recent")
 @click.option("--example", is_flag=True, help="Show usage examples")
-def sessions(project_search: str, limit: int, tail: bool, example: bool):
+def sessions(project_search: str, limit: int, head: bool, tail: bool, example: bool):
     """List sessions for a project.
 
     PROJECT_SEARCH can be a partial path match (e.g., 'myproject' or 'Documents/work')
@@ -370,10 +372,11 @@ def sessions(project_search: str, limit: int, tail: bool, example: bool):
 @click.argument("session_id", required=False)
 @click.option("--project", "-p", default=None, help="Project path to search in")
 @click.option("--limit", "-n", default=DEFAULT_SHOW_LIMIT, help="Maximum messages to show")
+@click.option("--head", is_flag=True, help="Show first N messages (default)")
 @click.option("--tail", "-t", is_flag=True, help="Show last N messages instead of first")
 @click.option("--raw", is_flag=True, help="Show raw JSON output")
 @click.option("--example", is_flag=True, help="Show usage examples")
-def show(session_id: str, project: str, limit: int, tail: bool, raw: bool, example: bool):
+def show(session_id: str, project: str, limit: int, head: bool, tail: bool, raw: bool, example: bool):
     """Show messages from a specific session.
 
     SESSION_ID can be a partial match of the session ID.
@@ -386,6 +389,10 @@ def show(session_id: str, project: str, limit: int, tail: bool, raw: bool, examp
         console.print("Use --example to see usage examples.")
         return
     proj = find_project(project) if project else None
+    if project and proj is None:
+        console.print(f"[red]No project found matching '{project}'[/red]")
+        console.print("\nUse 'claude-history projects' to see available projects.")
+        return
     session = get_session_by_id(session_id, proj)
 
     if not session:
@@ -491,7 +498,17 @@ def search(
         console.print("[red]Error: Missing argument 'PATTERN'[/red]")
         console.print("Use --example to see usage examples.")
         return
+    flags = 0 if case_sensitive else re.IGNORECASE
+    try:
+        compiled_re = _compile_regex_safe(pattern, flags)
+    except (ValueError, re.error) as e:
+        raise click.ClickException(f"Invalid regex: {e}")
+
     proj = find_project(project) if project else None
+    if project and proj is None:
+        console.print(f"[red]No project found matching '{project}'[/red]")
+        console.print("\nUse 'claude-history projects' to see available projects.")
+        return
 
     console.print(f"[bold]Searching for:[/bold] {pattern}")
     if proj:
@@ -500,7 +517,7 @@ def search(
 
     results_count = 0
     try:
-        for session, messages, compiled_re in search_sessions(pattern, proj, case_sensitive):
+        for session, messages in search_sessions(pattern, proj, case_sensitive):
             if results_count >= limit:
                 break
 
@@ -570,6 +587,10 @@ def export(
         console.print("Use --example to see usage examples.")
         return
     proj = find_project(project) if project else None
+    if project and proj is None:
+        console.print(f"[red]No project found matching '{project}'[/red]")
+        console.print("\nUse 'claude-history projects' to see available projects.")
+        return
     session = get_session_by_id(session_id, proj)
 
     if not session:
@@ -1506,8 +1527,8 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
     if year < 2024:
         console.print("[red]Error: Year must be 2024 or later (Claude Code was released in 2024)[/red]")
         return
-    if year > current_year + 1:
-        console.print("[red]Error: Year cannot be more than 1 year in the future[/red]")
+    if year > current_year:
+        console.print("[red]Error: Year cannot be in the future[/red]")
         return
 
     # Early January suggestion

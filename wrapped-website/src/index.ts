@@ -38,7 +38,7 @@ function parseStrictYear(value: string): number | null {
   if (!/^\d{4}$/.test(value)) return null;
   const year = Number(value);
   const currentYear = new Date().getFullYear();
-  return year >= 2024 && year <= currentYear + 1 ? year : null;
+  return year >= 2024 && year <= currentYear ? year : null;
 }
 
 function isBase64Url(value: string): boolean {

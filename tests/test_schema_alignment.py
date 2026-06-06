@@ -64,7 +64,7 @@ def test_typescript_decodes_python_encoding(tmp_path):
 
     # Run TypeScript schema alignment test
     result = subprocess.run(
-        ["npx", "tsx", "tests/schema-alignment.test.ts"],
+        ["npx", "vitest", "run", "tests/schema-alignment.test.ts"],
         capture_output=True,
         text=True,
         cwd=WRAPPED_WEBSITE_DIR,

@@ -243,15 +243,20 @@ git clone <repo>
 cd claude-history-explorer
 uv sync
 
+# Install Wrapped website dependencies first so Python↔TypeScript bridge tests run
+cd wrapped-website
+npm ci
+cd ..
+
 # Run Python tests/lint
 uv run pytest
 uv run ruff check .
 
-# Run Wrapped website tests/typecheck/audit
+# Run Wrapped website tests/typecheck/lint/audit
 cd wrapped-website
-npm ci
 npm test
 npm run typecheck
+npm run lint
 npm audit
 cd ..
 

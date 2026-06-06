@@ -72,6 +72,35 @@ class TestProjectDiscovery:
                 projects = list_projects()
                 assert len(projects) == 1
 
+    def test_excludes_plain_non_encoded_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            projects_dir = self._make_projects_dir(
+                tmp, ["-Users-ade-foo", "cache", "logs"]
+            )
+            with patch("claude_history_explorer.projects.get_projects_dir",
+                       return_value=projects_dir):
+                projects = list_projects()
+                assert [project.name for project in projects] == ["-Users-ade-foo"]
+
+    def test_mixed_empty_and_non_empty_projects_sort_without_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            projects_dir = Path(tmp) / "projects"
+            projects_dir.mkdir()
+            empty = projects_dir / "-Users-ade-empty"
+            full = projects_dir / "C--Users-Moho-project"
+            empty.mkdir()
+            full.mkdir()
+            (full / "session.jsonl").write_text(
+                '{"type":"user","timestamp":"2025-01-01T00:00:00Z","message":{"content":"hi"}}\n'
+            )
+            with patch("claude_history_explorer.projects.get_projects_dir",
+                       return_value=projects_dir):
+                projects = list_projects()
+                assert [project.name for project in projects] == [
+                    "C--Users-Moho-project",
+                    "-Users-ade-empty",
+                ]
+
 
 # ---------------------------------------------------------------------------
 # Issues 2-4: _decode_project_path — Unix root, drive letters, fallback sep
@@ -133,6 +162,20 @@ class TestDecodeProjectPath:
     def test_trailing_dash(self):
         result = Project._decode_project_path("-Users-ade-project-")
         assert "project" in result
+
+    def test_existing_dotted_path_component_is_preserved(self, tmp_path):
+        target = tmp_path / "foo.bar"
+        target.mkdir()
+        encoded = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in str(target))
+
+        assert Project._decode_project_path(encoded) == str(target)
+
+    def test_existing_spaced_path_component_is_preserved(self, tmp_path):
+        target = tmp_path / "foo bar"
+        target.mkdir()
+        encoded = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in str(target))
+
+        assert Project._decode_project_path(encoded) == str(target)
 
 
 # ---------------------------------------------------------------------------

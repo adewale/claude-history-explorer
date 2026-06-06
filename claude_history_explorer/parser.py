@@ -12,11 +12,11 @@ import re
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple
 
-logger = logging.getLogger(__name__)
-
 from .models import Message, Project, Session
 from .projects import list_projects
 from .utils import _compile_regex_safe
+
+logger = logging.getLogger(__name__)
 
 MAX_LINE_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -45,14 +45,23 @@ def parse_session(file_path: Path, project_path: str = "") -> Session:
     slug = None
 
     lines_seen = 0
-    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            line = line.strip()
+    with open(file_path, "rb") as f:
+        while True:
+            raw_line = f.readline(MAX_LINE_BYTES + 1)
+            if raw_line == b"":
+                break
+            if len(raw_line) > MAX_LINE_BYTES:
+                # Discard the remainder of the oversized physical line without
+                # ever allocating the whole line in memory.
+                while raw_line and not raw_line.endswith(b"\n"):
+                    raw_line = f.readline(MAX_LINE_BYTES + 1)
+                lines_seen += 1
+                continue
+
+            line = raw_line.decode("utf-8", errors="replace").strip()
             if not line:
                 continue
             lines_seen += 1
-            if len(line) > MAX_LINE_BYTES:
-                continue
             try:
                 data = json.loads(line)
 
@@ -110,6 +119,7 @@ def get_session_by_id(
 
     exact_match = None
     prefix_match = None
+    substring_match = None
     for proj in projects:
         for session_file in proj.session_files:
             stem = session_file.stem
@@ -118,10 +128,12 @@ def get_session_by_id(
                 break
             if stem.startswith(session_id) and prefix_match is None:
                 prefix_match = (session_file, proj)
+            if session_id in stem and substring_match is None:
+                substring_match = (session_file, proj)
         if exact_match:
             break
 
-    hit = exact_match or prefix_match
+    hit = exact_match or prefix_match or substring_match
     if hit:
         return parse_session(hit[0], hit[1].path)
     return None
@@ -129,7 +141,7 @@ def get_session_by_id(
 
 def search_sessions(
     pattern: str, project: Optional[Project] = None, case_sensitive: bool = False
-) -> Iterator[Tuple[Session, List[Message], "re.Pattern"]]:
+) -> Iterator[Tuple[Session, List[Message]]]:
     """Search for a regex pattern across all sessions.
 
     Searches message content and tool inputs. Yields results as they're found
@@ -148,13 +160,13 @@ def search_sessions(
         ...     print(f"{session.session_id}: {len(matches)} matches")
     """
 
+    flags = 0 if case_sensitive else re.IGNORECASE
+    regex = _compile_regex_safe(pattern, flags)
+
     if project:
         projects = [project]
     else:
         projects = list_projects()
-
-    flags = 0 if case_sensitive else re.IGNORECASE
-    regex = _compile_regex_safe(pattern, flags)
 
     for proj in projects:
         for session_file in proj.session_files:
@@ -174,4 +186,4 @@ def search_sessions(
                     matching_messages.append(msg)
 
             if matching_messages:
-                yield session, matching_messages, regex
+                yield session, matching_messages

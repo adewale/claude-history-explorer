@@ -393,7 +393,8 @@ This document provides a visual overview of the Claude History Explorer's domain
 
 ### Storage
 - Claude Code stores all conversation history in `~/.claude/projects/`
-- Each project directory name is an encoded filesystem path (e.g., `/Users/ade/myproject` becomes `-Users-ade-myproject`)
+- Each project directory name is an encoded filesystem path. Unix paths look like `-Users-ade-myproject`; Windows drive-letter paths look like `C--Users-ade-myproject`; UNC paths look like `--server-share-myproject`.
+- Decoding is ambiguity-aware: the code probes existing filesystem components by re-encoding child names, then falls back to a normalized slash-separated path when the original project path is not present on the current machine.
 - Session files are JSONL format, with `agent-*` prefix indicating delegated tasks
 
 ### Core Entities

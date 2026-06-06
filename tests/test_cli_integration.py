@@ -11,7 +11,6 @@ Run with: uv run pytest tests/test_cli_integration.py -v
 """
 
 import json
-import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -304,6 +303,17 @@ class TestSessionsCommand:
 
                 assert result.exit_code == 0
 
+    def test_sessions_accepts_documented_head_flag(self, runner, mock_project, mock_session):
+        """Test sessions command keeps --head as an explicit default flag."""
+        mock_project.session_files = [Path("/mock/session.jsonl")]
+
+        with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
+            with patch('claude_history_explorer.cli.parse_session', return_value=mock_session):
+                result = runner.invoke(main, ['sessions', 'myproject', '--head'])
+
+        assert result.exit_code == 0
+        assert 'No such option' not in result.output
+
 
 # =============================================================================
 # Test: show command
@@ -423,6 +433,14 @@ class TestShowCommand:
             assert result.exit_code == 0
             assert 'first 3 of 10' in result.output.lower()
 
+    def test_show_accepts_documented_head_flag(self, runner, mock_session):
+        """Test show command keeps --head as an explicit default flag."""
+        with patch('claude_history_explorer.cli.get_session_by_id', return_value=mock_session):
+            result = runner.invoke(main, ['show', 'abc123', '--head'])
+
+        assert result.exit_code == 0
+        assert 'No such option' not in result.output
+
 
 # =============================================================================
 # Test: search command
@@ -438,7 +456,7 @@ class TestSearchCommand:
             Message(role="user", content="Help with Python code", timestamp=datetime(2025, 12, 15, 10, 0)),
             Message(role="assistant", content="I can help with Python!", timestamp=datetime(2025, 12, 15, 10, 1)),
         ]
-        search_results = [(mock_session, matching_messages, re.compile("."))]
+        search_results = [(mock_session, matching_messages)]
 
         with patch('claude_history_explorer.cli.search_sessions', return_value=search_results):
             result = runner.invoke(main, ['search', 'Python'])
@@ -458,7 +476,7 @@ class TestSearchCommand:
         matching_messages = [
             Message(role="user", content="test content", timestamp=datetime(2025, 12, 15, 10, 0)),
         ]
-        search_results = [(mock_session, matching_messages, re.compile("."))]
+        search_results = [(mock_session, matching_messages)]
 
         with patch('claude_history_explorer.cli.find_project', return_value=mock_project):
             with patch('claude_history_explorer.cli.search_sessions', return_value=search_results):
@@ -478,8 +496,7 @@ class TestSearchCommand:
         matching_messages = [
             Message(role="user", content="test content", timestamp=datetime(2025, 12, 15, 10, 0)),
         ]
-        dummy_re = re.compile(".")
-        search_results = [(mock_session, matching_messages, dummy_re)] * 20
+        search_results = [(mock_session, matching_messages)] * 20
 
         with patch('claude_history_explorer.cli.search_sessions', return_value=search_results):
             result = runner.invoke(main, ['search', 'test', '-n', '5'])

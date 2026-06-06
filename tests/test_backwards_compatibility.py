@@ -174,7 +174,7 @@ class TestTypeScriptBackwardsCompatibility:
         """Verify TypeScript decoder handles all golden URLs."""
         require_wrapped_node_deps()
         result = subprocess.run(
-            ["npx", "tsx", "tests/backwards-compat.test.ts"],
+            ["npx", "vitest", "run", "tests/backwards-compat.test.ts"],
             capture_output=True,
             text=True,
             cwd=WRAPPED_WEBSITE_DIR,

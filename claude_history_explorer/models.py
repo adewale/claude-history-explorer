@@ -296,10 +296,12 @@ class Project:
         """
         components = encoded_name.split("-")
 
-        if (len(components) >= 2
-                and len(components[0]) == 1
-                and components[0].isalpha()
-                and components[1] == ""):
+        if (
+            len(components) >= 2
+            and len(components[0]) == 1
+            and components[0].isalpha()
+            and components[1] == ""
+        ):
             root = f"{components[0].upper()}:/"
             start = 2
         elif len(components) >= 2 and components[0] == "" and components[1] == "":
@@ -307,28 +309,36 @@ class Project:
             start = 2
         else:
             root = "/"
-            start = 1 if components[0] == "" else 0
+            start = 1 if components and components[0] == "" else 0
+
+        def encoded_parts(name: str) -> list[str]:
+            encoded = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in name)
+            return encoded.split("-")
 
         def decode_from(index: int, current_path: Path) -> Optional[Path]:
             if index >= len(components):
                 return current_path
+            if not current_path.exists() or not current_path.is_dir():
+                return None
 
-            for end in range(len(components), index, -1):
-                parts = components[index:end]
-                if not any(parts):
+            try:
+                children = sorted(
+                    current_path.iterdir(),
+                    key=lambda child: (-len(encoded_parts(child.name)), child.name),
+                )
+            except OSError:
+                return None
+
+            for child in children:
+                if not child.is_dir():
                     continue
-                candidate_names = ["-".join(parts)]
-                underscore_name = "_".join(parts)
-                if underscore_name not in candidate_names:
-                    candidate_names.append(underscore_name)
-
-                for candidate_name in candidate_names:
-                    candidate = current_path / candidate_name
-                    if not candidate.exists():
-                        continue
-                    decoded = decode_from(end, candidate)
-                    if decoded is not None:
-                        return decoded
+                child_parts = encoded_parts(child.name)
+                end = index + len(child_parts)
+                if components[index:end] != child_parts:
+                    continue
+                decoded = decode_from(end, child)
+                if decoded is not None:
+                    return decoded
 
             return None
 

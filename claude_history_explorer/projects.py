@@ -7,11 +7,19 @@ This module provides functions to locate and list Claude Code projects:
 - find_project(): Find a specific project by name/path search
 """
 
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
 from .models import Project
+
+ENCODED_PROJECT_DIR_RE = re.compile(r"^(?:-|--|[A-Za-z]--).+")
+
+
+def is_encoded_project_dir_name(name: str) -> bool:
+    """Return whether a directory name has Claude Code's encoded path shape."""
+    return bool(name) and not name.startswith(".") and bool(ENCODED_PROJECT_DIR_RE.match(name))
 
 
 def get_claude_dir() -> Path:
@@ -50,11 +58,13 @@ def list_projects() -> List[Project]:
 
     projects = []
     for item in projects_dir.iterdir():
-        if item.is_dir() and not item.name.startswith("."):
+        if item.is_dir() and is_encoded_project_dir_name(item.name):
             projects.append(Project.from_dir(item))
 
-    # Sort by last modified
-    projects.sort(key=lambda p: p.last_modified or datetime.min, reverse=True)
+    # Sort by last modified. Project.last_modified is timezone-aware, so the
+    # fallback must be aware too or mixed empty/non-empty project dirs crash.
+    oldest = datetime.min.replace(tzinfo=timezone.utc)
+    projects.sort(key=lambda p: p.last_modified or oldest, reverse=True)
     return projects
 
 

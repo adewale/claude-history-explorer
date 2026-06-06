@@ -98,7 +98,7 @@ When you open a Wrapped URL, the Worker receives and decodes the encoded URL dat
 | Tool modifying history | History read-only code paths and tests |
 | CLI data exfiltration | No CLI network calls |
 | Hidden fields in Wrapped URLs | `wrapped --decode` exposes the payload |
-| Malicious Wrapped URLs | Runtime validation, bounded decoding, escaping, CSP |
+| Malicious Wrapped URLs | Python and Worker decoders enforce Base64URL/size limits, runtime schema checks, bounded RLE, escaping, and CSP |
 | Supply chain risk | Small dependency sets, `npm audit`, `ruff`, tests |
 
 Out of scope: malware on your machine, someone with shell access to your account, screenshots/terminal logs you share, or a Wrapped URL you intentionally publish.

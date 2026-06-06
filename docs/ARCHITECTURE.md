@@ -304,16 +304,20 @@ Formatted Output (brief/detailed/timeline)
 3. **Path Sanitization**: Project path decoding prevents traversal
 4. **Error Handling**: Graceful handling of missing/corrupted files
 
-### Path Security
+### Path Decoding
 ```
-Encoded Path: -Users-username-Documents-my-project
-     │
-     ▼
-Decoding: "/" + name.lstrip("-").replace("-", "/")
-     │
-     ▼
-Result: /Users/username/Documents/my/project
+Unix encoded path:    -Users-username-Documents-my-project
+Windows drive path:   C--Users-username-Documents-my-project
+UNC path:             --server-share-project
 ```
+
+Claude Code encodes filesystem paths into project directory names by replacing
+path separators and other non-alphanumeric characters with `-`. Because that is
+ambiguous (`foo.bar`, `foo_bar`, `foo bar`, and nested `foo/bar` can collide),
+`Project._decode_project_path()` first recognizes the root shape (Unix, Windows
+drive, or UNC), then probes existing filesystem components by re-encoding child
+directory names. If the original path no longer exists on the current machine, it
+falls back to a normalized slash-separated display path.
 
 ## Performance Considerations
 

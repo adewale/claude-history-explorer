@@ -297,7 +297,7 @@ class TestParser:
             ):
                 results = list(search_sessions("NEEDLE"))
                 assert len(results) == 1
-                session, matches, _regex = results[0]
+                session, matches = results[0]
                 assert len(matches) == 1
 
 
