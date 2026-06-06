@@ -393,7 +393,8 @@ This document provides a visual overview of the Claude History Explorer's domain
 
 ### Storage
 - Claude Code stores all conversation history in `~/.claude/projects/`
-- Each project directory name is an encoded filesystem path (e.g., `/Users/ade/myproject` becomes `-Users-ade-myproject`)
+- Each project directory name is an encoded filesystem path. Unix paths look like `-Users-ade-myproject`; Windows drive-letter paths look like `C--Users-ade-myproject`; UNC paths look like `--server-share-myproject`.
+- Decoding is ambiguity-aware: the code probes existing filesystem components by re-encoding child names, then falls back to a normalized slash-separated path when the original project path is not present on the current machine.
 - Session files are JSONL format, with `agent-*` prefix indicating delegated tasks
 
 ### Core Entities
@@ -409,6 +410,9 @@ This document provides a visual overview of the Claude History Explorer's domain
 
 ### Design Principles
 1. **Read-only**: Never modifies any Claude Code history files
-2. **Streaming**: Parses JSONL line-by-line for memory efficiency
+2. **Streaming**: Parses JSONL line-by-line for memory efficiency, with explicit line-size bounds before decoding
 3. **Graceful degradation**: Skips malformed lines, handles missing data
 4. **Privacy-first**: Wrapped URLs contain only aggregate statistics, no content
+5. **Cross-platform path handling**: Treats Claude project directory names as ambiguous encoded paths and preserves real filesystem components when possible
+
+See [Lessons Learned](LESSONS_LEARNED.md) for the audit history behind these principles.

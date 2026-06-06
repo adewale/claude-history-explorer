@@ -1,9 +1,10 @@
 /**
  * Unit tests for the V3 decoder
  *
- * Run with: npx tsx tests/decoder.test.ts
+ * Run with: npx vitest run tests/decoder.test.ts
  */
 
+import { describe, expect, it } from 'vitest';
 import msgpack from 'msgpack-lite';
 
 import {
@@ -736,3 +737,10 @@ if (failed > 0) {
 } else {
   console.log('\nAll tests passed!');
 }
+
+describe('decoder compatibility harness', () => {
+  it('passes all manual decoder assertions', () => {
+    expect(failed).toBe(0);
+    expect(passed).toBeGreaterThan(0);
+  });
+});

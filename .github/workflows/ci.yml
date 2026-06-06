@@ -16,11 +16,12 @@ concurrency:
 
 jobs:
   python:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.10', '3.13']
     steps:
       - name: Check out repository
@@ -82,6 +83,10 @@ jobs:
       - name: Typecheck
         working-directory: wrapped-website
         run: npm run typecheck
+
+      - name: Lint
+        working-directory: wrapped-website
+        run: npm run lint
 
       - name: Audit production dependencies
         working-directory: wrapped-website

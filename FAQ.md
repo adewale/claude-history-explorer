@@ -63,7 +63,8 @@ Claude Code stores conversation history in:
 │   └── ...
 ```
 
-- Project directories are named with the path encoded (slashes become dashes)
+- Project directories are named with an encoded filesystem path. Unix paths look like `-Users-username-path-to-project`, Windows drive paths like `C--Users-username-path-to-project`, and UNC paths like `--server-share-project`.
+- Decoding is ambiguity-aware: when possible, the tool probes existing filesystem components to preserve dots, spaces, underscores, and hyphenated names.
 - Each `.jsonl` file is a conversation session
 - Files prefixed with `agent-` are sub-agent conversations
 
@@ -231,6 +232,10 @@ cd claude-history-explorer
 uv sync
 uv run claude-history --help
 ```
+
+## Where are project lessons and maintenance notes kept?
+
+See [docs/LESSONS_LEARNED.md](docs/LESSONS_LEARNED.md). It records lessons from audits, Windows compatibility work, Wrapped security hardening, cross-language tests, and real-corpus smoke testing.
 
 ## How do I get help for a specific command?
 

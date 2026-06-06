@@ -6,7 +6,7 @@ This module provides functions to generate development narratives:
 """
 
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List
 
 from .constants import (
@@ -65,10 +65,13 @@ def generate_project_story(project: Project) -> ProjectStory:
     # Basic lifecycle data
     first_session = sessions[0]
     last_session = sessions[-1]
-    lifecycle_days = (last_session.start_time - first_session.start_time).days + 1
+    try:
+        lifecycle_days = (last_session.start_time - first_session.start_time).days + 1
+    except TypeError:
+        lifecycle_days = 1
 
     # Daily activity analysis
-    daily_activity: Dict[datetime, int] = defaultdict(int)
+    daily_activity: Dict[date, int] = defaultdict(int)
     for session in sessions:
         day = session.start_time.date()
         daily_activity[day] += session.message_count
@@ -92,21 +95,18 @@ def generate_project_story(project: Project) -> ProjectStory:
     # simultaneous starts are reported as 3 instances, not 2 overlaps.
     concurrent_claude_instances = 1 if sessions else 0
 
-    for session1 in sessions:
-        if not session1.start_time:
-            continue
-        clustered_sessions = 0
-        for session2 in sessions:
-            if not session2.start_time:
-                continue
-            time_diff = abs(
-                (session1.start_time - session2.start_time).total_seconds() / 60
-            )
-            if time_diff < CONCURRENT_WINDOW_MINUTES:
-                clustered_sessions += 1
-
+    sorted_sessions = sorted(
+        [s for s in sessions if s.start_time],
+        key=lambda s: s.start_time,
+    )
+    left = 0
+    for right in range(len(sorted_sessions)):
+        while (
+            sorted_sessions[right].start_time - sorted_sessions[left].start_time
+        ).total_seconds() / 60 >= CONCURRENT_WINDOW_MINUTES:
+            left += 1
         concurrent_claude_instances = max(
-            concurrent_claude_instances, clustered_sessions
+            concurrent_claude_instances, right - left + 1
         )
 
     # Generate insights about concurrent usage
@@ -133,11 +133,12 @@ def generate_project_story(project: Project) -> ProjectStory:
     agent_sessions = len([s for s in sessions if s.is_agent])
     main_sessions = len([s for s in sessions if not s.is_agent])
 
-    if main_sessions > 0:
-        agent_ratio = agent_sessions / main_sessions
-        if agent_ratio > 2:
+    total_sessions = len(sessions)
+    if total_sessions > 0:
+        agent_ratio = agent_sessions / total_sessions
+        if agent_ratio > 0.66:
             collaboration_style = "Heavy delegation"
-        elif agent_ratio > 1:
+        elif agent_ratio > 0.33:
             collaboration_style = "Balanced collaboration"
         else:
             collaboration_style = "Primarily direct work"

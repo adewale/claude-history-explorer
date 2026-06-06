@@ -16,7 +16,6 @@ from .utils import format_duration
 
 
 def _classify_project(path: str) -> str:
-    """Classify a project by its path."""
     path_lower = path.lower()
     for work_type, patterns in WORK_TYPE_PATTERNS.items():
         for pattern in patterns:
@@ -53,7 +52,10 @@ def calculate_project_stats(project: Project) -> ProjectStats:
 
     for session_file in project.session_files:
         # File size
-        total_size_bytes += session_file.stat().st_size
+        try:
+            total_size_bytes += session_file.stat().st_size
+        except OSError:
+            continue
 
         # Parse session
         session = parse_session(session_file, project.path)

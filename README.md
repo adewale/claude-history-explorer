@@ -230,7 +230,8 @@ Claude Code stores conversation history in:
 │   └── ...
 ```
 
-- Project directories are named with the path encoded (slashes become dashes)
+- Project directories are named with an encoded filesystem path. Unix paths look like `-Users-username-path-to-project`, Windows drive paths like `C--Users-username-path-to-project`, and UNC paths like `--server-share-project`.
+- Decoding is ambiguity-aware: when possible, the tool probes existing filesystem components to preserve dots, spaces, underscores, and hyphenated names.
 - Each `.jsonl` file is a conversation session
 - Files prefixed with `agent-` are sub-agent conversations
 - Each line in a JSONL file is a JSON object representing a message or event
@@ -243,21 +244,37 @@ git clone <repo>
 cd claude-history-explorer
 uv sync
 
+# Install Wrapped website dependencies first so Python↔TypeScript bridge tests run
+cd wrapped-website
+npm ci
+cd ..
+
 # Run Python tests/lint
 uv run pytest
 uv run ruff check .
 
-# Run Wrapped website tests/typecheck/audit
+# Run privacy-preserving smoke test against your local Claude corpus
+uv run python scripts/smoketest_local_corpus.py
+
+# Run Wrapped website tests/typecheck/lint/audit
 cd wrapped-website
-npm ci
 npm test
 npm run typecheck
+npm run lint
 npm audit
 cd ..
 
 # Run the CLI
 uv run claude-history --help
 ```
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Domain model](docs/DOMAIN_MODEL.md)
+- [JSON schemas](docs/JSON_SCHEMAS.md)
+- [Trust model](TRUST.md)
+- [Lessons learned](docs/LESSONS_LEARNED.md)
 
 ## License
 

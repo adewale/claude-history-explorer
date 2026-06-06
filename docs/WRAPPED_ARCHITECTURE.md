@@ -19,7 +19,7 @@
 │                                   └─────────────────────────────────────┘  │
 │                                              │                              │
 │                                              ▼                              │
-│                   https://wrapped.claude.codes/2025/eyJ5IjoyMDI1...        │
+│    https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=...      │
 │                                                                             │
 │                              📋 Copied to clipboard                         │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -32,13 +32,12 @@
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                         Pages + Functions                            │   │
 │  │                                                                      │   │
-│  │   Route: /:year/<data>                                              │   │
+│  │   Route: /wrapped?d=<data> and /og/:year/:data.svg               │   │
 │  │   ┌──────────────────────────────────────────────────────────────┐  │   │
-│  │   │  1. Validate year (2024 ≤ year ≤ current)                    │  │   │
-│  │   │  2. Decode Base64URL → MessagePack → JSON                    │  │   │
-│  │   │  3. Validate story.y === path year                           │  │   │
-│  │   │  4. Inject dynamic OG meta tags                              │  │   │
-│  │   │  5. Return HTML + hydrate client                             │  │   │
+│  │   │  1. Decode Base64URL → MessagePack → JSON                    │  │   │
+│  │   │  2. Validate V3 schema and year (2024 ≤ year ≤ current)      │  │   │
+│  │   │  3. Inject dynamic OG meta tags                              │  │   │
+│  │   │  4. Return print-view HTML or SVG preview                    │  │   │
 │  │   └──────────────────────────────────────────────────────────────┘  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
@@ -125,24 +124,28 @@
 ## URL Anatomy
 
 ```
-https://wrapped.claude.codes/2025/eyJ5IjoyMDI1LCJuIjoiQWRld2FsZSIsInAiOjQs...
-│       │                    │    │
-│       │                    │    └─── Encoded WrappedStory (MessagePack + Base64URL)
-│       │                    │
-│       │                    └──────── Year (must match story.y inside)
+https://wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=3gAX...
+│       │                                            │       │
+│       │                                            │       └── Encoded WrappedStoryV3 (MessagePack + Base64URL)
+│       │                                            │
+│       │                                            └────────── Query key for current canonical route
 │       │
-│       └───────────────────────────── Domain (Cloudflare Pages)
+│       └─────────────────────────────────────────────────────── Worker domain
 │
-└───────────────────────────────────── Protocol
+└─────────────────────────────────────────────────────────────── Protocol
 ```
 
 ---
 
 ## WrappedStory Schema
 
+Current payloads use `WrappedStoryV3`, a compact MessagePack schema documented in [WRAPPED_V3_SPEC.md](WRAPPED_V3_SPEC.md). It includes aggregate counts, monthly arrays, heatmaps, distributions, top short project names, co-occurrence edges, timeline events, session fingerprints, streaks, and token/model aggregates.
+
+Legacy proposal examples below use a smaller `WrappedStory` shape for illustration only:
+
 ```
 WrappedStory {
-  y: 2025                          ─── Year (required, validated against URL)
+  y: 2025                          ─── Year
   n: "Adewale"                     ─── Display name (optional)
 
   p: 4                             ─┐
@@ -229,6 +232,7 @@ Workers KV                    Durable Objects              R2 Storage
 
 ## Related Documents
 
-- [WRAPPED_SPEC.md](WRAPPED_SPEC.md) — Full feature specification
-- [WRAPPED_UX.md](WRAPPED_UX.md) — User experience design
-- [WRAPPED_CLOUDFLARE_SHOWCASE.md](WRAPPED_CLOUDFLARE_SHOWCASE.md) — Platform showcase details
+- [WRAPPED_V3_SPEC.md](WRAPPED_V3_SPEC.md) — Current V3 schema and visualization specification
+- [WRAPPED_UX.md](WRAPPED_UX.md) — Historical/proposal user experience design
+- [WRAPPED_CLOUDFLARE_SHOWCASE.md](WRAPPED_CLOUDFLARE_SHOWCASE.md) — Future/proposal platform showcase details
+- [LESSONS_LEARNED.md](LESSONS_LEARNED.md) — Maintenance lessons from Wrapped audits and fixes

@@ -60,6 +60,9 @@ claude_history_explorer/
 ├── wrapped.py       # Wrapped V3 metrics, encoding, decoding
 ├── history.py       # Backwards-compatible public re-export facade
 └── cli.py           # CLI commands and display formatting
+
+scripts/
+└── smoketest_local_corpus.py  # Privacy-preserving end-to-end smoke test against local Claude history
 ```
 
 ## Core Components
@@ -304,16 +307,20 @@ Formatted Output (brief/detailed/timeline)
 3. **Path Sanitization**: Project path decoding prevents traversal
 4. **Error Handling**: Graceful handling of missing/corrupted files
 
-### Path Security
+### Path Decoding
 ```
-Encoded Path: -Users-username-Documents-my-project
-     │
-     ▼
-Decoding: "/" + name.lstrip("-").replace("-", "/")
-     │
-     ▼
-Result: /Users/username/Documents/my/project
+Unix encoded path:    -Users-username-Documents-my-project
+Windows drive path:   C--Users-username-Documents-my-project
+UNC path:             --server-share-project
 ```
+
+Claude Code encodes filesystem paths into project directory names by replacing
+path separators and other non-alphanumeric characters with `-`. Because that is
+ambiguous (`foo.bar`, `foo_bar`, `foo bar`, and nested `foo/bar` can collide),
+`Project._decode_project_path()` first recognizes the root shape (Unix, Windows
+drive, or UNC), then probes existing filesystem components by re-encoding child
+directory names. If the original path no longer exists on the current machine, it
+falls back to a normalized slash-separated display path.
 
 ## Performance Considerations
 
@@ -342,6 +349,14 @@ Result: /Users/username/Documents/my/project
 2. **Integration Tests**: Command execution and data flow
 3. **Security Tests**: Read-only behavior verification
 4. **Error Handling Tests**: Edge cases and failure modes
+5. **Cross-Language Contract Tests**: Python Wrapped encoder ↔ TypeScript decoder/schema alignment
+6. **Local-Corpus Smoke Test**: `scripts/smoketest_local_corpus.py` exercises every CLI command family against real local Claude history without printing transcript content
+
+## Documentation & Maintenance Notes
+
+- [Domain model](DOMAIN_MODEL.md) documents entities and invariants.
+- [JSON schemas](JSON_SCHEMAS.md) documents command outputs used by scripts.
+- [Lessons learned](LESSONS_LEARNED.md) records audit and maintenance lessons that should influence future changes.
 
 ## Dependencies
 

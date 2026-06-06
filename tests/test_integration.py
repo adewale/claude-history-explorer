@@ -16,7 +16,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import require_wrapped_node_deps
+from conftest import npx_command, require_wrapped_node_deps
 
 from claude_history_explorer.history import (
     WrappedStoryV3,
@@ -246,9 +246,9 @@ try {{
     let allPassed = true;
     for (const [name, passed] of checks) {{
         if (passed) {{
-            console.log(`✓ ${{name}}`);
+            console.log(`PASS ${{name}}`);
         }} else {{
-            console.log(`✗ ${{name}}`);
+            console.log(`FAIL ${{name}}`);
             allPassed = false;
         }}
     }}
@@ -271,12 +271,14 @@ try {{
         wrapped_dir = Path(__file__).parent.parent / "wrapped-website"
         test_file = tmp_path / "cross_language_test.ts"
 
-        test_file.write_text(ts_test_script)
+        test_file.write_text(ts_test_script, encoding="utf-8")
         result = subprocess.run(
-            ["npx", "tsx", str(test_file)],
+            [npx_command(), "tsx", str(test_file)],
             cwd=str(wrapped_dir),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
         )
 
@@ -296,6 +298,8 @@ class TestGenerateWrappedStoryV3Integration:
         # Create mock project
         mock_project = MagicMock()
         mock_project.short_name = "IntegrationProject"
+        mock_project.basename = "IntegrationProject"
+        mock_project.name = "IntegrationProject"
         mock_project.path = "/test/integration"
         mock_project.session_files = [Path("/test/session1.jsonl"), Path("/test/session2.jsonl")]
 

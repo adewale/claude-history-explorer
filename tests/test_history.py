@@ -1833,7 +1833,9 @@ class TestFingerprintComputation:
                 )
             ]
 
-            session_file_map = {"test-session": session_file}
+            from claude_history_explorer.parser import parse_session
+            parsed_session = parse_session(session_file)
+            session_file_map = {"test-session": parsed_session}
 
             result = get_top_session_fingerprints(sessions, session_file_map, ["Project"], limit=5)
 
@@ -1871,19 +1873,19 @@ class TestV3Integration:
                 'bs': 0.40, 'cs': 0.33, 'mv': 0.55, 'td': 0.60, 'ri': 0.70
             },
             tp=[
-                {'n': 'Main Project', 'm': 3000, 'h': 100.0, 'd': 30, 's': 60, 'ar': 40, 'fd': 15, 'ld': 350},
-                {'n': 'Side Project', 'm': 2000, 'h': 75.0, 'd': 20, 's': 40, 'ar': 60, 'fd': 50, 'ld': 300},
-                {'n': 'Experiment', 'm': 1500, 'h': 50.0, 'd': 15, 's': 30, 'ar': 30, 'fd': 100, 'ld': 250},
+                ['Main Project', 3000, 100, 30, 60, 40],
+                ['Side Project', 2000, 75, 20, 40, 60],
+                ['Experiment', 1500, 50, 15, 30, 30],
             ],
             pc=[(0, 1, 10), (0, 2, 5), (1, 2, 3)],
             te=[
-                {'d': 50, 't': 0, 'v': 150},   # peak_day
-                {'d': 100, 't': 4, 'v': 1000}, # milestone
-                {'d': 150, 't': 3, 'p': 2},    # new_project
+                [50, 0, 150, -1],
+                [100, 4, 1000, -1],
+                [150, 3, -1, 2],
             ],
             sf=[
-                {'id': 'abc123', 'd': 120, 'm': 100, 'a': False, 'h': 10, 'w': 0, 'pi': 0, 'fp': [20, 40, 60, 80, 50, 10, 30, 20]},
-                {'id': 'def456', 'd': 90, 'm': 80, 'a': True, 'h': 14, 'w': 2, 'pi': 1, 'fp': [30, 50, 70, 90, 40, 20, 40, 30]},
+                [120, 100, 0, 10, 0, 0, 20, 40, 60, 80, 50, 10, 30, 20],
+                [90, 80, 1, 14, 2, 1, 30, 50, 70, 90, 40, 20, 40, 30],
             ],
             yoy={'pm': 5000, 'ph': 180, 'ps': 100, 'pp': 4, 'pd': 35},
         )
@@ -1915,9 +1917,13 @@ class TestV3Integration:
         assert decoded.ar == story.ar
         assert decoded.ts == story.ts
         assert len(decoded.tp) == 3
-        assert decoded.tp[0]['n'] == 'Main Project'
+        assert decoded.tp[0][0] == 'Main Project'
+        assert decoded.tp[0][1] == 3000
         assert decoded.pc == [(0, 1, 10), (0, 2, 5), (1, 2, 3)]
         assert len(decoded.te) == 3
+        assert decoded.te[0] == [50, 0, 150, -1]
+        assert len(decoded.sf) == 2
+        assert decoded.sf[0][0] == 120
         assert decoded.yoy == story.yoy
 
     def test_url_size_typical(self):
@@ -1944,21 +1950,21 @@ class TestV3Integration:
                 'bs': 0.40, 'cs': 0.35, 'mv': 0.50, 'td': 0.55, 'ri': 0.60
             },
             tp=[
-                {'n': 'Main Project', 'm': 4000, 'h': 100.0, 'd': 30, 's': 70, 'ar': 45, 'fd': 20, 'ld': 340},
-                {'n': 'Side Project', 'm': 2500, 'h': 80.0, 'd': 25, 's': 50, 'ar': 55, 'fd': 60, 'ld': 300},
-                {'n': 'Hobby', 'm': 1500, 'h': 50.0, 'd': 15, 's': 30, 'ar': 30, 'fd': 100, 'ld': 250},
-                {'n': 'Learning', 'm': 1000, 'h': 40.0, 'd': 10, 's': 25, 'ar': 60, 'fd': 150, 'ld': 320},
-                {'n': 'Work Tool', 'm': 1000, 'h': 30.0, 'd': 10, 's': 25, 'ar': 20, 'fd': 50, 'ld': 350},
+                ['Main Project', 4000, 100, 30, 70, 45],
+                ['Side Project', 2500, 80, 25, 50, 55],
+                ['Hobby', 1500, 50, 15, 30, 30],
+                ['Learning', 1000, 40, 10, 25, 60],
+                ['Work Tool', 1000, 30, 10, 25, 20],
             ],
             pc=[(0, 1, 8), (0, 2, 3), (1, 3, 5)],
             te=[
-                {'d': 100, 't': 0, 'v': 200},
-                {'d': 50, 't': 4, 'v': 1000},
-                {'d': 200, 't': 4, 'v': 5000},
+                [100, 0, 200, -1],
+                [50, 4, 1000, -1],
+                [200, 4, 5000, -1],
             ],
             sf=[
-                {'id': 'abc123', 'd': 90, 'm': 80, 'a': False, 'h': 10, 'w': 0, 'pi': 0, 'fp': [20, 50, 70, 80, 50, 10, 30, 20]},
-                {'id': 'def456', 'd': 120, 'm': 100, 'a': True, 'h': 14, 'w': 2, 'pi': 1, 'fp': [30, 50, 60, 90, 40, 20, 40, 30]},
+                [90, 80, 0, 10, 0, 0, 20, 50, 70, 80, 50, 10, 30, 20],
+                [120, 100, 1, 14, 2, 1, 30, 50, 60, 90, 40, 20, 40, 30],
             ],
             yoy={'pm': 7000, 'ph': 200, 'ps': 150, 'pp': 4, 'pd': 50},
         )

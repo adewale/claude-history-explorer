@@ -5,9 +5,10 @@
  * as we make changes to the decoder. This prevents breaking changes that would
  * make old URLs unusable.
  *
- * Run with: npx tsx tests/backwards-compat.test.ts
+ * Run with: npx vitest run tests/backwards-compat.test.ts
  */
 
+import { describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -182,3 +183,10 @@ function runTests() {
 }
 
 runTests();
+
+describe('backwards compatibility harness', () => {
+  it('passes all manual golden URL assertions', () => {
+    expect(failed).toBe(0);
+    expect(passed).toBeGreaterThan(0);
+  });
+});

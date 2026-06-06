@@ -7,19 +7,22 @@ This module provides functions for generating and encoding wrapped stories:
 - Various compute_* functions for metrics and distributions
 """
 
-import json
+import base64
+import binascii
 import math
+import re
 from bisect import bisect_right
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from .constants import MILESTONE_VALUES
 from .models import (
     MAX_DISPLAY_NAME_LENGTH,
     MAX_PROJECT_NAME_LENGTH,
     WRAPPED_VERSION_V3,
+    Project,
     ProjectStatsV3,
     Session,
     SessionInfoV3,
@@ -49,6 +52,14 @@ MAX_PROJECTS = 12
 MAX_COOCCURRENCE_EDGES = 20
 MAX_TIMELINE_EVENTS = 25
 MAX_SESSION_FINGERPRINTS = 20
+
+HEATMAP_SIZE = 168
+MAX_RLE_OUTPUT = 1024
+MAX_ENCODED_LENGTH = 100_000
+MAX_DECODED_BYTES = 75_000
+BASE64URL_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+MODEL_FAMILIES = {"opus", "sonnet", "haiku"}
 
 # Heatmap quantization scale (0-15 for compact encoding)
 HEATMAP_QUANT_SCALE = 15
@@ -430,11 +441,10 @@ def compute_session_fingerprint(session: Session) -> List[int]:
 
     # Divide session into 4 quarters by message index
     total_messages = len(session.messages)
-    quarter_size = max(1, total_messages // 4)
 
     quarter_counts = [0, 0, 0, 0]
-    for i, msg in enumerate(session.messages):
-        quarter = min(3, i // quarter_size)
+    for i in range(total_messages):
+        quarter = min(3, (i * 4) // total_messages)
         quarter_counts[quarter] += 1
 
     # Normalize quarters to 0-1
@@ -479,7 +489,7 @@ def compute_session_fingerprint(session: Session) -> List[int]:
 
 def get_top_session_fingerprints(
     sessions: List[SessionInfoV3],
-    session_file_map: Dict[str, Path],
+    session_file_map: Dict[str, Union[Path, Session]],
     project_names: List[str],
     limit: int = MAX_SESSION_FINGERPRINTS,
 ) -> List[List]:
@@ -487,7 +497,7 @@ def get_top_session_fingerprints(
 
     Args:
         sessions: List of SessionInfoV3 with project_name set
-        session_file_map: Mapping of session_id to file path for loading
+        session_file_map: Mapping of session_id to a parsed Session or session file path
         project_names: Ordered list of project names for indexing
         limit: Max fingerprints to return
 
@@ -510,16 +520,19 @@ def get_top_session_fingerprints(
 
     fingerprints = []
     for _, info in scored[:limit]:
-        # Load full session if file path available
+        # Load full session if available
         fp = [25, 50, 75, 100, 50, 10, 30, 20]  # Default fallback (quantized 0-100)
 
         if info.session_id in session_file_map:
             try:
-                full_session = parse_session(
-                    session_file_map[info.session_id], info.project_path
+                session_or_path = session_file_map[info.session_id]
+                full_session = (
+                    session_or_path
+                    if isinstance(session_or_path, Session)
+                    else parse_session(session_or_path, info.project_path)
                 )
                 fp = compute_session_fingerprint(full_session)
-            except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError, KeyError):
+            except (OSError, ValueError, KeyError):
                 pass  # Use default fingerprint on parse/compute error
 
         # Compact array format: [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
@@ -570,12 +583,20 @@ def rle_encode(values: List[int]) -> List[int]:
     return result
 
 
-def rle_decode(encoded: List[int]) -> List[int]:
+def rle_decode(encoded: List[int], max_output: int = MAX_RLE_OUTPUT) -> List[int]:
     """Decode run-length encoded data."""
+    if not isinstance(encoded, list) or len(encoded) % 2 != 0:
+        raise ValueError("RLE data must be an even-length list")
     result = []
     for i in range(0, len(encoded), 2):
         value = encoded[i]
-        count = encoded[i + 1] if i + 1 < len(encoded) else 1
+        count = encoded[i + 1]
+        if not isinstance(value, int) or not isinstance(count, int):
+            raise ValueError("RLE value and count must be integers")
+        if count < 0:
+            raise ValueError(f"RLE count must be non-negative, got {count}")
+        if len(result) + count > max_output:
+            raise ValueError(f"RLE output exceeds max size {max_output}")
         result.extend([value] * count)
     return result
 
@@ -632,24 +653,156 @@ def encode_wrapped_story_v3(story: WrappedStoryV3) -> str:
     return base64.urlsafe_b64encode(packed).rstrip(b"=").decode("ascii")
 
 
-def decode_wrapped_story_v3(encoded: str) -> WrappedStoryV3:
-    """Decode V3 story."""
-    import base64
+def _validate_number_array(
+    name: str,
+    value: Any,
+    length: int,
+    min_value: int = 0,
+    max_value: int | None = None,
+) -> None:
+    if not isinstance(value, list) or len(value) != length:
+        raise ValueError(f"Invalid {name} size")
+    for item in value:
+        if not isinstance(item, (int, float)) or isinstance(item, bool):
+            raise ValueError(f"Invalid {name} values")
+        if item < min_value or (max_value is not None and item > max_value):
+            raise ValueError(f"Invalid {name} values")
 
+
+def _is_numeric_array(value: Any, length: int) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) == length
+        and all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value)
+    )
+
+
+def _default_wrapped_payload_fields(data: dict) -> None:
+    defaults: Dict[str, List[int]] = {
+        "hm": [0] * HEATMAP_SIZE,
+        "ma": [0] * 12,
+        "mh": [0] * 12,
+        "ms": [0] * 12,
+        "sd": [0] * 10,
+        "ar": [0] * 10,
+        "ml": [0] * 8,
+        "sk": [0, 0, 0, 0],
+    }
+    for key, value in defaults.items():
+        existing = data.get(key)
+        if existing in (None, []):
+            data[key] = value.copy()
+        elif key in {"sd", "ar", "ml"} and not _is_numeric_array(existing, len(value)):
+            # Backwards-compatible migration for early golden URLs whose optional
+            # visualization fields used legacy shapes. Replace unused legacy data
+            # with bounded defaults before strict validation/display.
+            data[key] = value.copy()
+    data.setdefault("tp", [])
+    data.setdefault("pc", [])
+    data.setdefault("te", [])
+    data.setdefault("sf", [])
+    data.setdefault(
+        "tk",
+        {
+            "total": 0,
+            "input": 0,
+            "output": 0,
+            "cache_read": 0,
+            "cache_create": 0,
+            "models": {},
+        },
+    )
+
+
+def _validate_wrapped_payload(data: dict) -> None:
+    if data.get("v") != WRAPPED_VERSION_V3:
+        raise ValueError(f"Unsupported Wrapped version: {data.get('v', 'missing')}")
+    current_year = datetime.now().year
+    if not isinstance(data.get("y"), int) or not 2024 <= data["y"] <= current_year:
+        raise ValueError("Invalid Wrapped year")
+    for name in ("p", "s", "m", "h", "d"):
+        value = data.get(name, 0)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            raise ValueError(f"Invalid Wrapped field: {name}")
+    if data.get("d", 0) > 366:
+        raise ValueError("Invalid Wrapped days active")
+
+    _validate_number_array("heatmap", data.get("hm"), HEATMAP_SIZE, 0, HEATMAP_QUANT_SCALE)
+    for name, length in {
+        "ma": 12,
+        "mh": 12,
+        "ms": 12,
+        "sk": 4,
+    }.items():
+        _validate_number_array(name, data.get(name, []), length)
+
+    for name, length in {"sd": 10, "ar": 10, "ml": 8}.items():
+        _validate_number_array(name, data.get(name, []), length)
+
+    top_projects = data.get("tp", [])
+    if not isinstance(top_projects, list) or len(top_projects) > MAX_PROJECTS:
+        raise ValueError("Invalid Wrapped top projects")
+    for project in top_projects:
+        if isinstance(project, list):
+            if len(project) < 6 or not isinstance(project[0], str):
+                raise ValueError("Invalid Wrapped top project")
+            stat_values = project[1:6]
+        elif isinstance(project, dict):
+            if not isinstance(project.get("n"), str):
+                raise ValueError("Invalid Wrapped top project")
+            stat_values = [project.get(key, 0) for key in ("m", "h", "d", "s", "ar")]
+        else:
+            raise ValueError("Invalid Wrapped top project")
+        for value in stat_values:
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+                raise ValueError("Invalid Wrapped top project stats")
+
+    if not isinstance(data.get("pc", []), list) or len(data.get("pc", [])) > MAX_COOCCURRENCE_EDGES:
+        raise ValueError("Invalid Wrapped project co-occurrence")
+    if not isinstance(data.get("te", []), list) or len(data.get("te", [])) > MAX_TIMELINE_EVENTS:
+        raise ValueError("Invalid Wrapped timeline events")
+    if not isinstance(data.get("sf", []), list) or len(data.get("sf", [])) > MAX_SESSION_FINGERPRINTS:
+        raise ValueError("Invalid Wrapped session fingerprints")
+
+    token_stats = data.get("tk", {})
+    if not isinstance(token_stats, dict):
+        raise ValueError("Invalid Wrapped token stats")
+
+
+def decode_wrapped_story_v3(encoded: str) -> WrappedStoryV3:
+    """Decode and validate a V3 story."""
     import msgpack
 
-    # Add padding if needed
+    if not encoded or len(encoded) > MAX_ENCODED_LENGTH or not BASE64URL_RE.fullmatch(encoded):
+        raise ValueError("Invalid or too large Wrapped data")
+
     padding = (4 - len(encoded) % 4) % 4
     padded = encoded + "=" * padding
 
-    packed = base64.urlsafe_b64decode(padded)
-    data = msgpack.unpackb(packed, raw=False, strict_map_key=False)
+    try:
+        packed = base64.b64decode(padded, altchars=b"-_", validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("Invalid Wrapped base64 data") from exc
+    if len(packed) > MAX_DECODED_BYTES:
+        raise ValueError("Decoded Wrapped data is too large")
 
-    # RLE decode heatmap if flagged
+    try:
+        data = msgpack.unpackb(packed, raw=False, strict_map_key=False)
+    except Exception as exc:
+        raise ValueError("Invalid Wrapped MessagePack payload") from exc
+    if not isinstance(data, dict):
+        raise ValueError("Invalid Wrapped payload")
+
+    # RLE decode heatmap if flagged. Heatmaps are fixed 7×24 grids.
     if data.get("hm_rle") and "hm" in data:
-        data["hm"] = rle_decode(data["hm"])
+        try:
+            data["hm"] = rle_decode(data["hm"], HEATMAP_SIZE)
+        except ValueError as exc:
+            raise ValueError(f"Invalid heatmap RLE data: {exc}") from exc
         del data["hm_rle"]
 
+    _default_wrapped_payload_fields(data)
+    _validate_wrapped_payload(data)
     return WrappedStoryV3.from_dict(data)
 
 
@@ -716,6 +869,20 @@ def compute_streak_stats(active_dates: Set[date], year: int) -> List[int]:
     return [streak_count, longest_streak, current_streak, avg_streak]
 
 
+def _project_display_names(projects: List[Project]) -> Dict[str, str]:
+    """Build stable unique display names while preserving short names when unique."""
+    base_counts = Counter(project.basename for project in projects)
+    seen: Dict[str, int] = defaultdict(int)
+    labels: Dict[str, str] = {}
+    for project in projects:
+        base = project.basename
+        seen[base] += 1
+        labels[project.path] = (
+            base if base_counts[base] == 1 or seen[base] == 1 else f"{base} ({seen[base]})"
+        )
+    return labels
+
+
 def generate_wrapped_story_v3(
     year: int, name: Optional[str] = None, previous_year_data: Optional[Dict] = None
 ) -> WrappedStoryV3:
@@ -735,9 +902,9 @@ def generate_wrapped_story_v3(
     if year < 2024:
         raise ValueError(f"Claude Code didn't exist in {year}")
 
-    # Collect all sessions with project info
-    all_sessions: List[SessionInfoV3] = []
-    session_file_map: Dict[str, Path] = {}  # For fingerprint computation
+    # Collect target-year sessions with project info
+    year_sessions: List[SessionInfoV3] = []
+    session_file_map: Dict[str, Union[Path, Session]] = {}  # For fingerprint computation
 
     # Also collect message lengths, tools, and token usage for the target year
     all_message_lengths: List[int] = []
@@ -753,45 +920,46 @@ def generate_wrapped_story_v3(
         "models": defaultdict(int),  # model -> total tokens
     }
 
-    for project in list_projects():
+    projects = list_projects()
+    project_labels = _project_display_names(projects)
+    for project in projects:
+        project_label = project_labels[project.path]
         for session_file in project.session_files:
             session = parse_session(session_file, project.path)
             is_agent = session_file.name.startswith("agent-")
             info = SessionInfoV3.from_session_with_project(
-                session, is_agent, project.short_name, project.path
+                session, is_agent, project_label, project.path
             )
-            if info is not None:
-                all_sessions.append(info)
-                session_file_map[session.session_id] = session_file
+            if info is None or not info.start_time or info.start_time.year != year:
+                continue
 
-                # Collect message lengths, tools, and tokens if in target year
-                if info.start_time and info.start_time.year == year:
-                    for msg in session.messages:
-                        if msg.content:
-                            all_message_lengths.append(len(msg.content))
-                        for tool_use in msg.tool_uses:
-                            tool_name = tool_use.get("name", "")
-                            if tool_name:
-                                all_unique_tools.add(tool_name)
-                        # Aggregate token usage from assistant messages
-                        if msg.token_usage:
-                            tu = msg.token_usage
-                            token_stats["input"] += tu.input_tokens
-                            token_stats["output"] += tu.output_tokens
-                            token_stats["cache_read"] += tu.cache_read_tokens
-                            token_stats["cache_create"] += tu.cache_creation_tokens
-                            token_stats["total"] += tu.total_tokens
-                            if tu.model:
-                                # Simplify model name for display
-                                model_short = (
-                                    tu.model.split("-")[1] if "-" in tu.model else tu.model
-                                )
-                                token_stats["models"][model_short] += tu.total_tokens
+            year_sessions.append(info)
+            session_file_map[session.session_id] = session_file
 
-    # Filter to requested year
-    year_sessions = [
-        s for s in all_sessions if s.start_time and s.start_time.year == year
-    ]
+            for msg in session.messages:
+                if msg.content:
+                    all_message_lengths.append(len(msg.content))
+                for tool_use in msg.tool_uses:
+                    tool_name = tool_use.get("name", "")
+                    if tool_name:
+                        all_unique_tools.add(tool_name)
+                # Aggregate token usage from assistant messages
+                if msg.token_usage:
+                    tu = msg.token_usage
+                    token_stats["input"] += tu.input_tokens
+                    token_stats["output"] += tu.output_tokens
+                    token_stats["cache_read"] += tu.cache_read_tokens
+                    token_stats["cache_create"] += tu.cache_creation_tokens
+                    token_stats["total"] += tu.total_tokens
+                    if tu.model:
+                        model_short = tu.model
+                        if "-" in tu.model:
+                            parts = tu.model.split("-")
+                            model_short = next(
+                                (p for p in parts if p in MODEL_FAMILIES),
+                                parts[1] if len(parts) > 1 else tu.model,
+                            )
+                        token_stats["models"][model_short] += tu.total_tokens
 
     if not year_sessions:
         raise ValueError(f"No Claude Code activity found for {year}")

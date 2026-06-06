@@ -1,5 +1,7 @@
 # Claude Code Wrapped V3: Tufte Edition
 
+> **Current implementation note:** V3 data types live in `claude_history_explorer/models.py`, generation/encoding/decoding lives in `claude_history_explorer/wrapped.py`, and the website renders Print view at `/wrapped?d=...` with SVG social preview. Historical checklist snippets below may mention older file locations.
+
 ## Executive Summary
 
 A complete redesign of the Wrapped visualization system, replacing narrative "personality labels" with **data integrity**: actual distributions, continuous metrics, and information-dense visualizations that reward close inspection. Inspired by Edward Tufte's principles: maximize data-ink ratio, show the data, enable micro/macro readings.
@@ -66,14 +68,14 @@ interface WrappedStoryV3 {
   // === PROJECT DATA ===
   // Limited to top 12 projects by message count; remainder grouped as implicit "Other"
   // Wire format: [name, messages, hours, days, sessions, agent_ratio]
-  tp: Array<{                    // Top projects (max 12)
-    n: string;                   // Name (truncated to 50 chars)
-    m: number;                   // Messages
-    h: number;                   // Hours (integer)
-    d: number;                   // Days active
-    s: number;                   // Sessions
-    ar: number;                  // Agent ratio (0-100)
-  }>;
+  tp: Array<[                    // Top projects (max 12)
+    string,                      // Name (truncated to 50 chars)
+    number,                      // Messages
+    number,                      // Hours (integer)
+    number,                      // Days active
+    number,                      // Sessions
+    number                       // Agent ratio (0-100)
+  ]>;
 
   // === PROJECT CO-OCCURRENCE (for graph) ===
   // Limited to top 20 edges by weight
@@ -83,27 +85,27 @@ interface WrappedStoryV3 {
   // === TIMELINE EVENTS ===
   // Limited to 25 most significant events (increased from original 15 to use URL headroom)
   // Wire format: [day, type, value, project_idx] (-1 for missing optional values)
-  te: Array<{
-    d: number;                   // Day of year (1-366)
-    t: number;                   // Event type index (see EVENT_TYPES)
-    v?: number;                  // Optional value (e.g., message count for peak_day)
-    p?: number;                  // Optional project index (into tp array)
-  }>;
+  te: Array<[
+    number,                      // Day of year (1-366)
+    number,                      // Event type index (see EVENT_TYPES)
+    number,                      // Optional value, or -1 when absent
+    number                       // Optional project index, or -1 when absent
+  ]>;
 
   // === SESSION FINGERPRINTS (subset for visualization) ===
   // Limited to 20 most significant sessions (increased from original 10 to use URL headroom)
   // Wire format: [duration, messages, is_agent, hour, weekday, project_idx, fp0..fp7]
-  sf: Array<{                    // Top 20 most significant sessions
-    d: number;                   // Duration minutes
-    m: number;                   // Message count
-    a: boolean;                  // Is agent session (wire: 1/0)
-    h: number;                   // Start hour (0-23)
-    w: number;                   // Day of week (0-6, 0=Monday)
-    pi: number;                  // Project index (into tp array)
-    fp: number[];                // Fingerprint: 8 integers 0-100 encoding session "shape"
+  sf: Array<[                    // Top 20 most significant sessions
+    number,                      // Duration minutes
+    number,                      // Message count
+    number,                      // Is agent session (1/0)
+    number,                      // Start hour (0-23)
+    number,                      // Day of week (0-6, 0=Monday)
+    number,                      // Project index (into tp array)
+    ...number[]                  // 8 fingerprint integers 0-100 encoding session "shape"
                                  // [msg_rate_q1, msg_rate_q2, msg_rate_q3, msg_rate_q4,
                                  //  tool_density, error_rate, edit_ratio, thinking_ratio]
-  }>;
+  ]>;
 
   ls: number;                    // Longest session in hours
   sk: number[];                  // Streak stats: [count, longest_days, current_days, avg_days]
@@ -174,7 +176,7 @@ These limits ensure URL size stays under 2KB:
 ### 1.1 Required Type Definitions
 
 ```python
-# In history.py - add to existing types
+# In models.py / wrapped.py - current implementation location
 
 @dataclass
 class SessionInfoV3(SessionInfo):
@@ -1768,7 +1770,7 @@ The mobile card layouts are a planned feature for swipeable card-based presentat
 
 - [ ] Create `SessionInfoV3` dataclass with `project_name` field
 - [ ] Create `ProjectStats` dataclass
-- [ ] Add `compute_activity_heatmap()` to history.py
+- [x] Add `compute_activity_heatmap()` to `claude_history_explorer/wrapped.py`
 - [ ] Add `compute_distribution()` with `bisect_right`
 - [ ] Add `compute_session_duration_distribution()`
 - [ ] Add `compute_agent_ratio_distribution()`
@@ -1876,6 +1878,9 @@ Print view is the only view. The page renders a Tufte-inspired, information-dens
 ---
 
 ## Appendix: References
+
+- [Wrapped Architecture](WRAPPED_ARCHITECTURE.md)
+- [Lessons Learned](LESSONS_LEARNED.md)
 
 - Tufte, E. (2001). *The Visual Display of Quantitative Information*
 - Tufte, E. (1997). *Visual Explanations*

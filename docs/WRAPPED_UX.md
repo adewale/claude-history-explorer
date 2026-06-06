@@ -766,11 +766,12 @@ Dark mode default (matches developer aesthetic):
 
 | Decision | Choice |
 |----------|--------|
-| **Default mode** | Story Mode with "Skip to summary" |
+| **Default mode (historical proposal)** | Story Mode with "Skip to summary" |
+| **Current implementation** | Print view at `/wrapped?d=...` with SVG social preview |
 | **Privacy approach** | Progressive disclosure, not policy walls |
 | **Key privacy touchpoints** | First card footer, share tooltips, final card, learn more modal |
 | **Trust signals** | Specific claims, source code links, verifiable architecture |
 | **CTA placement** | Final card + sticky on summary view |
 | **Mobile** | Full-screen swipeable cards |
 
-The page exists to convert viewers → generators → sharers, while making everyone feel safe about what they're sharing.
+The historical proposal exists to convert viewers → generators → sharers, while making everyone feel safe about what they're sharing. Current implementation and audit lessons are tracked in [WRAPPED_V3_SPEC.md](WRAPPED_V3_SPEC.md) and [LESSONS_LEARNED.md](LESSONS_LEARNED.md).

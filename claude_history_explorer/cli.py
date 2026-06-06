@@ -17,6 +17,7 @@ Commands:
 
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -46,6 +47,7 @@ from .history import (
     parse_session,
     search_sessions,
     get_session_by_id,
+    _compile_regex_safe,
     get_claude_dir,
     get_projects_dir,
     calculate_project_stats,
@@ -65,6 +67,20 @@ from .history import (
 
 __all__ = ["main"]
 
+
+def _ensure_utf8_output():
+    """Reconfigure stdout/stderr to UTF-8 on Windows.
+
+    Windows terminals default to cp1252 which cannot render the Unicode
+    content (emoji, em-dashes, etc.) found in Claude Code transcripts.
+    """
+    if sys.platform == "win32":
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+_ensure_utf8_output()
 console = Console()
 
 
@@ -295,7 +311,7 @@ def projects(limit: int, example: bool):
 @main.command()
 @click.argument("project_search", required=False)
 @click.option("--limit", "-n", default=DEFAULT_SESSIONS_LIMIT, help="Maximum number of sessions to show")
-@click.option("--head", is_flag=True, default=True, is_eager=True, help="Show most recent sessions (default)")
+@click.option("--head", is_flag=True, help="Show most recent sessions (default)")
 @click.option("--tail", "-t", is_flag=True, help="Show oldest sessions instead of most recent")
 @click.option("--example", is_flag=True, help="Show usage examples")
 def sessions(project_search: str, limit: int, head: bool, tail: bool, example: bool):
@@ -356,7 +372,7 @@ def sessions(project_search: str, limit: int, head: bool, tail: bool, example: b
 @click.argument("session_id", required=False)
 @click.option("--project", "-p", default=None, help="Project path to search in")
 @click.option("--limit", "-n", default=DEFAULT_SHOW_LIMIT, help="Maximum messages to show")
-@click.option("--head", is_flag=True, default=True, is_eager=True, help="Show first N messages (default)")
+@click.option("--head", is_flag=True, help="Show first N messages (default)")
 @click.option("--tail", "-t", is_flag=True, help="Show last N messages instead of first")
 @click.option("--raw", is_flag=True, help="Show raw JSON output")
 @click.option("--example", is_flag=True, help="Show usage examples")
@@ -373,6 +389,10 @@ def show(session_id: str, project: str, limit: int, head: bool, tail: bool, raw:
         console.print("Use --example to see usage examples.")
         return
     proj = find_project(project) if project else None
+    if project and proj is None:
+        console.print(f"[red]No project found matching '{project}'[/red]")
+        console.print("\nUse 'claude-history projects' to see available projects.")
+        return
     session = get_session_by_id(session_id, proj)
 
     if not session:
@@ -478,7 +498,17 @@ def search(
         console.print("[red]Error: Missing argument 'PATTERN'[/red]")
         console.print("Use --example to see usage examples.")
         return
+    flags = 0 if case_sensitive else re.IGNORECASE
+    try:
+        compiled_re = _compile_regex_safe(pattern, flags)
+    except (ValueError, re.error) as e:
+        raise click.ClickException(f"Invalid regex: {e}")
+
     proj = find_project(project) if project else None
+    if project and proj is None:
+        console.print(f"[red]No project found matching '{project}'[/red]")
+        console.print("\nUse 'claude-history projects' to see available projects.")
+        return
 
     console.print(f"[bold]Searching for:[/bold] {pattern}")
     if proj:
@@ -501,14 +531,12 @@ def search(
                 )
             )
 
-            for msg in messages[:3]:  # Show first 3 matching messages
+            for msg in messages[:3]:
                 role_style = "blue" if msg.role == "user" else "green"
                 console.print(f"[{role_style}]{msg.role.upper()}:[/{role_style}]")
 
-                # Show context around match
                 content = msg.content
-                flags = 0 if case_sensitive else re.IGNORECASE
-                match = re.search(pattern, content, flags)
+                match = compiled_re.search(content)
                 if match:
                     start = max(0, match.start() - context)
                     end = min(len(content), match.end() + context)
@@ -559,6 +587,10 @@ def export(
         console.print("Use --example to see usage examples.")
         return
     proj = find_project(project) if project else None
+    if project and proj is None:
+        console.print(f"[red]No project found matching '{project}'[/red]")
+        console.print("\nUse 'claude-history projects' to see available projects.")
+        return
     session = get_session_by_id(session_id, proj)
 
     if not session:
@@ -1119,7 +1151,7 @@ def _generate_global_summary(stats: GlobalStats, output_format: str, show_workty
             )
             bar = "█" * bar_length
             lines.append(
-                f"{proj_stats.project.path.split('/')[-1]:15} │{bar:30}│ {proj_stats.total_sessions}"
+                f"{proj_stats.project.short_name:15} │{bar:30}│ {proj_stats.total_sessions}"
             )
 
         # Message volume sparkline
@@ -1140,7 +1172,7 @@ def _generate_global_summary(stats: GlobalStats, output_format: str, show_workty
             stats.projects, key=lambda p: p.total_messages, reverse=True
         )[:5]:
             lines.append(
-                f"• {proj_stats.project.path.split('/')[-1]}: {proj_stats.total_messages} messages"
+                f"• {proj_stats.project.short_name}: {proj_stats.total_messages} messages"
             )
 
         return "\n".join(lines)
@@ -1495,8 +1527,8 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
     if year < 2024:
         console.print("[red]Error: Year must be 2024 or later (Claude Code was released in 2024)[/red]")
         return
-    if year > current_year + 1:
-        console.print("[red]Error: Year cannot be more than 1 year in the future[/red]")
+    if year > current_year:
+        console.print("[red]Error: Year cannot be in the future[/red]")
         return
 
     # Early January suggestion
@@ -1529,8 +1561,12 @@ def wrapped(year: int, name: str, raw: bool, no_copy: bool, decode: str, example
     encoded = encode_wrapped_story_v3(story)
     url = f"https://{WRAPPED_URL_DOMAIN}/wrapped?d={encoded}"
 
-    # Display summary
     _display_wrapped_summary(story, url, year)
+
+    console.print(
+        "\n[dim]Note: The URL contains your project names and activity data "
+        "in a reversible encoding (base64). Anyone with the link can decode it.[/dim]"
+    )
 
     # Copy to clipboard
     if not no_copy:

@@ -602,7 +602,7 @@ export function validateStoryV3(story: WrappedStoryV3): { valid: boolean; error?
     return { valid: false, error: 'Not a V3 story' };
   }
   const currentYear = new Date().getFullYear();
-  if (!Number.isInteger(story.y) || story.y < 2024 || story.y > currentYear + 1) {
+  if (!Number.isInteger(story.y) || story.y < 2024 || story.y > currentYear) {
     return { valid: false, error: `Invalid year: ${story.y}` };
   }
 

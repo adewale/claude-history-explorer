@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import require_wrapped_node_deps
+from conftest import npx_command, require_wrapped_node_deps
 
 # Get paths relative to this file
 TESTS_DIR = Path(__file__).parent
@@ -37,7 +37,9 @@ def test_generate_schema_test_cases(tmp_path):
     )
     assert result.returncode == 0, f"Generator failed:\n{result.stderr}"
     assert output.exists(), "Test cases file not created"
-    assert output.read_text() == (FIXTURES_DIR / "schema_test_cases.json").read_text()
+    assert output.read_text(encoding="utf-8") == (
+        FIXTURES_DIR / "schema_test_cases.json"
+    ).read_text(encoding="utf-8")
 
 
 def test_typescript_decodes_python_encoding(tmp_path):
@@ -64,9 +66,11 @@ def test_typescript_decodes_python_encoding(tmp_path):
 
     # Run TypeScript schema alignment test
     result = subprocess.run(
-        ["npx", "tsx", "tests/schema-alignment.test.ts"],
+        [npx_command(), "vitest", "run", "tests/schema-alignment.test.ts"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=WRAPPED_WEBSITE_DIR,
         env={**os.environ, "SCHEMA_TEST_CASES": str(generated_cases)},
     )

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `docs/LESSONS_LEARNED.md` to capture project-level lessons from audits, Windows compatibility fixes, Wrapped security hardening, cross-language testing, and local-corpus smoke testing.
+- `scripts/smoketest_local_corpus.py` for privacy-preserving end-to-end smoke testing against a developer's local Claude corpus.
+
+### Changed
+- Refreshed documentation for current Wrapped V3 behavior, ambiguity-aware path decoding, validation commands, and related-document links.
+- Clarified historical/proposal Wrapped docs so future Cloudflare features are not confused with current implementation.
+
 ## [0.1.0] - 2025-12-06
 
 ### Added

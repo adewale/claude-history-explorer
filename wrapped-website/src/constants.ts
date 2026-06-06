@@ -2,7 +2,7 @@
  * Shared constants for Wrapped V3 encoding/decoding and visualization.
  *
  * These constants MUST stay in sync with:
- * - Python: claude_history_explorer/history.py
+ * - Python: claude_history_explorer/wrapped.py
  * - Spec: docs/WRAPPED_V3_SPEC.md
  */
 

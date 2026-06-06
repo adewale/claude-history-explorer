@@ -9,63 +9,17 @@ This module contains all dataclasses used throughout the package:
 - WrappedStoryV3: Rich visualization data for wrapped feature
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass, field, fields
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .constants import ACTIVITY_GAP_CAP_MINUTES
+from .utils import _active_duration_minutes, format_duration as _format_duration
 
 # V3 encoding constants (used by WrappedStoryV3)
 WRAPPED_VERSION_V3 = 3
 MAX_PROJECT_NAME_LENGTH = 50
 MAX_DISPLAY_NAME_LENGTH = 30
-
-
-def _format_duration(minutes: int) -> str:
-    """Format a duration in minutes as a human-readable string.
-
-    This is a local helper to avoid circular imports with utils.py.
-
-    Args:
-        minutes: Duration in minutes
-
-    Returns:
-        Formatted string like "45m" or "2h 30m"
-    """
-    if minutes < 60:
-        return f"{minutes}m"
-    hours = minutes // 60
-    mins = minutes % 60
-    return f"{hours}h {mins}m"
-
-
-def _active_duration_minutes(
-    messages: List["Message"], max_gap_minutes: int = ACTIVITY_GAP_CAP_MINUTES
-) -> int:
-    """Calculate active duration by summing gaps between messages, capping each gap.
-
-    This is a local helper to avoid circular imports with utils.py.
-
-    Args:
-        messages: List of Message objects with timestamps
-        max_gap_minutes: Maximum minutes to count for any single gap
-
-    Returns:
-        Active duration in minutes
-    """
-    timestamps = [m.timestamp for m in messages if m.timestamp is not None]
-    if len(timestamps) < 2:
-        return 0
-
-    timestamps.sort()
-    total_minutes = 0
-
-    for i in range(1, len(timestamps)):
-        gap = (timestamps[i] - timestamps[i - 1]).total_seconds() / 60
-        total_minutes += min(gap, max_gap_minutes)
-
-    return int(total_minutes)
 
 
 @dataclass
@@ -184,6 +138,8 @@ class Message:
                 timestamp = datetime.fromisoformat(
                     data["timestamp"].replace("Z", "+00:00")
                 )
+                if timestamp.tzinfo is None:
+                    timestamp = timestamp.replace(tzinfo=timezone.utc)
             except (ValueError, AttributeError):
                 pass
 
@@ -285,8 +241,10 @@ class Project:
 
     Example:
         >>> project = Project.from_dir(Path("~/.claude/projects/-Users-foo-bar"))
-        >>> project.path
+        >>> project.path  # probes filesystem; falls back to slash-joining
         '/Users/foo/bar'
+        >>> Project.from_dir(Path("~/.claude/projects/C--Users-foo-bar")).path
+        'C:/Users/foo/bar'
     """
 
     name: str
@@ -307,8 +265,14 @@ class Project:
         name = dir_path.name
         decoded_path = cls._decode_project_path(name)
 
+        def _safe_mtime(p: Path) -> float:
+            try:
+                return p.stat().st_mtime
+            except OSError:
+                return 0.0
+
         session_files = sorted(
-            dir_path.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True
+            dir_path.glob("*.jsonl"), key=_safe_mtime, reverse=True
         )
 
         return cls(
@@ -319,72 +283,100 @@ class Project:
     def _decode_project_path(encoded_name: str) -> str:
         """Decode a Claude project directory name to the actual filesystem path.
 
-        Claude Code encodes paths by replacing '/' with '-', but also converts
-        '_' and '-' in folder names to '-'. This creates ambiguity that we
-        resolve by checking which path actually exists on disk.
+        Claude Code encodes paths by replacing every non-alphanumeric,
+        non-hyphen character with '-'.  This means '/', '\\', ':', '_', '.'
+        all become '-', which creates ambiguity.  We resolve it by probing the
+        filesystem; when no match exists (e.g. a Windows-origin path decoded
+        on Linux) we fall back to joining with '/'.
 
-        Args:
-            encoded_name: Directory name like '-Users-ade-projects-block-browser'
-
-        Returns:
-            Decoded path like '/Users/ade/projects/block_browser'
+        Handles three prefix patterns:
+          Unix:    -Users-ade-foo        → /Users/ade/foo
+          Windows: C--Users-Moho-foo     → C:/Users/Moho/foo
+          UNC:     --server-share-foo    → //server/share/foo
         """
-        # Split into components: '-Users-ade-foo-bar' -> ['', 'Users', 'ade', 'foo', 'bar']
         components = encoded_name.split("-")
-        start_index = 1 if components and components[0] == "" else 0
+
+        if (
+            len(components) >= 2
+            and len(components[0]) == 1
+            and components[0].isalpha()
+            and components[1] == ""
+        ):
+            root = f"{components[0].upper()}:/"
+            start = 2
+        elif len(components) >= 2 and components[0] == "" and components[1] == "":
+            root = "//"
+            start = 2
+        else:
+            root = "/"
+            start = 1 if components and components[0] == "" else 0
+
+        def encoded_parts(name: str) -> list[str]:
+            encoded = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in name)
+            return encoded.split("-")
 
         def decode_from(index: int, current_path: Path) -> Optional[Path]:
             if index >= len(components):
                 return current_path
+            if not current_path.exists() or not current_path.is_dir():
+                return None
 
-            # Prefer longer existing components first. This handles real folders
-            # such as "my-five-part-long-folder" even when the encoded name has
-            # many hyphen-separated tokens.
-            for end in range(len(components), index, -1):
-                parts = components[index:end]
-                candidate_names = ["-".join(parts)]
-                underscore_name = "_".join(parts)
-                if underscore_name not in candidate_names:
-                    candidate_names.append(underscore_name)
+            try:
+                children = sorted(
+                    current_path.iterdir(),
+                    key=lambda child: (-len(encoded_parts(child.name)), child.name),
+                )
+            except OSError:
+                return None
 
-                for candidate_name in candidate_names:
-                    candidate = current_path / candidate_name
-                    if not candidate.exists():
-                        continue
-                    decoded = decode_from(end, candidate)
-                    if decoded is not None:
-                        return decoded
+            for child in children:
+                if not child.is_dir():
+                    continue
+                child_parts = encoded_parts(child.name)
+                end = index + len(child_parts)
+                if components[index:end] != child_parts:
+                    continue
+                decoded = decode_from(end, child)
+                if decoded is not None:
+                    return decoded
 
             return None
 
-        decoded = decode_from(start_index, Path("/"))
+        decoded = decode_from(start, Path(root))
         if decoded is not None:
-            return str(decoded)
+            return str(decoded).replace("\\", "/")
 
-        # Path doesn't exist on disk, fall back to simple slash replacement.
-        return str(Path("/") / "/".join(components[start_index:]))
+        remaining = "/".join(c for c in components[start:] if c)
+        result = str(Path(root) / remaining) if remaining else str(Path(root))
+        return result.replace("\\", "/")
 
     @property
     def session_count(self) -> int:
         return len(self.session_files)
 
     @property
-    def short_name(self) -> str:
-        """Get the short name (last path component) of the project, prettified.
+    def basename(self) -> str:
+        """Last component of the decoded project path, separator-agnostic."""
+        result = self.path.replace("\\", "/").rsplit("/", 1)[-1]
+        return result if result else self.name
 
-        Converts folder names like 'block_browser' or 'my-project' to
-        'Block Browser' or 'My Project' for display.
+    @property
+    def short_name(self) -> str:
+        """Last path component, prettified for display.
+
+        'block_browser' → 'Block Browser', 'my-project' → 'My Project'.
         """
-        raw_name = self.path.split("/")[-1]
-        # Replace underscores and hyphens with spaces, then title case
-        prettified = raw_name.replace("_", " ").replace("-", " ")
+        prettified = self.basename.replace("_", " ").replace("-", " ")
         return prettified.title()
 
     @property
     def last_modified(self) -> Optional[datetime]:
         if self.session_files:
-            mtime = self.session_files[0].stat().st_mtime
-            return datetime.fromtimestamp(mtime)
+            try:
+                mtime = self.session_files[0].stat().st_mtime
+                return datetime.fromtimestamp(mtime, tz=timezone.utc)
+            except OSError:
+                return None
         return None
 
 
@@ -456,33 +448,11 @@ class SessionInfoV3(SessionInfo):
     def from_session_with_project(
         cls, session: Session, is_agent: bool, project_name: str, project_path: str
     ) -> Optional["SessionInfoV3"]:
-        """Create SessionInfoV3 from a Session object with project info.
-
-        Args:
-            session: The parsed Session
-            is_agent: Whether this is an agent session
-            project_name: Short project name
-            project_path: Full project path
-
-        Returns:
-            SessionInfoV3 with computed metrics, or None if session has no start_time
-        """
-        start_time = session.start_time
-        if start_time is None:
+        base = SessionInfo.from_session(session, is_agent)
+        if base is None:
             return None
-
-        # Use active duration from Session property
-        duration = session.active_duration_minutes
-
         return cls(
-            session_id=session.session_id,
-            start_time=start_time,
-            end_time=session.end_time,
-            duration_minutes=duration,
-            message_count=session.message_count,
-            user_message_count=session.user_message_count,
-            is_agent=is_agent,
-            slug=session.slug,
+            **{f.name: getattr(base, f.name) for f in fields(base)},
             project_name=project_name,
             project_path=project_path,
         )
