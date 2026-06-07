@@ -275,6 +275,7 @@ uv run claude-history --help
 - [JSON schemas](docs/JSON_SCHEMAS.md)
 - [Trust model](TRUST.md)
 - [Lessons learned](docs/LESSONS_LEARNED.md)
+- [Release process](docs/RELEASE_PROCESS.md)
 
 ## License
 

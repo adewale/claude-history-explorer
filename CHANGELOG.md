@@ -7,13 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-06
+
 ### Added
-- `docs/LESSONS_LEARNED.md` to capture project-level lessons from audits, Windows compatibility fixes, Wrapped security hardening, cross-language testing, and local-corpus smoke testing.
+- Claude Code Wrapped V3 with compact MessagePack/Base64URL encoding, `/wrapped?d=...` URLs, print-view website rendering, SVG social preview, and Python/TypeScript decoder coverage.
+- Work type classification available through `--show-worktype` on statistics and summaries.
+- GitHub Actions CI covering Python 3.10 and 3.13 on Ubuntu, macOS, and Windows, plus Wrapped website test/typecheck/lint/audit jobs.
+- Python↔TypeScript schema alignment, golden URL backwards-compatibility tests, and website Vitest coverage for all `wrapped-website/tests/**/*.test.ts` files.
 - `scripts/smoketest_local_corpus.py` for privacy-preserving end-to-end smoke testing against a developer's local Claude corpus.
+- `docs/LESSONS_LEARNED.md` and `docs/RELEASE_PROCESS.md` for project maintenance and release procedures.
+- Domain model, FAQ, Wrapped architecture/spec, Trust, and Cloudflare proposal documentation.
 
 ### Changed
+- Split the original monolithic history implementation into focused modules (`models.py`, `parser.py`, `projects.py`, `stats.py`, `stories.py`, `wrapped.py`) while keeping `history.py` as a backwards-compatible facade.
+- Improved cross-platform project discovery and path decoding for Unix, Windows drive-letter, UNC, dotted, spaced, underscored, and hyphenated project paths.
+- Preserved documented `--head` behavior for `sessions` and `show`, and made `--project` misses fail closed instead of falling back to all projects.
+- Updated Wrapped project labeling so duplicate basenames remain distinct (for example, `app` and `app (2)`).
+- Made Wrapped year handling consistent across CLI, Python decoder, and website routes.
 - Refreshed documentation for current Wrapped V3 behavior, ambiguity-aware path decoding, validation commands, and related-document links.
-- Clarified historical/proposal Wrapped docs so future Cloudflare features are not confused with current implementation.
+
+### Fixed
+- Active-duration calculation now caps idle gaps consistently, avoiding inflated session hours.
+- `search_sessions()` again yields the documented `(session, messages)` tuples and avoids duplicate message matches when content and tool input both match.
+- Partial session lookup supports substring matches as documented.
+- Project listing no longer crashes when empty project directories produce `None` timestamps alongside timezone-aware datetimes.
+- JSONL parsing tolerates invalid UTF-8 and skips oversized physical lines without reading whole lines into memory.
+- Regex handling reports Click errors for invalid patterns and rejects additional nested-quantifier ReDoS patterns.
+- Story/global summary generation handles zero-session projects and concurrent session counting correctly.
+- Session fingerprint quarter buckets now behave correctly for short sessions.
+- Tests no longer dirty tracked fixtures and are portable across Windows default encodings and `npx.cmd` subprocess behavior.
+
+### Security
+- Hardened output path sanitization against sibling-prefix traversal.
+- Hardened Wrapped decoders against malformed Base64URL, oversized payloads, invalid MessagePack/schema, unsupported versions, and malformed/bounded RLE heatmaps.
+- Escaped and clamped Wrapped website rendering, removed inline event handlers/remote fonts, added stricter security headers, and avoided per-user Cloudflare cache persistence.
+- Updated JavaScript dependencies and verified `npm audit --omit=dev` and full `npm audit` with no vulnerabilities.
 
 ## [0.1.0] - 2025-12-06
 
@@ -54,5 +82,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Architecture documentation
   - JSON schema documentation
 
-[Unreleased]: https://github.com/adewale/claude-history-explorer/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/adewale/claude-history-explorer/releases/tag/v0.1.0
+[Unreleased]: https://github.com/adewale/claude-history-explorer/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/adewale/claude-history-explorer/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/adewale/claude-history-explorer/tree/v0.1.0
