@@ -13,7 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-import { decodeWrappedStoryV3, type WrappedStoryV3 } from '../src/decoder';
+import { decodeWrappedStoryV3, validateStoryV3, type WrappedStoryV3 } from '../src/decoder';
 
 // Get directory path
 const __filename = fileURLToPath(import.meta.url);
@@ -83,8 +83,10 @@ function runTests() {
       // Decode the URL
       const story = decodeWrappedStoryV3(testCase.encoded);
 
-      // Verify version
+      // Verify version and runtime validation, matching production Worker routes.
       assertTrue(story.v === 3, 'story version is 3');
+      const validation = validateStoryV3(story);
+      assertTrue(validation.valid, `story validates: ${validation.error ?? ''}`);
 
       // Verify core fields
       for (const [key, expectedValue] of Object.entries(testCase.expected_core)) {

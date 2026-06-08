@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Wrapped website decoder now normalizes legacy optional V3 sample fields before runtime validation, so previously generated golden URLs render after deployment.
+
 ## [0.2.0] - 2026-06-06
 
 ### Added

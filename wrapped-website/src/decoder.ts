@@ -401,13 +401,14 @@ export function decodeWrappedStoryV3(encoded: string): WrappedStoryV3 {
       ma: (Array.isArray(raw.ma) ? raw.ma : []) as number[],
       mh: (Array.isArray(raw.mh) ? raw.mh : []) as number[],
       ms: (Array.isArray(raw.ms) ? raw.ms : []) as number[],
-      sd: (Array.isArray(raw.sd) ? raw.sd : []) as number[],
-      ar: (Array.isArray(raw.ar) ? raw.ar : []) as number[],
-      ml: (Array.isArray(raw.ml) ? raw.ml : []) as number[],
-      ts: (raw.ts || {
-        ad: 50, sp: 50, fc: 50, cc: 50, wr: 50,
-        bs: 50, cs: 50, mv: 50, td: 50, ri: 50
-      }) as TraitScores,
+      // Early V3 sample URLs used legacy shapes for some optional visualization
+      // fields (for example sd as a trait-score object and ml as string labels).
+      // Normalize those unused legacy shapes to bounded defaults before the
+      // strict runtime validator runs, matching the Python decoder.
+      sd: numericArrayOrDefault(raw.sd, 10),
+      ar: numericArrayOrDefault(raw.ar, 10),
+      ml: numericArrayOrDefault(raw.ml, 8),
+      ts: traitScoresOrDefault(raw.ts),
       tp,
       pc: (Array.isArray(raw.pc) ? raw.pc : []) as [number, number, number][],
       te,
@@ -587,6 +588,21 @@ export function calcYoyChange(current: number, previous: number): { value: numbe
 
 function isFiniteNumber(value: unknown, min = 0, max = Number.POSITIVE_INFINITY): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function numericArrayOrDefault(value: unknown, length: number, defaultValue = 0): number[] {
+  return Array.isArray(value) && value.length === length && value.every((item) => isFiniteNumber(item))
+    ? value as number[]
+    : Array(length).fill(defaultValue);
+}
+
+function traitScoresOrDefault(value: unknown): TraitScores {
+  const rawScores = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const scores: Record<string, unknown> = {};
+  for (const code of TRAIT_CODES) {
+    scores[code] = rawScores[code] === undefined ? 50 : rawScores[code];
+  }
+  return scores as unknown as TraitScores;
 }
 
 function validateNumberArray(name: string, value: unknown, length: number, max = Number.POSITIVE_INFINITY): string | null {
