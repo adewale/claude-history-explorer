@@ -27,7 +27,7 @@ grep -r "open.*'w'" claude_history_explorer/
 grep -r "import requests" claude_history_explorer/
 
 # Run the read-only verification test
-uv run pytest tests/test_history.py -k "read_only" -v
+uv run --locked pytest tests/test_history.py -k "read_only" -v
 ```
 
 ## Will you support other AI coding agents?

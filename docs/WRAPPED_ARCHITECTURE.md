@@ -1,6 +1,6 @@
 # Wrapped Architecture
 
-> **Current implementation note:** The live implementation is V3-only and uses `/wrapped?d=...` on `wrapped-claude-codes.adewale-883.workers.dev`. Historical examples in this document that use `wrapped.claude.codes/{year}/{data}`, KV counters, Queues/R2, Durable Objects, Browser Rendering, or generated PNG storage are proposal/future architecture notes, not current behavior.
+> **Current implementation note:** The live implementation is V3-only and uses `/wrapped?d=...` on `wrapped-claude-codes.adewale-883.workers.dev`. It is a Cloudflare Worker deployed with Wrangler and routed by Hono. Historical examples in this document that use `wrapped.claude.codes/{year}/{data}`, Cloudflare Pages, KV counters, Queues/R2, Durable Objects, Browser Rendering, or generated PNG storage are proposal/future architecture notes, not current behavior.
 
 ## End-to-End Flow
 
@@ -30,9 +30,10 @@
 │                           CLOUDFLARE EDGE                                    │
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         Pages + Functions                            │   │
+│  │                     Worker + Hono routes                             │   │
 │  │                                                                      │   │
-│  │   Route: /wrapped?d=<data> and /og/:year/:data.svg               │   │
+│  │   Routes: /wrapped?d=<data>, /:year/:data redirect,              │   │
+│  │           /og/:year/:data(.svg) SVG preview                       │   │
 │  │   ┌──────────────────────────────────────────────────────────────┐  │   │
 │  │   │  1. Decode Base64URL → MessagePack → JSON                    │  │   │
 │  │   │  2. Validate V3 schema and year (2024 ≤ year ≤ current)      │  │   │

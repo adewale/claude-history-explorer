@@ -1,6 +1,6 @@
 # Claude Code Wrapped - Cloudflare Platform Showcase Spec
 
-> **Note**: This file is a future/proposal showcase for Cloudflare primitives. The current Worker does not implement KV view counters, Durable Objects presence, Queues/R2 async image storage, Browser Rendering PDF export, or year-in-path canonical URLs. Current canonical URLs use `/wrapped?d=...` and render a print view plus SVG social preview.
+> **Note**: This file is a future/proposal showcase for Cloudflare primitives. The current Worker is a Wrangler-deployed Hono app and does not implement KV view counters, Durable Objects presence, Queues/R2 async image storage, Browser Rendering PDF export, or year-in-path canonical URLs. Current canonical URLs use `/wrapped?d=...`; `/:year/:data` is legacy redirect compatibility; social previews are SVG.
 
 ## Overview
 
@@ -782,8 +782,8 @@ This turns every Wrapped view into a mini-lesson on edge computing.
 ### Year-Aware Design Principles
 
 1. **All keys/names include year**: Prevents cross-year collisions and enables clean data separation
-2. **URL path includes year**: `/:year/<data>` for SEO and social sharing
-3. **Data includes year**: `story.y` field validated against path year
+2. **URL path includes year (proposal only)**: `/:year/<data>` for SEO and social sharing; current canonical URLs use `/wrapped?d=...` and keep `/:year/:data` only as a redirect
+3. **Data includes year**: `story.y` is range-validated from the decoded payload; OG routes also require the path year to match `story.y`
 4. **Storage prefixed by year**: R2 paths like `2025/hash.png` enable easy lifecycle management
 5. **Metrics segmented by year**: Analytics can compare year-over-year engagement
 
@@ -794,7 +794,7 @@ This turns every Wrapped view into a mini-lesson on edge computing.
 These are future/proposal steps. Current implementation notes and audit lessons live in [WRAPPED_ARCHITECTURE.md](WRAPPED_ARCHITECTURE.md), [WRAPPED_V3_SPEC.md](WRAPPED_V3_SPEC.md), and [LESSONS_LEARNED.md](LESSONS_LEARNED.md).
 
 1. **CLI command first**: Implement `claude-history wrapped --year YYYY` (see [WRAPPED_V3_SPEC.md](WRAPPED_V3_SPEC.md))
-2. **Basic website**: Set up Cloudflare Pages with `/wrapped?d=...` routing, retaining `/:year/<data>` only as legacy redirect compatibility if needed
+2. **Basic website**: Continue the shipped Cloudflare Worker/Hono site with `/wrapped?d=...` routing, retaining `/:year/<data>` only as legacy redirect compatibility
 3. **KV counter**: Add year-namespaced view counting (`{year}:views:{id}`)
 4. **Durable Objects presence**: Real-time viewers with year-prefixed instances
 5. **Queues + R2**: Async image generation with `{year}/` storage prefixes

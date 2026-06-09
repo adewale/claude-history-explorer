@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- Wrapped website decoder now normalizes legacy optional V3 sample fields before runtime validation, so previously generated golden URLs render after deployment.
+### Changed
+- Updated maintenance docs to record the post-`0.2.0` Wrapped deployment hotfix, release/deployment consistency checks, and published V3 URL audit workflow.
 
-## [0.2.0] - 2026-06-06
+### Fixed
+- Wrapped website decoder now normalizes legacy optional V3 sample fields and partial trait-score maps before runtime validation, so previously generated golden URLs render after deployment.
+- Backwards-compatibility tests now run the same V3 runtime validation path as the production Worker before accepting old URLs.
+
+## [0.2.0] - 2026-06-07
 
 ### Added
 - Claude Code Wrapped V3 with compact MessagePack/Base64URL encoding, `/wrapped?d=...` URLs, print-view website rendering, SVG social preview, and Python/TypeScript decoder coverage.

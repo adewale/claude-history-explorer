@@ -14,8 +14,8 @@ Allowed writes are explicit and user-controlled:
 Verify the history read-only behavior:
 
 ```bash
-uv run pytest tests/test_history.py -k "read_only" -v
-uv run pytest tests/test_audit_regressions.py -q
+uv run --locked pytest tests/test_history.py -k "read_only" -v
+uv run --locked pytest tests/test_audit_regressions.py -q
 ```
 
 ## Network model
@@ -98,18 +98,19 @@ When you open a Wrapped URL, the Worker receives and decodes the encoded URL dat
 | Tool modifying history | History read-only code paths and tests |
 | CLI data exfiltration | No CLI network calls |
 | Hidden fields in Wrapped URLs | `wrapped --decode` exposes the payload |
-| Malicious Wrapped URLs | Python and Worker decoders enforce Base64URL/size limits, runtime schema checks, bounded RLE, escaping, and CSP |
-| Supply chain risk | Small dependency sets, `npm audit`, `ruff`, tests |
+| Malicious Wrapped URLs | Python and Worker decoders enforce Base64URL/size limits, runtime schema checks, bounded RLE, escaping, and CSP; known legacy optional V3 shapes are normalized before validation |
+| Supply chain risk | Small dependency sets, `npm audit --omit=dev`, full `npm audit`, `ruff`, tests |
 
 Out of scope: malware on your machine, someone with shell access to your account, screenshots/terminal logs you share, or a Wrapped URL you intentionally publish.
 
 ## Verification commands
 
 ```bash
-uv run pytest -q
-uv run ruff check .
-uv run python scripts/smoketest_local_corpus.py
-cd wrapped-website && npm test && npm run typecheck && npm run lint && npm audit
+uv run --locked ruff check .
+uv run --locked pytest -q
+HOME=$(mktemp -d) uv run --locked pytest -q
+uv run --locked python scripts/smoketest_local_corpus.py
+cd wrapped-website && npm test && npm run typecheck && npm run lint && npm audit --omit=dev && npm audit
 ```
 
 See [docs/LESSONS_LEARNED.md](docs/LESSONS_LEARNED.md) for the audit lessons behind these checks.

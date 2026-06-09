@@ -120,20 +120,45 @@ If publishing to PyPI is in scope:
 uv publish
 ```
 
-If the Wrapped website is not automatically deployed from `main`, deploy it manually and smoke-test a generated URL:
+If the Wrapped website is not automatically deployed from `main`, deploy it manually and smoke-test both a generated URL and the compatibility corpus:
 
 ```bash
 cd wrapped-website
 npm run deploy
 cd ..
-claude-history wrapped --no-copy
+uv run --locked claude-history wrapped --no-copy
 ```
 
-## 9. Final verification
+For Wrapped deploys, verify at minimum:
+- landing page: `/`
+- generated local URL: `/wrapped?d=...`
+- golden/schema fixture URLs: canonical `/wrapped?d=...`
+- legacy redirects: `/:year/:data`
+- social previews: `/og/:year/:data.svg` and `/og/:year/:data`
+
+If a production deploy happens after a release tag, document that `main`/deployment is ahead of the latest release and either:
+- leave the fix in `CHANGELOG.md` under `Unreleased`, or
+- cut a patch release so package artifacts, tags, and production behavior match.
+
+## 9. Published V3 URL compatibility audit
+
+Before tightening the Wrapped schema or changing routes, search observable publishing surfaces for V3 URLs and test them against the live Worker:
+
+```bash
+git fetch --all --tags --prune
+git fetch origin '+refs/pull/*/head:refs/remotes/origin/pr/*'
+# Then scan repo history, GitHub releases/issues/PRs/comments, and public code search
+# for wrapped-claude-codes.adewale-883.workers.dev URLs whose decoded msgpack has v == 3.
+```
+
+Promote any real V3 URL that exercises a new legacy shape into fixtures or backwards-compatibility tests. Do not include private/user-supplied URLs in public fixtures without consent.
+
+## 10. Final verification
 
 Confirm:
 - `git status -sb` is clean.
-- `git tag --points-at HEAD` includes the release tag.
+- For a just-created release, `git tag --points-at HEAD` includes the release tag.
 - GitHub release exists and includes artifacts.
 - `gh run list --branch main --limit 1` shows a successful release commit CI run.
+- Wrapped deployment state is documented if it differs from the latest release tag.
 - Any known warnings or skipped optional checks are documented in the release notes.

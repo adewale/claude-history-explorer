@@ -1,7 +1,7 @@
 # Claude Code Wrapped - UX Specification
 
 > **Note**: This document describes the original card-based Story Mode which has been removed.
-> Current implementation is V3-only Print view at `/wrapped?d=...` on `wrapped-claude-codes.adewale-883.workers.dev`. The old `wrapped.claude.codes/{year}/{data}` path, Story Mode, Framer Motion transitions, and "no query params" decisions below are historical/proposal content, not current behavior.
+> Current implementation is V3-only Print view at `/wrapped?d=...` on `wrapped-claude-codes.adewale-883.workers.dev`, with SVG social previews at `/og/:year/:data.svg` and `/og/:year/:data`. The old `wrapped.claude.codes/{year}/{data}` path, Story Mode, Framer Motion transitions, and "no query params" decisions below are historical/proposal content, not current behavior.
 
 ## Overview
 

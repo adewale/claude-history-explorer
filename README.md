@@ -250,17 +250,18 @@ npm ci
 cd ..
 
 # Run Python tests/lint
-uv run pytest
-uv run ruff check .
+uv run --locked pytest -q
+uv run --locked ruff check .
 
 # Run privacy-preserving smoke test against your local Claude corpus
-uv run python scripts/smoketest_local_corpus.py
+uv run --locked python scripts/smoketest_local_corpus.py
 
 # Run Wrapped website tests/typecheck/lint/audit
 cd wrapped-website
 npm test
 npm run typecheck
 npm run lint
+npm audit --omit=dev
 npm audit
 cd ..
 
@@ -270,9 +271,11 @@ uv run claude-history --help
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Domain model](docs/DOMAIN_MODEL.md)
 - [JSON schemas](docs/JSON_SCHEMAS.md)
+- [Wrapped V3 spec](docs/WRAPPED_V3_SPEC.md)
 - [Trust model](TRUST.md)
 - [Lessons learned](docs/LESSONS_LEARNED.md)
 - [Release process](docs/RELEASE_PROCESS.md)

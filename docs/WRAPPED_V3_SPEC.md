@@ -1,6 +1,6 @@
 # Claude Code Wrapped V3: Tufte Edition
 
-> **Current implementation note:** V3 data types live in `claude_history_explorer/models.py`, generation/encoding/decoding lives in `claude_history_explorer/wrapped.py`, and the website renders Print view at `/wrapped?d=...` with SVG social preview. Historical checklist snippets below may mention older file locations.
+> **Current implementation note:** V3 data types live in `claude_history_explorer/models.py`, generation/encoding/decoding lives in `claude_history_explorer/wrapped.py`, and the website renders Print view at `/wrapped?d=...` with SVG social preview routes `/og/:year/:data.svg` and `/og/:year/:data`. The Worker normalizes known legacy optional V3 field shapes before strict validation so published V3 URLs remain compatible. Historical checklist snippets below may mention older file locations.
 
 ## Executive Summary
 

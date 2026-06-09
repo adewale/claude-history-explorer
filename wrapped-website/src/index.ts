@@ -4,7 +4,8 @@
  * Routes:
  * - GET /           - Landing page
  * - GET /wrapped?d= - Wrapped page (Print view)
- * - GET /og/:year/:data.svg - Open Graph SVG image
+ * - GET /og/:year/:data(.svg) - Open Graph SVG image
+ * - GET /:year/:data - Legacy redirect to /wrapped?d=
  */
 
 import { Hono } from 'hono';

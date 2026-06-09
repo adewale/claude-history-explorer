@@ -1,6 +1,6 @@
 # Lessons Learned
 
-Last updated: 2026-06-06
+Last updated: 2026-06-09
 
 This file records project-level lessons from building, auditing, fixing, and validating Claude History Explorer. Keep it concise, current, and linked to tests or docs when possible.
 
@@ -98,10 +98,32 @@ Practices that followed:
 - Install website dependencies before Python bridge tests.
 - Run lint, typecheck, test, and audit commands for the website.
 
+## 11. URL compatibility tests must match production routing and validation
+
+A published V3 demo URL decoded successfully in TypeScript but failed on the live Worker because the backwards-compatibility test did not call the same `validateStoryV3()` step used by production routes. The root cause was early V3 schema drift in optional visualization fields and partial trait-score maps.
+
+Practices that followed:
+- Treat every published Wrapped URL as a compatibility artifact, not just sample data.
+- Test old URLs through decode **and** runtime validation before accepting them.
+- Normalize known legacy optional V3 shapes to bounded defaults before strict validation; do not weaken core safety checks.
+- Verify canonical `/wrapped?d=...`, legacy `/:year/:data`, and OG `/og/:year/:data(.svg)` routes against the same corpus.
+- Periodically search repo history, releases, PRs/issues, and public code search for V3 URLs before tightening the schema.
+
+## 12. Releases and deployments are separate artifacts
+
+The `0.2.0` GitHub release points at `d9b5be7`, while the live Wrapped Worker was later redeployed from `69d18bd` to fix legacy URL validation. That is acceptable only when the difference is documented and either remains in `Unreleased` or is followed by a patch release.
+
+Practices that followed:
+- Report whether `main`, the latest release tag, and the live Worker deployment point to the same code.
+- After any post-release production hotfix, decide explicitly between leaving it in `Unreleased` or cutting a patch release such as `0.2.1`.
+- Include live deployment verification in release/deployment notes: landing page, generated local URL, golden URLs, legacy redirects, and OG SVG routes.
+- Avoid implying release artifacts include post-tag fixes.
+
 ## Maintenance checklist
 
 When a new bug or audit finding is fixed, ask:
 1. Is the root cause a trust boundary, path/schema ambiguity, or docs/API mismatch?
 2. Is there a regression test at the smallest useful tier?
 3. Did README, FAQ, Trust, Architecture, schemas/specs, Roadmap, and Changelog stay consistent?
-4. Should this file gain a new lesson or update an old one?
+4. If release or deployment state changed, do the docs distinguish `main`, the latest tag/release, and the live Worker?
+5. Should this file gain a new lesson or update an old one?

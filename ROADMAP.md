@@ -103,44 +103,46 @@ class WrappedStory:
 
 ## Phase 2: Basic Website
 
-A minimal Cloudflare Pages site that renders wrapped URLs.
+A minimal Cloudflare Worker site that renders wrapped URLs. Earlier notes called this a Cloudflare Pages site; the shipped implementation is a Worker deployed with Wrangler and routed by Hono.
 
 ### Phase 2A: Static Site & Routing
 
 **Goal**: Deploy a site that decodes and displays wrapped data.
 
 **Deliverables**:
-1. Cloudflare Pages project at `wrapped-claude-codes.adewale-883.workers.dev`
-2. `/wrapped?d=<data>` route handling, with `/:year/<data>` retained only as legacy redirect compatibility if needed
+1. Cloudflare Worker deployed at `wrapped-claude-codes.adewale-883.workers.dev`
+2. `/wrapped?d=<data>` route handling, with `/:year/<data>` retained as legacy redirect compatibility
 3. Landing page with "Get your own" CTA
-4. Worker/website decoder (Base64URL → MessagePack → JSON)
+4. Worker/website decoder (Base64URL → MessagePack → V3 object)
 5. Year validation against decoded `story.y`
 
 **Tech Stack**:
 - Cloudflare Workers
-- Vanilla JS or lightweight framework (Preact/Solid)
-- Hono or itty-router for routing
+- TypeScript
+- Hono routing
+- HTML rendered by small server-side string templates
 
-**Project Structure**:
+**Current project structure**:
 ```
 wrapped-website/
 ├── src/
-│   ├── index.ts            # Worker entry point + routing
-│   ├── decoder.ts          # URL decoding logic
-│   ├── renderer.ts         # Card rendering
+│   ├── index.ts            # Worker entry point + Hono routing
+│   ├── decoder.ts          # V3 URL decoding, migration, and validation
+│   ├── og.ts               # SVG social preview generation
+│   ├── constants.ts        # Shared display/schema constants
 │   └── pages/
 │       ├── landing.ts      # Landing page HTML
-│       └── wrapped.ts      # Wrapped card HTML
-├── static/
-│   └── styles.css          # Embedded or inlined
+│       └── print.ts        # Print-view Wrapped page and error page
+├── tests/                  # Vitest, schema, security, and compatibility tests
 └── wrangler.toml
 ```
 
 **Verification Criteria**:
-- [ ] `wrapped-claude-codes.adewale-883.workers.dev/` shows landing page with CLI command
+- [x] `wrapped-claude-codes.adewale-883.workers.dev/` shows landing page with CLI command
 - [x] `wrapped-claude-codes.adewale-883.workers.dev/wrapped?d=<valid-data>` renders the print view
-- [ ] Invalid year (e.g., 2030) shows error page
-- [ ] Mismatched year (path vs data.y) shows error page
+- [x] Invalid/future years show error pages
+- [x] Mismatched OG path year vs decoded `story.y` is rejected
+- [x] Known V3 golden/schema URLs and legacy redirects pass live verification
 - [ ] Works on mobile browsers
 - [ ] Page load < 2 seconds
 
@@ -181,6 +183,8 @@ wrapped-website/
 Make shared URLs look great in social feeds.
 
 ### Phase 3: OG Image Generation
+
+**Current implementation note:** SVG social previews are shipped at `/og/:year/:data.svg` and `/og/:year/:data`; `.png` requests are rejected with guidance to use SVG. The PNG/Satori/Resvg plan below remains future/proposal work.
 
 **Goal**: Generate dynamic PNG images for social sharing.
 
