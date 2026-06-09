@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-09
+
 ### Changed
 - Updated maintenance docs to record the post-`0.2.0` Wrapped deployment hotfix, release/deployment consistency checks, and published V3 URL audit workflow.
 
@@ -89,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Architecture documentation
   - JSON schema documentation
 
-[Unreleased]: https://github.com/adewale/claude-history-explorer/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/adewale/claude-history-explorer/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/adewale/claude-history-explorer/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/adewale/claude-history-explorer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/adewale/claude-history-explorer/tree/v0.1.0

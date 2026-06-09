@@ -20,7 +20,7 @@ Example:
     ...     print(f"{p.short_name}: {p.session_count} sessions")
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 # Re-export commonly used symbols for convenience
 from .history import (
