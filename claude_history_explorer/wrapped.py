@@ -15,7 +15,7 @@ from bisect import bisect_right
 from collections import Counter, defaultdict
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 from .constants import MILESTONE_VALUES
 from .models import (
@@ -65,7 +65,7 @@ MODEL_FAMILIES = {"opus", "sonnet", "haiku"}
 HEATMAP_QUANT_SCALE = 15
 
 
-def compute_activity_heatmap(sessions: List[SessionInfoV3]) -> List[int]:
+def compute_activity_heatmap(sessions: list[SessionInfoV3]) -> list[int]:
     """Compute 7x24 activity heatmap from sessions.
 
     Returns:
@@ -88,7 +88,7 @@ def compute_activity_heatmap(sessions: List[SessionInfoV3]) -> List[int]:
     return heatmap
 
 
-def compute_distribution(values: List[float], buckets: List[float]) -> List[int]:
+def compute_distribution(values: list[float], buckets: list[float]) -> list[int]:
     """Bucket values into a histogram distribution.
 
     Uses bisect_right for bucket assignment:
@@ -109,19 +109,19 @@ def compute_distribution(values: List[float], buckets: List[float]) -> List[int]
     return dist
 
 
-def compute_session_duration_distribution(sessions: List[SessionInfoV3]) -> List[int]:
+def compute_session_duration_distribution(sessions: list[SessionInfoV3]) -> list[int]:
     """Compute session duration histogram."""
     durations = [s.duration_minutes for s in sessions if s.duration_minutes > 0]
     return compute_distribution(durations, SESSION_DURATION_BUCKETS)
 
 
-def compute_agent_ratio_distribution(projects: List[ProjectStatsV3]) -> List[int]:
+def compute_agent_ratio_distribution(projects: list[ProjectStatsV3]) -> list[int]:
     """Compute agent ratio histogram across projects."""
     ratios = [p.agent_ratio for p in projects if p.session_count > 0]
     return compute_distribution(ratios, AGENT_RATIO_BUCKETS)
 
 
-def compute_message_length_distribution(message_lengths: List[int]) -> List[int]:
+def compute_message_length_distribution(message_lengths: list[int]) -> list[int]:
     """Compute message length histogram.
 
     Args:
@@ -134,11 +134,11 @@ def compute_message_length_distribution(message_lengths: List[int]) -> List[int]
 
 
 def compute_trait_scores(
-    sessions: List[SessionInfoV3],
-    projects: List[ProjectStatsV3],
-    heatmap: List[int],
+    sessions: list[SessionInfoV3],
+    projects: list[ProjectStatsV3],
+    heatmap: list[int],
     unique_tools_count: int = 0,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Compute quantized 0-100 scores for behavioral dimensions.
 
     These are self-relative normalized scores, NOT population percentiles.
@@ -154,7 +154,7 @@ def compute_trait_scores(
     Returns:
         Dict mapping trait code to integer score in [0, 100]
     """
-    scores: Dict[str, float] = {}
+    scores: dict[str, float] = {}
 
     # === AGENT DELEGATION (ad) ===
     # 0 = all hands-on, 1 = all agent
@@ -207,7 +207,7 @@ def compute_trait_scores(
 
     # === BURST VS STEADY (bs) ===
     # Coefficient of variation of daily message counts
-    daily_messages: Dict[datetime, int] = defaultdict(int)
+    daily_messages: dict[datetime, int] = defaultdict(int)
     for s in sessions:
         if s.start_time:
             day_key = s.start_time.date()
@@ -227,7 +227,7 @@ def compute_trait_scores(
 
     # === CONTEXT SWITCHING (cs) ===
     # Average unique projects per active day
-    projects_per_day: Dict[datetime, Set[str]] = defaultdict(set)
+    projects_per_day: dict[datetime, set[str]] = defaultdict(set)
     for s in sessions:
         if s.start_time and s.project_name:
             day_key = s.start_time.date()
@@ -277,10 +277,10 @@ def compute_trait_scores(
 
 
 def compute_project_cooccurrence(
-    sessions: List[SessionInfoV3],
-    project_names: List[str],
+    sessions: list[SessionInfoV3],
+    project_names: list[str],
     max_edges: int = MAX_COOCCURRENCE_EDGES,
-) -> List[Tuple[int, int, int]]:
+) -> list[tuple[int, int, int]]:
     """Compute project co-occurrence: which projects were worked on the same day.
 
     Args:
@@ -295,14 +295,14 @@ def compute_project_cooccurrence(
     proj_to_idx = {name: i for i, name in enumerate(project_names)}
 
     # Group sessions by day
-    sessions_by_day: Dict[datetime, Set[str]] = defaultdict(set)
+    sessions_by_day: dict[datetime, set[str]] = defaultdict(set)
     for s in sessions:
         if s.start_time and s.project_name:
             day = s.start_time.date()
             sessions_by_day[day].add(s.project_name)
 
     # Count co-occurrences
-    cooccurrence: Dict[Tuple[int, int], int] = defaultdict(int)
+    cooccurrence: dict[tuple[int, int], int] = defaultdict(int)
     for day_projects in sessions_by_day.values():
         project_list = [p for p in day_projects if p in proj_to_idx]
         for i in range(len(project_list)):
@@ -320,11 +320,11 @@ def compute_project_cooccurrence(
 
 
 def detect_timeline_events(
-    sessions: List[SessionInfoV3],
-    project_names: List[str],
+    sessions: list[SessionInfoV3],
+    project_names: list[str],
     year: int,
     max_events: int = MAX_TIMELINE_EVENTS,
-) -> List[List]:
+) -> list[list]:
     """Detect significant events throughout the year.
 
     Events are prioritized: peak > milestones > streaks > gaps > new_project
@@ -334,11 +334,11 @@ def detect_timeline_events(
         (4 elements per event, -1 for missing optional values)
     """
     proj_to_idx = {name: i for i, name in enumerate(project_names)}
-    events: List[List] = []
+    events: list[list] = []
 
     # Group by day of year
-    messages_by_day: Dict[int, int] = defaultdict(int)
-    projects_first_day: Dict[str, int] = {}
+    messages_by_day: dict[int, int] = defaultdict(int)
+    projects_first_day: dict[str, int] = {}
 
     for s in sessions:
         if not s.start_time or s.start_time.year != year:
@@ -421,7 +421,7 @@ def detect_timeline_events(
     return events
 
 
-def compute_session_fingerprint(session: Session) -> List[int]:
+def compute_session_fingerprint(session: Session) -> list[int]:
     """Compute an 8-value fingerprint encoding session "shape".
 
     Fingerprint encodes (quantized to integers 0-100):
@@ -488,11 +488,11 @@ def compute_session_fingerprint(session: Session) -> List[int]:
 
 
 def get_top_session_fingerprints(
-    sessions: List[SessionInfoV3],
-    session_file_map: Dict[str, Union[Path, Session]],
-    project_names: List[str],
+    sessions: list[SessionInfoV3],
+    session_file_map: dict[str, Path | Session],
+    project_names: list[str],
     limit: int = MAX_SESSION_FINGERPRINTS,
-) -> List[List]:
+) -> list[list]:
     """Get fingerprints for the most significant sessions.
 
     Args:
@@ -556,7 +556,7 @@ def get_top_session_fingerprints(
 # =============================================================================
 
 
-def rle_encode(values: List[int]) -> List[int]:
+def rle_encode(values: list[int]) -> list[int]:
     """Run-length encode a list of integers.
 
     Format: [value, count, value, count, ...]
@@ -583,7 +583,7 @@ def rle_encode(values: List[int]) -> List[int]:
     return result
 
 
-def rle_decode(encoded: List[int], max_output: int = MAX_RLE_OUTPUT) -> List[int]:
+def rle_decode(encoded: list[int], max_output: int = MAX_RLE_OUTPUT) -> list[int]:
     """Decode run-length encoded data."""
     if not isinstance(encoded, list) or len(encoded) % 2 != 0:
         raise ValueError("RLE data must be an even-length list")
@@ -601,7 +601,7 @@ def rle_decode(encoded: List[int], max_output: int = MAX_RLE_OUTPUT) -> List[int
     return result
 
 
-def rle_encode_if_smaller(values: List[int]) -> Tuple[bool, List[int]]:
+def rle_encode_if_smaller(values: list[int]) -> tuple[bool, list[int]]:
     """RLE encode only if it reduces size.
 
     Returns:
@@ -613,7 +613,7 @@ def rle_encode_if_smaller(values: List[int]) -> Tuple[bool, List[int]]:
     return (False, values)
 
 
-def quantize_heatmap(heatmap: List[int], scale: int = HEATMAP_QUANT_SCALE) -> List[int]:
+def quantize_heatmap(heatmap: list[int], scale: int = HEATMAP_QUANT_SCALE) -> list[int]:
     """Quantize heatmap values to 0-scale for compact encoding.
 
     Args:
@@ -638,7 +638,7 @@ def encode_wrapped_story_v3(story: WrappedStoryV3) -> str:
     data = story.to_dict()
 
     # Quantize and RLE encode heatmap
-    if "hm" in data and data["hm"]:
+    if data.get("hm"):
         # Quantize to 0-15 scale for compact encoding
         quantized = quantize_heatmap(data["hm"])
         # RLE encode if beneficial
@@ -678,7 +678,7 @@ def _is_numeric_array(value: Any, length: int) -> bool:
 
 
 def _default_wrapped_payload_fields(data: dict) -> None:
-    defaults: Dict[str, List[int]] = {
+    defaults: dict[str, list[int]] = {
         "hm": [0] * HEATMAP_SIZE,
         "ma": [0] * 12,
         "mh": [0] * 12,
@@ -806,7 +806,7 @@ def decode_wrapped_story_v3(encoded: str) -> WrappedStoryV3:
     return WrappedStoryV3.from_dict(data)
 
 
-def compute_streak_stats(active_dates: Set[date], year: int) -> List[int]:
+def compute_streak_stats(active_dates: set[date], year: int) -> list[int]:
     """Compute streak statistics from active dates.
 
     A streak is 2+ consecutive days of activity.
@@ -826,7 +826,7 @@ def compute_streak_stats(active_dates: Set[date], year: int) -> List[int]:
     sorted_dates = sorted(active_dates)
 
     # Find all streaks
-    streaks: List[int] = []
+    streaks: list[int] = []
     current_streak_length = 1
 
     for i in range(1, len(sorted_dates)):
@@ -869,11 +869,11 @@ def compute_streak_stats(active_dates: Set[date], year: int) -> List[int]:
     return [streak_count, longest_streak, current_streak, avg_streak]
 
 
-def _project_display_names(projects: List[Project]) -> Dict[str, str]:
+def _project_display_names(projects: list[Project]) -> dict[str, str]:
     """Build stable unique display names while preserving short names when unique."""
     base_counts = Counter(project.basename for project in projects)
-    seen: Dict[str, int] = defaultdict(int)
-    labels: Dict[str, str] = {}
+    seen: dict[str, int] = defaultdict(int)
+    labels: dict[str, str] = {}
     for project in projects:
         base = project.basename
         seen[base] += 1
@@ -884,7 +884,7 @@ def _project_display_names(projects: List[Project]) -> Dict[str, str]:
 
 
 def generate_wrapped_story_v3(
-    year: int, name: Optional[str] = None, previous_year_data: Optional[Dict] = None
+    year: int, name: str | None = None, previous_year_data: dict | None = None
 ) -> WrappedStoryV3:
     """Generate a V3 WrappedStory with rich visualization data.
 
@@ -903,15 +903,15 @@ def generate_wrapped_story_v3(
         raise ValueError(f"Claude Code didn't exist in {year}")
 
     # Collect target-year sessions with project info
-    year_sessions: List[SessionInfoV3] = []
-    session_file_map: Dict[str, Union[Path, Session]] = {}  # For fingerprint computation
+    year_sessions: list[SessionInfoV3] = []
+    session_file_map: dict[str, Path | Session] = {}  # For fingerprint computation
 
     # Also collect message lengths, tools, and token usage for the target year
-    all_message_lengths: List[int] = []
-    all_unique_tools: Set[str] = set()
+    all_message_lengths: list[int] = []
+    all_unique_tools: set[str] = set()
 
     # Token tracking
-    token_stats: Dict[str, Any] = {
+    token_stats: dict[str, Any] = {
         "total": 0,
         "input": 0,
         "output": 0,
@@ -965,13 +965,13 @@ def generate_wrapped_story_v3(
         raise ValueError(f"No Claude Code activity found for {year}")
 
     # Group by project for the year
-    year_project_sessions: Dict[str, List[SessionInfoV3]] = defaultdict(list)
+    year_project_sessions: dict[str, list[SessionInfoV3]] = defaultdict(list)
     for s in year_sessions:
         if s.project_name:  # Skip sessions with empty project names
             year_project_sessions[s.project_name].append(s)
 
     # Calculate project stats
-    project_stats: List[ProjectStatsV3] = []
+    project_stats: list[ProjectStatsV3] = []
     for proj_name, sessions in year_project_sessions.items():
         messages = sum(s.message_count for s in sessions)
         hours = round(sum(s.duration_minutes for s in sessions) / 60)  # Integer hours

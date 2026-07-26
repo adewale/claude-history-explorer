@@ -9,8 +9,8 @@ This module provides functions to parse Claude Code session files:
 import json
 import logging
 import re
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple
 
 from .models import Message, Project, Session
 from .projects import list_projects
@@ -39,7 +39,7 @@ def parse_session(file_path: Path, project_path: str = "") -> Session:
         >>> print(f"{session.message_count} messages")
     """
     session_id = file_path.stem
-    messages: List[Message] = []
+    messages: list[Message] = []
     start_time = None
     end_time = None
     slug = None
@@ -96,8 +96,8 @@ def parse_session(file_path: Path, project_path: str = "") -> Session:
 
 
 def get_session_by_id(
-    session_id: str, project: Optional[Project] = None
-) -> Optional[Session]:
+    session_id: str, project: Project | None = None
+) -> Session | None:
     """Get a specific session by ID (supports partial matches).
 
     Args:
@@ -140,8 +140,8 @@ def get_session_by_id(
 
 
 def search_sessions(
-    pattern: str, project: Optional[Project] = None, case_sensitive: bool = False
-) -> Iterator[Tuple[Session, List[Message]]]:
+    pattern: str, project: Project | None = None, case_sensitive: bool = False
+) -> Iterator[tuple[Session, list[Message]]]:
     """Search for a regex pattern across all sessions.
 
     Searches message content and tool inputs. Yields results as they're found
@@ -171,7 +171,7 @@ def search_sessions(
     for proj in projects:
         for session_file in proj.session_files:
             session = parse_session(session_file, proj.path)
-            matching_messages: List[Message] = []
+            matching_messages: list[Message] = []
 
             for msg in session.messages:
                 matched = bool(regex.search(msg.content))

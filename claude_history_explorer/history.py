@@ -36,7 +36,6 @@ Example:
 import re
 
 # Re-export all public symbols for backward compatibility
-
 # Work type classification (single source of truth in constants.py)
 from .constants import WORK_TYPE_INFO, WORK_TYPE_PATTERNS
 
@@ -110,7 +109,6 @@ from .wrapped import (
     rle_encode_if_smaller,
 )
 
-
 # =============================================================================
 # Work Type Classification Functions
 # =============================================================================
@@ -143,66 +141,6 @@ def get_work_type_name(work_type: str) -> str:
     return WORK_TYPE_INFO.get(work_type, {}).get("name", work_type.title())
 
 __all__ = [
-    # Data models
-    "Message",
-    "Session",
-    "SessionInfo",
-    "SessionInfoV3",
-    "Project",
-    "ProjectStats",
-    "ProjectStatsV3",
-    "GlobalStats",
-    "ProjectStory",
-    "GlobalStory",
-    "TokenUsage",
-    "WrappedStoryV3",
-    # Path functions
-    "get_claude_dir",
-    "get_projects_dir",
-    # Helper functions
-    "format_duration",
-    "format_timestamp",
-    "classify",
-    "_active_duration_minutes",
-    "_compile_regex_safe",
-    # Core functions
-    "list_projects",
-    "find_project",
-    "parse_session",
-    "search_sessions",
-    "get_session_by_id",
-    # Statistics functions
-    "calculate_project_stats",
-    "calculate_global_stats",
-    # Story functions
-    "generate_project_story",
-    "generate_global_story",
-    # Work type classification
-    "classify_project",
-    "get_work_type_name",
-    "WORK_TYPE_PATTERNS",
-    "WORK_TYPE_INFO",
-    # V3 Wrapped functions
-    "generate_wrapped_story_v3",
-    "encode_wrapped_story_v3",
-    "decode_wrapped_story_v3",
-    # V3 Compute functions
-    "compute_activity_heatmap",
-    "compute_distribution",
-    "compute_session_duration_distribution",
-    "compute_agent_ratio_distribution",
-    "compute_message_length_distribution",
-    "compute_trait_scores",
-    "compute_project_cooccurrence",
-    "detect_timeline_events",
-    "compute_session_fingerprint",
-    "get_top_session_fingerprints",
-    "compute_streak_stats",
-    "quantize_heatmap",
-    # V3 Encoding
-    "rle_encode",
-    "rle_decode",
-    "rle_encode_if_smaller",
     # V3 Constants
     "AGENT_RATIO_BUCKETS",
     "EVENT_TYPE_INDICES",
@@ -213,4 +151,64 @@ __all__ = [
     "MAX_TIMELINE_EVENTS",
     "MESSAGE_LENGTH_BUCKETS",
     "SESSION_DURATION_BUCKETS",
+    "WORK_TYPE_INFO",
+    "WORK_TYPE_PATTERNS",
+    "GlobalStats",
+    "GlobalStory",
+    # Data models
+    "Message",
+    "Project",
+    "ProjectStats",
+    "ProjectStatsV3",
+    "ProjectStory",
+    "Session",
+    "SessionInfo",
+    "SessionInfoV3",
+    "TokenUsage",
+    "WrappedStoryV3",
+    "_active_duration_minutes",
+    "_compile_regex_safe",
+    "calculate_global_stats",
+    # Statistics functions
+    "calculate_project_stats",
+    "classify",
+    # Work type classification
+    "classify_project",
+    # V3 Compute functions
+    "compute_activity_heatmap",
+    "compute_agent_ratio_distribution",
+    "compute_distribution",
+    "compute_message_length_distribution",
+    "compute_project_cooccurrence",
+    "compute_session_duration_distribution",
+    "compute_session_fingerprint",
+    "compute_streak_stats",
+    "compute_trait_scores",
+    "decode_wrapped_story_v3",
+    "detect_timeline_events",
+    "encode_wrapped_story_v3",
+    "find_project",
+    # Helper functions
+    "format_duration",
+    "format_timestamp",
+    "generate_global_story",
+    # Story functions
+    "generate_project_story",
+    # V3 Wrapped functions
+    "generate_wrapped_story_v3",
+    # Path functions
+    "get_claude_dir",
+    "get_projects_dir",
+    "get_session_by_id",
+    "get_top_session_fingerprints",
+    "get_work_type_name",
+    # Core functions
+    "list_projects",
+    "parse_session",
+    "quantize_heatmap",
+    "rle_decode",
+    # V3 Encoding
+    "rle_encode",
+    "rle_encode_if_smaller",
+    "search_sessions",
 ]

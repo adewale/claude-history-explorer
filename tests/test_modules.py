@@ -277,8 +277,8 @@ class TestParser:
 
     def test_search_sessions_with_pattern(self):
         """Test searching sessions with a pattern."""
-        from claude_history_explorer.parser import search_sessions
         from claude_history_explorer.models import Project
+        from claude_history_explorer.parser import search_sessions
 
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_path = Path(tmpdir)
@@ -297,7 +297,7 @@ class TestParser:
             ):
                 results = list(search_sessions("NEEDLE"))
                 assert len(results) == 1
-                session, matches = results[0]
+                _session, matches = results[0]
                 assert len(matches) == 1
 
 
@@ -471,11 +471,11 @@ class TestWrapped:
 
     def test_encode_decode_wrapped_story_v3(self):
         """Test encoding and decoding WrappedStoryV3."""
+        from claude_history_explorer.models import WrappedStoryV3
         from claude_history_explorer.wrapped import (
             decode_wrapped_story_v3,
             encode_wrapped_story_v3,
         )
-        from claude_history_explorer.models import WrappedStoryV3
 
         story = WrappedStoryV3(y=2025, p=5, s=10, m=100, h=50, d=30)
         encoded = encode_wrapped_story_v3(story)

@@ -10,21 +10,20 @@ Run with: uv run pytest tests/test_integration.py -v
 """
 
 import subprocess
-from pathlib import Path
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 from conftest import npx_command, require_wrapped_node_deps
 
 from claude_history_explorer.history import (
-    WrappedStoryV3,
-    encode_wrapped_story_v3,
-    decode_wrapped_story_v3,
-    generate_wrapped_story_v3,
-    Session,
     Message,
+    Session,
+    WrappedStoryV3,
+    decode_wrapped_story_v3,
+    encode_wrapped_story_v3,
+    generate_wrapped_story_v3,
 )
 
 
@@ -280,6 +279,7 @@ try {{
             encoding="utf-8",
             errors="replace",
             timeout=30,
+            check=False,
         )
 
         if result.returncode != 0:
@@ -575,6 +575,7 @@ class TestWrappedURLTruncationBug:
         with width=80, losing over 1300 characters.
         """
         from io import StringIO
+
         from rich.console import Console
 
         # Create a console with narrow width to simulate the bug
@@ -614,6 +615,7 @@ class TestWrappedURLTruncationBug:
         is preserved (though it may wrap to multiple lines).
         """
         from io import StringIO
+
         from rich.console import Console
 
         narrow_width = 80
@@ -655,6 +657,7 @@ class TestCLIOutputIntegrity:
         Uses Click's CliRunner to capture actual CLI output.
         """
         from click.testing import CliRunner
+
         from claude_history_explorer.cli import main
 
         runner = CliRunner()
@@ -705,7 +708,7 @@ class TestCLIOutputIntegrity:
             # THE KEY TEST: The URL should be decodable
             try:
                 decoded = decode_wrapped_story_v3(encoded_data)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - decode failures are the assertion subject
                 pytest.fail(
                     f"URL in CLI output is not decodable!\n"
                     f"URL: {url}\n"
@@ -726,6 +729,7 @@ class TestCLIOutputIntegrity:
         Catches bugs where display and clipboard get different data.
         """
         from click.testing import CliRunner
+
         from claude_history_explorer.cli import main
 
         runner = CliRunner()
@@ -762,8 +766,8 @@ class TestCLIOutputIntegrity:
 
         Directly tests the function that had the overflow="ignore" bug.
         """
-        from io import StringIO
         import sys
+        from io import StringIO
 
         # Create a story and URL
         story = WrappedStoryV3(
@@ -837,8 +841,8 @@ class TestCLIOutputIntegrity:
         # Test various simulated terminal widths
         for width in [40, 60, 80, 100, 120, 200]:
             # Capture stdout with simulated width
-            from io import StringIO
             import sys
+            from io import StringIO
 
             captured = StringIO()
             old_stdout = sys.stdout

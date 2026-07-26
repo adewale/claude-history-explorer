@@ -17,7 +17,6 @@ from unittest.mock import patch
 from claude_history_explorer.models import Project
 from claude_history_explorer.projects import list_projects
 
-
 # ---------------------------------------------------------------------------
 # Issue 1: projects.py filter — startswith("-") excludes Windows dirs
 # ---------------------------------------------------------------------------
@@ -240,6 +239,7 @@ class TestConsoleEncoding:
     def test_reconfigure_guard_does_not_crash_on_non_text_stream(self):
         """_ensure_utf8_output must not raise when stdout lacks reconfigure."""
         import io
+
         from claude_history_explorer.cli import _ensure_utf8_output
 
         fake_stdout = io.BytesIO()
@@ -251,6 +251,7 @@ class TestConsoleEncoding:
     def test_reconfigure_called_on_win32(self):
         """_ensure_utf8_output must call reconfigure on win32."""
         from unittest.mock import MagicMock
+
         from claude_history_explorer.cli import _ensure_utf8_output
 
         fake_out = MagicMock()
@@ -269,6 +270,7 @@ class TestConsoleEncoding:
     def test_no_reconfigure_on_non_win32(self):
         """_ensure_utf8_output must be a no-op on non-Windows."""
         import io
+
         from claude_history_explorer.cli import _ensure_utf8_output
 
         fake_stream = io.StringIO()

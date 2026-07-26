@@ -20,49 +20,48 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 import click
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.syntax import Syntax
+from rich.table import Table
 from sparklines import sparklines
 
 from .constants import (
-    MESSAGE_DISPLAY_LIMIT,
-    TOOL_INPUT_PREVIEW_LIMIT,
-    SEARCH_TRUNCATION_LIMIT,
-    SLUG_DISPLAY_LIMIT,
+    DATETIME_FORMAT,
     DEFAULT_PROJECTS_LIMIT,
+    DEFAULT_SEARCH_LIMIT,
     DEFAULT_SESSIONS_LIMIT,
     DEFAULT_SHOW_LIMIT,
-    DEFAULT_SEARCH_LIMIT,
-    DATETIME_FORMAT,
+    MESSAGE_DISPLAY_LIMIT,
+    SEARCH_TRUNCATION_LIMIT,
+    SLUG_DISPLAY_LIMIT,
+    TOOL_INPUT_PREVIEW_LIMIT,
     WRAPPED_URL_DOMAIN,
 )
 from .history import (
-    list_projects,
-    find_project,
-    parse_session,
-    search_sessions,
-    get_session_by_id,
+    GlobalStats,
+    GlobalStory,
+    ProjectStats,
+    ProjectStory,
+    WrappedStoryV3,
     _compile_regex_safe,
+    calculate_global_stats,
+    calculate_project_stats,
+    decode_wrapped_story_v3,
+    encode_wrapped_story_v3,
+    find_project,
+    generate_global_story,
+    generate_project_story,
+    generate_wrapped_story_v3,
     get_claude_dir,
     get_projects_dir,
-    calculate_project_stats,
-    calculate_global_stats,
-    generate_project_story,
-    generate_global_story,
-    generate_wrapped_story_v3,
-    encode_wrapped_story_v3,
-    decode_wrapped_story_v3,
+    get_session_by_id,
     get_work_type_name,
-    ProjectStats,
-    GlobalStats,
-    ProjectStory,
-    GlobalStory,
-    WrappedStoryV3,
+    list_projects,
+    parse_session,
+    search_sessions,
 )
 
 __all__ = ["main"]
@@ -120,7 +119,7 @@ def _sanitize_output_path(output: str) -> Path:
     return path
 
 
-def format_datetime(dt: Optional[datetime], fallback: str = "unknown") -> str:
+def format_datetime(dt: datetime | None, fallback: str = "unknown") -> str:
     """Format a datetime object consistently across the CLI.
 
     Args:
@@ -151,7 +150,7 @@ def truncate(text: str, limit: int, suffix: str = "...") -> str:
     return text[:limit] + suffix
 
 
-def safe_sparkline(values: List[int]) -> Optional[str]:
+def safe_sparkline(values: list[int]) -> str | None:
     """Generate a sparkline string, returning None on failure.
 
     Wraps the sparklines library with error handling for edge cases
@@ -264,7 +263,6 @@ def main():
     Claude Code stores conversation history in ~/.claude/projects/ as JSONL files.
     This tool helps you browse, search, and export that history.
     """
-    pass
 
 
 @main.command()

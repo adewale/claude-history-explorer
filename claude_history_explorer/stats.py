@@ -6,7 +6,6 @@ This module provides functions to calculate usage statistics:
 """
 
 import re
-from typing import List, Optional
 
 from .constants import WORK_TYPE_PATTERNS
 from .models import GlobalStats, Project, ProjectStats
@@ -73,13 +72,13 @@ def calculate_project_stats(project: Project) -> ProjectStats:
         # Duration - use active duration (gaps capped)
         duration = session.active_duration_minutes
         total_duration_minutes += duration
-        if duration > longest_duration_minutes:
-            longest_duration_minutes = duration
+        longest_duration_minutes = max(longest_duration_minutes, duration)
 
         # Most recent session
-        if session.start_time:
-            if most_recent_session is None or session.start_time > most_recent_session:
-                most_recent_session = session.start_time
+        if session.start_time and (
+            most_recent_session is None or session.start_time > most_recent_session
+        ):
+            most_recent_session = session.start_time
 
     avg_messages = (
         total_messages / project.session_count if project.session_count > 0 else 0
@@ -101,7 +100,7 @@ def calculate_project_stats(project: Project) -> ProjectStats:
     )
 
 
-def calculate_global_stats(project_filter: Optional[str] = None) -> GlobalStats:
+def calculate_global_stats(project_filter: str | None = None) -> GlobalStats:
     """Calculate aggregated statistics across all projects.
 
     Computes per-project stats and aggregates them into global metrics.
@@ -123,7 +122,7 @@ def calculate_global_stats(project_filter: Optional[str] = None) -> GlobalStats:
         project = find_project(project_filter)
         if not project:
             raise ValueError(f"No project found matching '{project_filter}'")
-        projects: List[ProjectStats] = [calculate_project_stats(project)]
+        projects: list[ProjectStats] = [calculate_project_stats(project)]
     else:
         all_projects = list_projects()
         projects = [calculate_project_stats(p) for p in all_projects]
@@ -145,12 +144,11 @@ def calculate_global_stats(project_filter: Optional[str] = None) -> GlobalStats:
     # Find most recent activity
     most_recent_activity = None
     for p in projects:
-        if p.most_recent_session:
-            if (
-                most_recent_activity is None
-                or p.most_recent_session > most_recent_activity
-            ):
-                most_recent_activity = p.most_recent_session
+        if p.most_recent_session and (
+            most_recent_activity is None
+            or p.most_recent_session > most_recent_activity
+        ):
+            most_recent_activity = p.most_recent_session
 
     # Calculate averages
     avg_sessions_per_project = total_sessions / len(projects)

@@ -19,9 +19,9 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import npx_command, require_wrapped_node_deps
 
 from claude_history_explorer.history import decode_wrapped_story_v3
-from conftest import npx_command, require_wrapped_node_deps
 
 # Get paths relative to this file
 TESTS_DIR = Path(__file__).parent
@@ -180,6 +180,7 @@ class TestTypeScriptBackwardsCompatibility:
             encoding="utf-8",
             errors="replace",
             cwd=WRAPPED_WEBSITE_DIR,
+            check=False,
         )
 
         # Print output for debugging

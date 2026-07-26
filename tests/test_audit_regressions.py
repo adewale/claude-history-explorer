@@ -9,9 +9,23 @@ import msgpack
 import pytest
 from click.testing import CliRunner
 
-from claude_history_explorer.cli import _generate_global_summary, _sanitize_output_path, main
-from claude_history_explorer.models import GlobalStats, Message, Project, ProjectStats, Session
-from claude_history_explorer.parser import get_session_by_id, parse_session, search_sessions
+from claude_history_explorer.cli import (
+    _generate_global_summary,
+    _sanitize_output_path,
+    main,
+)
+from claude_history_explorer.models import (
+    GlobalStats,
+    Message,
+    Project,
+    ProjectStats,
+    Session,
+)
+from claude_history_explorer.parser import (
+    get_session_by_id,
+    parse_session,
+    search_sessions,
+)
 from claude_history_explorer.stories import generate_project_story
 from claude_history_explorer.utils import _compile_regex_safe
 from claude_history_explorer.wrapped import (

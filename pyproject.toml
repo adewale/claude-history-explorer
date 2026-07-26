@@ -26,5 +26,17 @@ packages = ["claude_history_explorer"]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=7.0.0",
-    "ruff>=0.1.0",
+    "ruff==0.16.0",
 ]
+
+[tool.ruff]
+required-version = "==0.16.0"
+
+[tool.ruff.lint.per-file-ignores]
+# These reports deliberately use the user's local calendar year; the persisted
+# Claude history schema itself contains timezone-naive timestamps.
+"claude_history_explorer/cli.py" = ["DTZ005"]
+"claude_history_explorer/wrapped.py" = ["DTZ005", "DTZ011", "TRY004"]
+# Test fixtures mirror that persisted schema, and nested patch contexts make
+# setup/teardown ownership explicit.
+"tests/**/*.py" = ["DTZ001", "DTZ005", "SIM102", "SIM117"]
