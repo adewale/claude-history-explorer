@@ -14,26 +14,25 @@ import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
 from claude_history_explorer.cli import main
 from claude_history_explorer.history import (
-    Project,
-    Session,
-    Message,
-    SessionInfo,
-    ProjectStats,
     GlobalStats,
-    ProjectStory,
     GlobalStory,
+    Message,
+    Project,
+    ProjectStats,
+    ProjectStory,
+    Session,
+    SessionInfo,
     WrappedStoryV3,
-    encode_wrapped_story_v3,
     decode_wrapped_story_v3,
+    encode_wrapped_story_v3,
 )
-
 
 # =============================================================================
 # Test Fixtures

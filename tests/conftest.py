@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-
 PROJECT_ROOT = Path(__file__).parent.parent
 WRAPPED_WEBSITE_DIR = PROJECT_ROOT / "wrapped-website"
 
@@ -33,4 +32,3 @@ def npx_command() -> str:
 
 def pytest_configure():
     """Configure pytest for our tests."""
-    pass

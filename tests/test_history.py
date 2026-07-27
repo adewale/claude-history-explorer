@@ -2,43 +2,43 @@
 
 import json
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-import claude_history_explorer.history as history
+from claude_history_explorer import history
 from claude_history_explorer.history import (
+    AGENT_RATIO_BUCKETS,
+    MESSAGE_LENGTH_BUCKETS,
+    SESSION_DURATION_BUCKETS,
+    GlobalStats,
     Message,
-    Session,
     Project,
     ProjectStats,
-    GlobalStats,
+    ProjectStatsV3,
+    Session,
     SessionInfo,
-    _active_duration_minutes,
     # V3 imports
     SessionInfoV3,
-    ProjectStatsV3,
     WrappedStoryV3,
-    compute_trait_scores,
-    compute_message_length_distribution,
-    compute_session_fingerprint,
-    get_top_session_fingerprints,
-    encode_wrapped_story_v3,
-    decode_wrapped_story_v3,
-    MESSAGE_LENGTH_BUCKETS,
-    rle_encode,
-    rle_decode,
-    rle_encode_if_smaller,
+    _active_duration_minutes,
     compute_activity_heatmap,
-    compute_distribution,
-    compute_session_duration_distribution,
     compute_agent_ratio_distribution,
+    compute_distribution,
+    compute_message_length_distribution,
     compute_project_cooccurrence,
+    compute_session_duration_distribution,
+    compute_session_fingerprint,
+    compute_trait_scores,
+    decode_wrapped_story_v3,
     detect_timeline_events,
-    SESSION_DURATION_BUCKETS,
-    AGENT_RATIO_BUCKETS,
+    encode_wrapped_story_v3,
+    get_top_session_fingerprints,
+    rle_decode,
+    rle_encode,
+    rle_encode_if_smaller,
 )
 
 
@@ -192,8 +192,7 @@ class TestSession:
             ]
             
             with open(session_file, "w") as f:
-                for item in data:
-                    f.write(json.dumps(item) + "\n")
+                f.writelines(json.dumps(item) + "\n" for item in data)
             
             session = history.parse_session(session_file, "/test/project")
             
@@ -522,6 +521,7 @@ class TestReadOnlyBehavior:
     def test_no_write_operations_in_history_module(self):
         """Test that history module doesn't perform write operations."""
         import inspect
+
         import claude_history_explorer.history as history_module
         
         # Get all functions in the module
@@ -581,6 +581,7 @@ class TestReadOnlyBehavior:
     def test_cli_commands_are_read_only(self):
         """Test that CLI commands don't modify files."""
         import inspect
+
         import claude_history_explorer.cli as cli_module
         
         # Get all command functions
@@ -727,8 +728,7 @@ class TestErrorHandling:
             ]
 
             with open(session_file, "w") as f:
-                for item in data:
-                    f.write(json.dumps(item) + "\n")
+                f.writelines(json.dumps(item) + "\n" for item in data)
 
             # Should parse without crashing, skipping invalid timestamps
             session = history.parse_session(session_file, "/test")
@@ -1983,6 +1983,7 @@ class TestGenerateWrappedStoryV3:
     def test_generate_wrapped_story_v3_with_mocked_data(self):
         """Test generate_wrapped_story_v3 with mocked project/session data."""
         from unittest.mock import MagicMock
+
         from claude_history_explorer.history import generate_wrapped_story_v3
 
         # Create mock project
@@ -2296,6 +2297,7 @@ class TestGenerateProjectStory:
     def test_generate_project_story_basic(self):
         """Test basic project story generation."""
         from datetime import timedelta
+
         from claude_history_explorer.history import generate_project_story
 
         base_time = datetime(2025, 12, 1, 10, 0)
@@ -2361,6 +2363,7 @@ class TestGenerateProjectStory:
     def test_generate_project_story_concurrent_detection(self):
         """Test detection of concurrent Claude instances."""
         from datetime import timedelta
+
         from claude_history_explorer.history import generate_project_story
 
         base_time = datetime(2025, 12, 1, 10, 0)
@@ -2413,6 +2416,7 @@ class TestGenerateProjectStory:
     def test_generate_project_story_break_periods(self):
         """Test detection of break periods in activity."""
         from datetime import timedelta
+
         from claude_history_explorer.history import generate_project_story
 
         base_time = datetime(2025, 12, 1, 10, 0)
@@ -2445,7 +2449,11 @@ class TestGenerateGlobalStory:
 
     def test_generate_global_story_basic(self):
         """Test basic global story generation."""
-        from claude_history_explorer.history import generate_global_story, ProjectStory, SessionInfo
+        from claude_history_explorer.history import (
+            ProjectStory,
+            SessionInfo,
+            generate_global_story,
+        )
 
         mock_session_info = SessionInfo(
             session_id="s1",
@@ -2537,7 +2545,11 @@ class TestGenerateGlobalStory:
 
     def test_generate_global_story_skips_failed_projects(self):
         """Test that projects failing to generate stories are skipped."""
-        from claude_history_explorer.history import generate_global_story, ProjectStory, SessionInfo
+        from claude_history_explorer.history import (
+            ProjectStory,
+            SessionInfo,
+            generate_global_story,
+        )
 
         mock_session_info = SessionInfo(
             session_id="s1",
@@ -2637,7 +2649,7 @@ if __name__ == "__main__":
                 method = getattr(instance, method_name)
                 method()
                 print(f"  ✓ {method_name}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - generated fixture reports any test failure
                 print(f"  ✗ {method_name}: {e}")
                 sys.exit(1)
     

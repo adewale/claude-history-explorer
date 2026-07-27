@@ -12,9 +12,10 @@ This module contains all dataclasses used throughout the package:
 from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
-from .utils import _active_duration_minutes, format_duration as _format_duration
+from .utils import _active_duration_minutes
+from .utils import format_duration as _format_duration
 
 # V3 encoding constants (used by WrappedStoryV3)
 WRAPPED_VERSION_V3 = 3
@@ -80,9 +81,9 @@ class Message:
 
     role: str  # 'user' or 'assistant'
     content: str
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
     tool_uses: list = field(default_factory=list)
-    token_usage: Optional[TokenUsage] = None
+    token_usage: TokenUsage | None = None
 
     @classmethod
     def from_json(cls, data: dict) -> Optional["Message"]:
@@ -186,9 +187,9 @@ class Session:
     project_path: str
     file_path: Path
     messages: list[Message] = field(default_factory=list)
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    slug: Optional[str] = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    slug: str | None = None
 
     @property
     def message_count(self) -> int:
@@ -315,7 +316,7 @@ class Project:
             encoded = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in name)
             return encoded.split("-")
 
-        def decode_from(index: int, current_path: Path) -> Optional[Path]:
+        def decode_from(index: int, current_path: Path) -> Path | None:
             if index >= len(components):
                 return current_path
             if not current_path.exists() or not current_path.is_dir():
@@ -370,7 +371,7 @@ class Project:
         return prettified.title()
 
     @property
-    def last_modified(self) -> Optional[datetime]:
+    def last_modified(self) -> datetime | None:
         if self.session_files:
             try:
                 mtime = self.session_files[0].stat().st_mtime
@@ -400,12 +401,12 @@ class SessionInfo:
 
     session_id: str
     start_time: datetime
-    end_time: Optional[datetime]
+    end_time: datetime | None
     duration_minutes: int
     message_count: int
     user_message_count: int
     is_agent: bool
-    slug: Optional[str]
+    slug: str | None
 
     @classmethod
     def from_session(cls, session: Session, is_agent: bool) -> Optional["SessionInfo"]:
@@ -491,7 +492,7 @@ class ProjectStats:
     total_size_bytes: int
     avg_messages_per_session: float
     longest_session_duration: str
-    most_recent_session: Optional[datetime]
+    most_recent_session: datetime | None
     work_type: str = "coding"
 
     @property
@@ -550,7 +551,7 @@ class GlobalStats:
         most_recent_activity: Most recent session timestamp
     """
 
-    projects: List["ProjectStats"]
+    projects: list["ProjectStats"]
     total_projects: int
     total_sessions: int
     total_messages: int
@@ -561,7 +562,7 @@ class GlobalStats:
     avg_messages_per_session: float
     most_active_project: str
     largest_project: str
-    most_recent_activity: Optional[datetime]
+    most_recent_activity: datetime | None
 
     @property
     def total_size_mb(self) -> float:
@@ -613,8 +614,8 @@ class ProjectStory:
     lifecycle_days: int
     birth_date: datetime
     last_active: datetime
-    peak_day: Optional[tuple[datetime, int]]
-    break_periods: List[tuple[datetime, datetime, int]]
+    peak_day: tuple[datetime, int] | None
+    break_periods: list[tuple[datetime, datetime, int]]
     agent_sessions: int
     main_sessions: int
     collaboration_style: str
@@ -625,13 +626,13 @@ class ProjectStory:
     avg_session_hours: float
     longest_session_hours: float
     session_style: str
-    personality_traits: List[str]
+    personality_traits: list[str]
     most_productive_session: SessionInfo
     daily_engagement: str
-    insights: List[str]
-    daily_activity: Dict[datetime, int] = field(default_factory=dict)
+    insights: list[str]
+    daily_activity: dict[datetime, int] = field(default_factory=dict)
     concurrent_claude_instances: int = 0
-    concurrent_insights: List[str] = field(default_factory=list)
+    concurrent_insights: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -657,9 +658,9 @@ class GlobalStory:
     total_dev_time: float
     avg_agent_ratio: float
     avg_session_length: float
-    common_traits: List[tuple[str, int]]
-    project_stories: List[ProjectStory]
-    recent_activity: List[tuple[datetime, str]]
+    common_traits: list[tuple[str, int]]
+    project_stories: list[ProjectStory]
+    recent_activity: list[tuple[datetime, str]]
 
 
 @dataclass
@@ -673,7 +674,7 @@ class WrappedStoryV3:
     # Version and basic info
     v: int = WRAPPED_VERSION_V3
     y: int = 0  # Year
-    n: Optional[str] = None  # Display name
+    n: str | None = None  # Display name
 
     # Core counts
     p: int = 0  # Total projects
@@ -683,42 +684,42 @@ class WrappedStoryV3:
     d: int = 0  # Days active
 
     # Temporal data
-    hm: List[int] = field(default_factory=list)  # 7×24 heatmap (168 values)
-    ma: List[int] = field(default_factory=list)  # Monthly activity (12 values)
-    mh: List[int] = field(default_factory=list)  # Monthly hours (12 values, integers)
-    ms: List[int] = field(default_factory=list)  # Monthly sessions (12 values)
+    hm: list[int] = field(default_factory=list)  # 7×24 heatmap (168 values)
+    ma: list[int] = field(default_factory=list)  # Monthly activity (12 values)
+    mh: list[int] = field(default_factory=list)  # Monthly hours (12 values, integers)
+    ms: list[int] = field(default_factory=list)  # Monthly sessions (12 values)
 
     # Distributions
-    sd: List[int] = field(default_factory=list)  # Session duration distribution
-    ar: List[int] = field(default_factory=list)  # Agent ratio distribution
-    ml: List[int] = field(default_factory=list)  # Message length distribution
+    sd: list[int] = field(default_factory=list)  # Session duration distribution
+    ar: list[int] = field(default_factory=list)  # Agent ratio distribution
+    ml: list[int] = field(default_factory=list)  # Message length distribution
 
     # Trait scores (0-100 integers, quantized from 0.0-1.0)
-    ts: Dict[str, int] = field(default_factory=dict)
+    ts: dict[str, int] = field(default_factory=dict)
 
     # Project data (compact arrays: [name, messages, hours, days, sessions, agent_ratio])
-    tp: List[List] = field(default_factory=list)
+    tp: list[list] = field(default_factory=list)
 
     # Co-occurrence graph
-    pc: List[Tuple[int, int, int]] = field(default_factory=list)
+    pc: list[tuple[int, int, int]] = field(default_factory=list)
 
     # Timeline events (compact arrays: [day, type, value, project_idx])
-    te: List[List] = field(default_factory=list)
+    te: list[list] = field(default_factory=list)
 
     # Session fingerprints (compact arrays: [duration, messages, is_agent, hour, weekday, pi, fp0..7])
-    sf: List[List] = field(default_factory=list)
+    sf: list[list] = field(default_factory=list)
 
     # Longest session (hours, float for precision)
     ls: float = 0.0
 
     # Streak stats: [count, longest_days, current_days, avg_days]
-    sk: List[int] = field(default_factory=list)
+    sk: list[int] = field(default_factory=list)
 
     # Token stats: {total, input, output, cache_read, cache_create, models: {model: tokens}}
-    tk: Dict[str, Any] = field(default_factory=dict)
+    tk: dict[str, Any] = field(default_factory=dict)
 
     # Year-over-year comparison
-    yoy: Optional[Dict[str, int]] = None
+    yoy: dict[str, int] | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""

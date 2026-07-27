@@ -21,16 +21,16 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from claude_history_explorer.parser import parse_session  # noqa: E402
-from claude_history_explorer.projects import list_projects  # noqa: E402
+from claude_history_explorer.parser import parse_session
+from claude_history_explorer.projects import list_projects
 
 CLI = [sys.executable, "-m", "claude_history_explorer.cli"]
 COMMANDS = [
@@ -77,6 +77,7 @@ def run_cli(args: Sequence[str], *, label: str | None = None, timeout: int = 90)
         capture_output=True,
         text=True,
         timeout=timeout,
+        check=False,
     )
     display = label or _safe_label(args)
     if result.returncode != 0:
@@ -374,7 +375,7 @@ def main() -> int:
         else:
             temp_context.cleanup()
         return 1
-    except Exception as exc:  # pragma: no cover - defensive script boundary
+    except Exception as exc:  # noqa: BLE001  # pragma: no cover - defensive CLI boundary
         print(f"✗ unexpected smoke test error: {type(exc).__name__}: {exc}", file=sys.stderr)
         if args.keep_artifacts:
             print(f"Artifacts kept at: {temp_context.name}", file=sys.stderr)

@@ -10,7 +10,6 @@ This module provides functions to locate and list Claude Code projects:
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
 
 from .models import Project
 
@@ -40,7 +39,7 @@ def get_projects_dir() -> Path:
     return get_claude_dir() / "projects"
 
 
-def list_projects() -> List[Project]:
+def list_projects() -> list[Project]:
     """List all Claude Code projects, sorted by last modified.
 
     Returns:
@@ -68,7 +67,7 @@ def list_projects() -> List[Project]:
     return projects
 
 
-def find_project(search: str) -> Optional[Project]:
+def find_project(search: str) -> Project | None:
     """Find a project by name or path substring (case-insensitive).
 
     Args:

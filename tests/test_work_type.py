@@ -1,10 +1,10 @@
 """Tests for work type classification."""
 
 from claude_history_explorer.history import (
+    WORK_TYPE_INFO,
+    WORK_TYPE_PATTERNS,
     classify_project,
     get_work_type_name,
-    WORK_TYPE_PATTERNS,
-    WORK_TYPE_INFO,
 )
 
 
@@ -102,7 +102,7 @@ class TestWorkTypeInfo:
 
     def test_all_pattern_types_have_info(self):
         """Ensure every type in WORK_TYPE_PATTERNS has corresponding info."""
-        for work_type in WORK_TYPE_PATTERNS.keys():
+        for work_type in WORK_TYPE_PATTERNS:
             assert work_type in WORK_TYPE_INFO, f"{work_type} has patterns but no info"
 
 

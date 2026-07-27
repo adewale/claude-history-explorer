@@ -7,7 +7,6 @@ This module provides functions to generate development narratives:
 
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
-from typing import Dict, List
 
 from .constants import (
     ACTIVITY_INTENSITY_HIGH,
@@ -49,7 +48,7 @@ def generate_project_story(project: Project) -> ProjectStory:
         >>> print(f"Personality: {', '.join(story.personality_traits)}")
     """
     # Collect all sessions
-    sessions: List[SessionInfo] = []
+    sessions: list[SessionInfo] = []
     for session_file in project.session_files:
         session = parse_session(session_file, project.path)
         is_agent = session_file.name.startswith("agent-")
@@ -71,14 +70,14 @@ def generate_project_story(project: Project) -> ProjectStory:
         lifecycle_days = 1
 
     # Daily activity analysis
-    daily_activity: Dict[date, int] = defaultdict(int)
+    daily_activity: dict[date, int] = defaultdict(int)
     for session in sessions:
         day = session.start_time.date()
         daily_activity[day] += session.message_count
 
     # Find peak day and break periods
     peak_day = None
-    break_periods: List[tuple] = []
+    break_periods: list[tuple] = []
 
     if daily_activity:
         peak_day = max(daily_activity.items(), key=lambda x: x[1])
@@ -110,7 +109,7 @@ def generate_project_story(project: Project) -> ProjectStory:
         )
 
     # Generate insights about concurrent usage
-    concurrent_insights: List[str] = []
+    concurrent_insights: list[str] = []
     if concurrent_claude_instances > 3:
         concurrent_insights.append(
             f"Highly parallel workflow - used up to {concurrent_claude_instances} Claude instances simultaneously"
@@ -178,7 +177,7 @@ def generate_project_story(project: Project) -> ProjectStory:
     )
 
     # Personality traits
-    personality_traits: List[str] = []
+    personality_traits: list[str] = []
 
     # Agent ratio trait
     agent_ratio_value = agent_sessions / len(sessions) if sessions else 0.0
@@ -229,7 +228,7 @@ def generate_project_story(project: Project) -> ProjectStory:
         daily_engagement = "Focused work with occasional breaks"
 
     # Generate insights
-    insights: List[str] = []
+    insights: list[str] = []
     insights.append(f"Most productive session: {most_productive.message_count} messages")
 
     if agent_sessions and main_sessions:
@@ -292,7 +291,7 @@ def generate_global_story() -> GlobalStory:
         >>> print(f"{story.total_projects} projects analyzed")
     """
     all_projects = list_projects()
-    project_stories: List[ProjectStory] = []
+    project_stories: list[ProjectStory] = []
 
     for project in all_projects:
         try:
@@ -325,14 +324,14 @@ def generate_global_story() -> GlobalStory:
     )
 
     # Most common traits
-    all_traits: List[str] = []
+    all_traits: list[str] = []
     for story in project_stories:
         all_traits.extend(story.personality_traits)
 
     common_traits = Counter(all_traits).most_common(3)
 
     # Project switching patterns
-    recent_activity: List[tuple] = []
+    recent_activity: list[tuple] = []
     if project_stories:
         now = datetime.now(project_stories[0].birth_date.tzinfo)
         for story in project_stories:

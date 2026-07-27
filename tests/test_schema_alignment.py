@@ -16,7 +16,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from conftest import npx_command, require_wrapped_node_deps
 
 # Get paths relative to this file
@@ -34,6 +33,7 @@ def test_generate_schema_test_cases(tmp_path):
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT,
+        check=False,
     )
     assert result.returncode == 0, f"Generator failed:\n{result.stderr}"
     assert output.exists(), "Test cases file not created"
@@ -61,6 +61,7 @@ def test_typescript_decodes_python_encoding(tmp_path):
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT,
+        check=False,
     )
     assert gen_result.returncode == 0, f"Generator failed:\n{gen_result.stderr}"
 
@@ -72,6 +73,7 @@ def test_typescript_decodes_python_encoding(tmp_path):
         encoding="utf-8",
         errors="replace",
         cwd=WRAPPED_WEBSITE_DIR,
+        check=False,
         env={**os.environ, "SCHEMA_TEST_CASES": str(generated_cases)},
     )
 

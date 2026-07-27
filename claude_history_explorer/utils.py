@@ -10,12 +10,11 @@ This module provides shared helper functions used across the package:
 
 import re
 from datetime import datetime
-from typing import List, Optional
-
-from .constants import ACTIVITY_GAP_CAP_MINUTES
 
 # Import Message type for type hints (avoiding circular import at runtime)
 from typing import TYPE_CHECKING
+
+from .constants import ACTIVITY_GAP_CAP_MINUTES
 
 if TYPE_CHECKING:
     from .models import Message
@@ -43,7 +42,7 @@ def format_duration(minutes: int) -> str:
     return f"{hours}h {mins}m"
 
 
-def format_timestamp(dt: Optional[datetime], fmt: str = "%Y-%m-%d %H:%M") -> str:
+def format_timestamp(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     """Format a datetime with a default pattern.
 
     Args:
@@ -116,7 +115,7 @@ def _compile_regex_safe(pattern: str, flags: int = 0) -> re.Pattern:
 
 
 def _active_duration_minutes(
-    messages: List["Message"], max_gap_minutes: int = ACTIVITY_GAP_CAP_MINUTES
+    messages: list["Message"], max_gap_minutes: int = ACTIVITY_GAP_CAP_MINUTES
 ) -> int:
     """Calculate active duration by summing gaps between messages, capping each gap.
 
