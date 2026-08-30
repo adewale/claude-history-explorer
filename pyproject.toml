@@ -24,6 +24,7 @@ packages = ["claude_history_explorer"]
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=7.0.0",
     "ruff==0.16.0",
