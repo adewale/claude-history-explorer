@@ -1,6 +1,6 @@
 # Lessons Learned
 
-Last updated: 2026-06-09
+Last updated: 2026-08-31
 
 This file records project-level lessons from building, auditing, fixing, and validating Claude History Explorer. Keep it concise, current, and linked to tests or docs when possible.
 
@@ -118,6 +118,20 @@ Practices that followed:
 - After any post-release production hotfix, decide explicitly between leaving it in `Unreleased` or cutting a patch release such as `0.2.1`.
 - Include live deployment verification in release/deployment notes: landing page, generated local URL, golden URLs, legacy redirects, and OG SVG routes.
 - Avoid implying release artifacts include post-tag fixes.
+
+## 13. Valid JSON is not necessarily a valid session record
+
+`parse_session` treated every successfully decoded JSONL value as an object. A syntactically valid
+line containing the scalar `42` therefore raised `TypeError` when the parser looked for message
+fields. Malformed-JSON examples did not cover this separate shape boundary.
+
+Practices that followed:
+- Validate that each decoded value is an object before reading `slug`, `type`, or `message` fields.
+- Treat valid non-object JSON as an invalid session record and skip it without losing later valid
+  records.
+- Generate recursive scalar and list values alongside production-shaped message objects; assert
+  both totality for invalid records and exact preservation of valid ones.
+- Keep JSON syntax errors and decoded-shape errors as separate regression classes.
 
 ## Maintenance checklist
 

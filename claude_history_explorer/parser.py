@@ -64,6 +64,10 @@ def parse_session(file_path: Path, project_path: str = "") -> Session:
             lines_seen += 1
             try:
                 data = json.loads(line)
+                if not isinstance(data, dict):
+                    # A JSONL record must be an object. Other JSON values are
+                    # valid JSON, but cannot represent a Claude message.
+                    continue
 
                 # Extract metadata
                 if slug is None and "slug" in data:
