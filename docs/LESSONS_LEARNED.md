@@ -1,6 +1,6 @@
 # Lessons Learned
 
-Last updated: 2026-06-09
+Last updated: 2026-08-31
 
 This file records project-level lessons from building, auditing, fixing, and validating Claude History Explorer. Keep it concise, current, and linked to tests or docs when possible.
 
