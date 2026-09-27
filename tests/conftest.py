@@ -19,6 +19,20 @@ def require_wrapped_node_deps() -> None:
         pytest.skip(message)
 
 
+def require_fixture(path: Path) -> None:
+    """Require a committed test fixture, failing in CI and skipping locally.
+
+    The golden and schema fixtures are committed, so a missing one means it
+    was renamed or deleted, which would otherwise silently disable the
+    backwards-compatibility and schema-alignment suites.
+    """
+    if not path.exists():
+        message = f"Test fixture not found: {path} (it is committed; was it renamed or deleted?)"
+        if os.environ.get("CI"):
+            pytest.fail(message)
+        pytest.skip(message)
+
+
 def npx_command() -> str:
     """Return a Windows-safe npx executable path for subprocess calls."""
     executable = shutil.which("npx.cmd" if os.name == "nt" else "npx") or shutil.which("npx")

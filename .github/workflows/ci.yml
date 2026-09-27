@@ -88,10 +88,9 @@ jobs:
         working-directory: wrapped-website
         run: npm run lint
 
-      - name: Audit production dependencies
+      # Blocks only on high/critical advisories in what the Worker ships.
+      # Moderate and dev-only advisories are reported by the scheduled
+      # audit.yml instead, so a new advisory can't turn every PR red.
+      - name: Audit production dependencies (high/critical)
         working-directory: wrapped-website
-        run: npm audit --omit=dev
-
-      - name: Audit all dependencies
-        working-directory: wrapped-website
-        run: npm audit
+        run: npm audit --omit=dev --audit-level=high
