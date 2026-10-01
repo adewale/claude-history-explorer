@@ -516,96 +516,98 @@ class TestGlobalStats:
 
 
 class TestReadOnlyBehavior:
-    """Test that the tool maintains read-only behavior."""
-    
-    def test_no_write_operations_in_history_module(self):
-        """Test that history module doesn't perform write operations."""
-        import inspect
+    """The CLI never modifies Claude Code history (TRUST.md core guarantee).
 
-        import claude_history_explorer.history as history_module
-        
-        # Get all functions in the module
-        functions = inspect.getmembers(history_module, inspect.isfunction)
-        
-        write_operations = {'write', 'open', 'mkdir', 'touch', 'remove', 'rmdir'}
-        
-        for name, func in functions:
-            # Get the source code
-            try:
-                source = inspect.getsource(func)
-            except (OSError, TypeError):
-                continue  # Skip built-in or compiled functions
-            
-            # Check for write operations in mode strings
-            for op in write_operations:
-                # Look for write modes in file operations
-                if f'"{op}"' in source or f"'{op}'" in source:
-                    if 'w' in source or 'a' in source or 'x' in source:
-                        # Allow opening files for reading only
-                        if 'open(' in source:
-                            lines = source.split('\n')
-                            for line in lines:
-                                if 'open(' in line and ('"' in line or "'" in line):
-                                    # Check if it's a write mode
-                                    if any(mode in line for mode in ['"w"', "'w'", '"a"', "'a'", '"x"', "'x'"]):
-                                        assert False, f"Write operation found in {name}: {line.strip()}"
-    
-    def test_functions_only_read_files(self):
-        """Test that all file operations are read-only."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            temp_path = Path(tmpdir)
-            
-            # Create test data
-            test_file = temp_path / "test.jsonl"
-            test_file.write_text('{"type": "user", "message": {"content": "test"}}')
-            
-            # Test all functions that work with files
-            project = Project.from_dir(temp_path)
-            session = history.parse_session(test_file, "/test")
-            assert project.session_count == 1
-            assert session.message_count == 1
-            
-            # Verify no files were created or modified
-            original_files = list(temp_path.rglob("*"))
-            
-            # Run various operations
-            history.list_projects()
-            history.find_project("test")
-            history.search_sessions("test", None, False)
-            history.get_session_by_id("test", None)
-            
-            # Check that no new files were created
-            final_files = list(temp_path.rglob("*"))
-            assert len(original_files) == len(final_files)
-    
-    def test_cli_commands_are_read_only(self):
-        """Test that CLI commands don't modify files."""
-        import inspect
+    Runs every command family through the real CLI, parser and file system
+    against a throwaway ``~/.claude`` tree, then checks that no file under it
+    was created, removed, rewritten or touched.
+    """
 
-        import claude_history_explorer.cli as cli_module
-        
-        # Get all command functions
-        functions = inspect.getmembers(cli_module, inspect.isfunction)
-        
-        for name, func in functions:
-            if name.startswith('_') or name in ['main']:
-                continue  # Skip helper functions and main
-                
-            try:
-                source = inspect.getsource(func)
-            except (OSError, TypeError):
-                continue
-            
-            # Check for file write operations
-            lines = source.split('\n')
-            for line in lines:
-                if 'open(' in line and ('"' in line or "'" in line):
-                    # Allow opening files for writing only in export command
-                    if 'export' in name.lower():
-                        continue  # Export command is allowed to write
-                    # Check for write modes
-                    if any(mode in line for mode in ['"w"', "'w'", '"a"', "'a'", '"x"', "'x'"]):
-                        assert False, f"Write operation found in CLI command {name}: {line.strip()}"
+    SESSION_ID = "0a1b2c3d-1111-4222-8333-444455556666"
+
+    @staticmethod
+    def _snapshot(root: Path) -> dict:
+        """Map each path under root to its type, size, mtime and content."""
+        snapshot = {}
+        for path in sorted(root.rglob("*")):
+            key = path.relative_to(root).as_posix()
+            if path.is_dir():
+                snapshot[key] = ("dir", path.stat().st_mtime_ns)
+            else:
+                stat = path.stat()
+                snapshot[key] = ("file", stat.st_size, stat.st_mtime_ns, path.read_bytes())
+        return snapshot
+
+    def _write_history(self, home: Path) -> Path:
+        project_dir = home / ".claude" / "projects" / "-home-dev-flamingo-app"
+        project_dir.mkdir(parents=True)
+        records = [
+            {"type": "user", "slug": "pink-bird",
+             "message": {"content": "Why does the flamingo parser drop the last line?"},
+             "timestamp": "2025-06-02T09:00:00Z"},
+            {"type": "assistant",
+             "message": {"content": [
+                 {"type": "text", "text": "The loop stops one record early."},
+                 {"type": "tool_use", "name": "Read", "input": {"file_path": "parser.py"}},
+             ]},
+             "timestamp": "2025-06-02T09:01:00Z"},
+            {"type": "user", "message": {"content": "Fix it please"},
+             "timestamp": "2025-06-02T09:05:00Z"},
+            {"type": "assistant", "message": {"content": "Fixed and tested."},
+             "timestamp": "2025-06-02T09:07:00Z"},
+        ]
+        (project_dir / f"{self.SESSION_ID}.jsonl").write_text(
+            "".join(json.dumps(record) + "\n" for record in records), encoding="utf-8"
+        )
+        (project_dir / "agent-5f5f5f5f.jsonl").write_text(
+            json.dumps({"type": "assistant", "message": {"content": "agent flamingo notes"},
+                        "timestamp": "2025-06-02T09:02:00Z"}) + "\n",
+            encoding="utf-8",
+        )
+        return home / ".claude"
+
+    def test_cli_commands_leave_history_read_only(self, tmp_path):
+        from click.testing import CliRunner
+
+        from claude_history_explorer.cli import main
+
+        claude_dir = self._write_history(tmp_path / "home")
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        before = self._snapshot(claude_dir)
+        assert "projects/-home-dev-flamingo-app/agent-5f5f5f5f.jsonl" in before
+
+        home = str(tmp_path / "home")
+        runner = CliRunner(env={"HOME": home, "USERPROFILE": home})
+        short_id = self.SESSION_ID[:8]
+        commands = [
+            ["projects"],
+            ["sessions", "flamingo"],
+            ["show", short_id],
+            ["show", short_id, "--raw"],
+            ["search", "flamingo"],
+            ["export", short_id, "-f", "json"],
+            ["export", short_id, "-f", "markdown", "-o", str(out_dir / "export.md")],
+            ["stats"],
+            ["stats", "-p", "flamingo", "-f", "json"],
+            ["summary", "-o", str(out_dir / "summary.md")],
+            ["story", "-p", "flamingo", "-o", str(out_dir / "story.txt")],
+            ["info"],
+            ["wrapped", "-y", "2025", "--no-copy"],
+        ]
+        outputs = {}
+        for args in commands:
+            result = runner.invoke(main, args)
+            assert result.exit_code == 0, f"{args}: {result.output}"
+            outputs[" ".join(args)] = result.output
+
+        # The commands read this tree, not the developer's real history.
+        assert "flamingo" in outputs["projects"]
+        assert "drop the last line" in outputs[f"show {short_id}"]
+        assert "flamingo parser" in outputs["search flamingo"]
+        assert "Fixed and tested." in (out_dir / "export.md").read_text(encoding="utf-8")
+
+        assert self._snapshot(claude_dir) == before
 
 
 class TestPathHandling:
