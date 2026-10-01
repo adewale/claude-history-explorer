@@ -20,7 +20,6 @@ import {
   generateSparkline,
   findPeakTime,
   calcYoyChange,
-  isV3Story,
   normalizeTraitScore,
   normalizeFingerprint,
   getHeatmapValue,
@@ -283,27 +282,6 @@ function testEventType() {
 }
 
 testEventType();
-
-console.log('\n=== isV3Story Tests ===');
-
-function testIsV3Story() {
-  const story: WrappedStoryV3 = {
-    v: 3,
-    y: 2025,
-    p: 1, s: 1, m: 100, h: 1, d: 1,
-    hm: Array(168).fill(0),
-    ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
-    sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
-    ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
-    tp: [], pc: [], te: [], sf: [], ls: 0, sk: [0, 0, 0, 0],
-    tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
-  };
-
-  // isV3Story always returns true now (V3 only)
-  assertTrue(isV3Story(story), 'isV3Story returns true');
-}
-
-testIsV3Story();
 
 console.log('\n=== Validate Story Tests ===');
 
