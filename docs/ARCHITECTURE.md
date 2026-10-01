@@ -302,8 +302,8 @@ Formatted Output (brief/detailed/timeline)
 ## Security & Safety
 
 ### Read-Only Guarantee
-1. **Static Analysis**: Tests verify no write operations in core modules
-2. **File Mode Validation**: All file opens use read modes
+1. **Behavioural Test**: `pytest tests/test_history.py -k read_only` runs every CLI command family against a temporary `~/.claude` tree and fails if any file under it is added, removed, rewritten or touched
+2. **Read-Only History Access**: Session files are opened in `"rb"` mode; the only file writes are the `--output` paths you pass to `export`, `summary` or `story`
 3. **Path Sanitization**: Project path decoding prevents traversal
 4. **Error Handling**: Graceful handling of missing/corrupted files
 
@@ -341,7 +341,7 @@ falls back to a normalized slash-separated display path.
 │   Unit Tests    │  (Individual functions, classes)
 └─────────────────┘
 ┌─────────────────┐
-│  Static Analysis│  (Read-only verification, security)
+│   Read-only     │  (Every CLI command against a temp ~/.claude tree)
 └─────────────────┘
 ```
 
