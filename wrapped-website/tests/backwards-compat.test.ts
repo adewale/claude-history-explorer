@@ -222,7 +222,10 @@ describe('golden URLs through the Worker routes', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('image/svg+xml');
-    expect(await response.text()).toContain('<svg');
+    const svg = await response.text();
+    expect(svg).toContain('<svg');
+    // The image shows this story's message count (thousands separators ignored).
+    expect(svg.replace(/,/g, '')).toContain(`>${testCase.expected_core.m}<`);
   });
 
   it.each(goldenRows)('%s redirects from the legacy /:year/:data URL', async (_id, testCase) => {
