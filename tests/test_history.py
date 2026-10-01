@@ -2412,8 +2412,8 @@ class TestGenerateProjectStory:
         with patch('claude_history_explorer.stories.parse_session', side_effect=mock_parse_session):
             story = generate_project_story(project)
 
-        # High message rate should result in "Rapid-fire" work pace
-        assert "Rapid" in story.work_pace or story.work_pace is not None
+        # 100 messages in one short session is far above MESSAGE_RATE_HIGH (30/hour).
+        assert story.work_pace == "Rapid-fire development"
 
     def test_generate_project_story_break_periods(self):
         """Test detection of break periods in activity."""
