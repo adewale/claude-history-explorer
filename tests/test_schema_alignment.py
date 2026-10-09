@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import npx_command, require_wrapped_node_deps
+from conftest import npx_command, require_fixture, require_wrapped_node_deps
 
 # Get paths relative to this file
 TESTS_DIR = Path(__file__).parent
@@ -98,8 +98,7 @@ def test_roundtrip_basic():
     import json
 
     cases_file = FIXTURES_DIR / "schema_test_cases.json"
-    if not cases_file.exists():
-        pytest.skip("Test cases not generated yet")
+    require_fixture(cases_file)
 
     with open(cases_file) as f:
         cases = json.load(f)

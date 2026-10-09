@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
+import app from '../src/index';
 import { decodeWrappedStoryV3, validateStoryV3, type WrappedStoryV3 } from '../src/decoder';
 
 // Get directory path
@@ -190,5 +191,58 @@ describe('backwards compatibility harness', () => {
   it('passes all manual golden URL assertions', () => {
     expect(failed).toBe(0);
     expect(passed).toBeGreaterThan(0);
+  });
+});
+
+// The harness above checks decode + validateStoryV3, a mirror of the Worker's
+// checks. These cases send the same published URLs through the real routes,
+// which also render the page and the OG image (docs/LESSONS_LEARNED.md, 11).
+const goldenCases: GoldenUrlCase[] = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../../tests/fixtures/golden_urls.json'), 'utf-8')
+);
+const goldenRows = goldenCases.map((testCase) => [testCase.id, testCase] as const);
+
+describe('golden URLs through the Worker routes', () => {
+  it('has golden URLs to check', () => {
+    expect(goldenRows.length).toBeGreaterThan(0);
+  });
+
+  it.each(goldenRows)('%s renders at /wrapped?d=', async (_id, testCase) => {
+    const response = await app.request(`/wrapped?d=${testCase.encoded}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/html');
+    if (testCase.expected_first_project) {
+      expect(await response.text()).toContain(testCase.expected_first_project.n);
+    }
+  });
+
+  it.each(goldenRows)('%s renders an SVG at /og/:year/:data.svg', async (_id, testCase) => {
+    const response = await app.request(`/og/${testCase.expected_core.y}/${testCase.encoded}.svg`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('image/svg+xml');
+    const svg = await response.text();
+    expect(svg).toContain('<svg');
+    // The image shows this story's message count (thousands separators ignored).
+    expect(svg.replace(/,/g, '')).toContain(`>${testCase.expected_core.m}<`);
+  });
+
+  it.each(goldenRows)('%s redirects from the legacy /:year/:data URL', async (_id, testCase) => {
+    const response = await app.request(`/${testCase.expected_core.y}/${testCase.encoded}`);
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(`/wrapped?d=${testCase.encoded}`);
+  });
+});
+
+describe('landing page demo link', () => {
+  it('links to a Wrapped page that renders', async () => {
+    const landing = await (await app.request('/')).text();
+    const demoHref = landing.match(/href="(\/wrapped\?d=[A-Za-z0-9_-]+)"/)?.[1];
+
+    expect(demoHref).toBeDefined();
+    const response = await app.request(demoHref!);
+    expect(response.status).toBe(200);
   });
 });
