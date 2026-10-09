@@ -89,8 +89,9 @@ jobs:
         run: npm run lint
 
       # Blocks only on high/critical advisories in what the Worker ships.
-      # Moderate and dev-only advisories are reported by the scheduled
-      # audit.yml instead, so a new advisory can't turn every PR red.
+      # Moderate and dev-only advisories don't block, so a newly published
+      # advisory in a dev tool can't turn every PR red. Run `npm audit`
+      # locally to see them.
       - name: Audit production dependencies (high/critical)
         working-directory: wrapped-website
         run: npm audit --omit=dev --audit-level=high

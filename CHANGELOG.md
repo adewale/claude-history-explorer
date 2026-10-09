@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- CI now blocks only on high/critical advisories in the Wrapped website's production dependencies (`npm audit --omit=dev --audit-level=high`). The full `npm audit` (all severities, dev dependencies included) moved to a weekly scheduled workflow (`.github/workflows/audit.yml`), so a newly published advisory no longer turns every PR red.
+- CI now blocks only on high/critical advisories in the Wrapped website's production dependencies (`npm audit --omit=dev --audit-level=high`). The full `npm audit` (all severities, dev dependencies included) no longer runs in CI, so a newly published advisory in a dev-only tool no longer turns every PR red; run it locally when bumping dependencies.
 - Missing golden-URL or schema-alignment fixtures now fail the test run in CI instead of silently skipping those suites (they still skip locally, like the other bridge prerequisites).
 
 ### Security

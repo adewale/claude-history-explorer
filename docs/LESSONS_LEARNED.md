@@ -96,7 +96,7 @@ Windows compatibility cannot rely on local macOS tests. Wrapped bridge coverage 
 Practices that followed:
 - Run Python tests on Ubuntu, macOS, and Windows across supported Python versions.
 - Install website dependencies before Python bridge tests.
-- Run lint, typecheck, and test commands for the website on every change; block on high/critical production advisories, and run the full dependency audit on a schedule so a new advisory cannot turn unrelated PRs red.
+- Run lint, typecheck, and test commands for the website on every change; block on high/critical production advisories so a new dev-only advisory cannot turn unrelated PRs red, and run the full dependency audit locally when bumping dependencies.
 - Committed fixtures that gate a suite (golden URLs, schema cases) must fail in CI when missing, not skip.
 
 ## 11. URL compatibility tests must match production routing and validation
