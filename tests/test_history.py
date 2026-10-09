@@ -556,11 +556,13 @@ class TestReadOnlyBehavior:
             {"type": "assistant", "message": {"content": "Fixed and tested."},
              "timestamp": "2025-06-02T09:07:00Z"},
         ]
-        # A blank line and a truncated record send the parser down its
-        # skip branches too, so a write hidden there would also be caught.
+        # A blank line, a non-object record and a truncated record send the
+        # parser down its skip branches too, so a write hidden there would
+        # also be caught.
         (project_dir / f"{self.SESSION_ID}.jsonl").write_text(
             "".join(json.dumps(record) + "\n" for record in records)
             + "\n"
+            + "42\n"
             + '{"type": "user", "message": \n',
             encoding="utf-8",
         )
