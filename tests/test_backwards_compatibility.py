@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import npx_command, require_wrapped_node_deps
+from conftest import npx_command, require_fixture, require_wrapped_node_deps
 
 from claude_history_explorer.history import decode_wrapped_story_v3
 
@@ -33,8 +33,7 @@ GOLDEN_FILE = FIXTURES_DIR / "golden_urls.json"
 
 def load_golden_urls():
     """Load the golden URL test cases."""
-    if not GOLDEN_FILE.exists():
-        pytest.skip(f"Golden file not found: {GOLDEN_FILE}")
+    require_fixture(GOLDEN_FILE)
 
     with open(GOLDEN_FILE) as f:
         return json.load(f)

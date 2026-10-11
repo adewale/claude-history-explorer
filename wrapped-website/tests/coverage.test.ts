@@ -18,7 +18,6 @@ import {
   generateSparkline,
   findPeakTime,
   calcYoyChange,
-  isV3Story,
   normalizeTraitScore,
   normalizeFingerprint,
   getHeatmapValue,

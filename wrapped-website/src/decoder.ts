@@ -436,15 +436,6 @@ export function decodeWrappedStoryAuto(encoded: string): WrappedStoryV3 {
 }
 
 /**
- * Check if a story is V3 format.
- * Since only V3 is now supported, this always returns true.
- * Kept for backwards compatibility with existing code.
- */
-export function isV3Story(story: WrappedStoryV3): story is WrappedStoryV3 {
-  return true;
-}
-
-/**
  * Get event type name from index
  */
 export function getEventTypeName(typeIndex: number): EventType {

@@ -188,7 +188,8 @@ function runTests() {
 runTests();
 
 describe('schema alignment compatibility harness', () => {
-  it('completed all manual schema alignment assertions', () => {
-    expect(true).toBe(true);
+  it('passes all manual schema alignment assertions', () => {
+    expect(failed).toBe(0);
+    expect(passed).toBeGreaterThan(0);
   });
 });

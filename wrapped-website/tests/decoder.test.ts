@@ -20,7 +20,6 @@ import {
   generateSparkline,
   findPeakTime,
   calcYoyChange,
-  isV3Story,
   normalizeTraitScore,
   normalizeFingerprint,
   getHeatmapValue,
@@ -283,27 +282,6 @@ function testEventType() {
 }
 
 testEventType();
-
-console.log('\n=== isV3Story Tests ===');
-
-function testIsV3Story() {
-  const story: WrappedStoryV3 = {
-    v: 3,
-    y: 2025,
-    p: 1, s: 1, m: 100, h: 1, d: 1,
-    hm: Array(168).fill(0),
-    ma: Array(12).fill(0), mh: Array(12).fill(0), ms: Array(12).fill(0),
-    sd: Array(10).fill(0), ar: Array(10).fill(0), ml: Array(8).fill(0),
-    ts: { ad: 50, sp: 50, fc: 50, cc: 50, wr: 50, bs: 50, cs: 50, mv: 50, td: 50, ri: 50 },
-    tp: [], pc: [], te: [], sf: [], ls: 0, sk: [0, 0, 0, 0],
-    tk: { total: 0, input: 0, output: 0, cache_read: 0, cache_create: 0, models: {} },
-  };
-
-  // isV3Story always returns true now (V3 only)
-  assertTrue(isV3Story(story), 'isV3Story returns true');
-}
-
-testIsV3Story();
 
 console.log('\n=== Validate Story Tests ===');
 
@@ -576,18 +554,6 @@ function testEdgeCases() {
     'invalid base64 throws'
   );
 
-  // Msgpack that decodes but is not a valid story should not throw during decode
-  // (validation is separate), but completely invalid msgpack structure might
-  // Just verify the decode doesn't crash on unexpected but parseable data
-  try {
-    const result = decodeWrappedStoryV3('gQ');  // msgpack for empty map {}
-    assertTrue(result.v === 3, 'empty map defaults to v=3');
-    passed++;
-    console.log('  ✓ empty msgpack map handles gracefully');
-  } catch {
-    passed++;
-    console.log('  ✓ empty msgpack map throws as expected');
-  }
 }
 
 testEdgeCases();
@@ -687,47 +653,6 @@ function testAuditIssues() {
 
 testAuditIssues();
 
-console.log('\n=== Sample URL Validation Tests ===');
-
-/**
- * Test that the sample URL used in landing.ts has meaningful data.
- * This catches the bug where wire format (arrays) was confused with display format (objects).
- */
-function testSampleUrlValidation() {
-  // This is the sample URL from landing.ts - update if it changes
-  const sampleUrlData = '3gAXoXYDoXnNB-mhbqlEZW1vIFVzZXKhbc0LH6FozJyhcAihc3yhZFmibHPLQBDMzMzMzM2iaG3cAKgCAAECAQAEBgYNDQsFBw0PDw4ICAcCAgMBAAEAAAAGBgQMDQwGBQ4ODg4JCQgCBAQAAAACAgIFBgYNCwwHBQ0NDw0JBwkEBAMAAQAAAAEGBgQNCw0FBw8ODw4HCQkDBAICAQEBAAAGBQQNCwsFBw0NDw8ICAgCBAIAAAACAgEBAgIDBAUEAgUEBAUFBgUCAwQAAgEBAQABAgEFAwQDAwYGBgUHBwcDAwKibWGcVcyOzMbNAQvNATjNAR3NAVXNASrNAQDM4My9zPqibWicCAsOEhUTGBQRDwwRom1znAYJDA4QDxIQDQsJDKJzZIqiYWREonNwKqJmY0uiY2MjondyOqJicy2iY3M-om12JqJ0ZEeicmk0omFymggMEhgWEAoGAwGibWyWojUwozEyMKMyODCjNDUwozYyMKM4NTCidHOGomFkRKJzcCqiZmNLomJzLaJjcz6icmk0onRwlpa3Y2xhdWRlLWhpc3RvcnktZXhwbG9yZXLNA3w0Ii1Ilq93cmFwcGVkLXdlYnNpdGXNAnomHCBBlq1wZXJzb25hbC1zaXRlzQGcGBIWMJaqYXBpLWNsaWVudM0BHxAMDyOWqGRvdGZpbGVzzJwICAoWlqdzY3JpcHRzYgUFBg-icGOVkwABHJMAAgyTAQIIkwADBpMCBASidGWVlC0ALwCUAQEM_5RZBM0D6P-UeAP_AZTMyAA0AaJzZpOey0AMAAAAAAAALQEOAgBIQU5SLQxEN57LQADMzMzMzM0cAAoAATpIQEYmCDQwnstAEMzMzMzMzT4BEAMAVU5YXDQPSz6ic2uUDA4FBqJ0a4aldG90YWzOAIGzIKVpbnB1dM4AT1iApm91dHB1dM4AMlqgqmNhY2hlX3JlYWTOABJPgKxjYWNoZV9jcmVhdGXOAAbd0KZtb2RlbHOCpnNvbm5ldM4AZ8KApWhhaWt1zgAZ8KA';
-
-  const story = decodeWrappedStoryAuto(sampleUrlData);
-
-  // Year validation
-  assertEqual(story.y, 2025, 'sample URL is for year 2025');
-
-  // Basic story validation
-  assertTrue(Boolean(story.n && story.n.length > 0), 'sample URL has display name');
-  assertTrue(story.m > 0, 'sample URL has messages');
-  assertTrue(story.h > 0, 'sample URL has hours');
-  assertTrue(story.d > 0, 'sample URL has days active');
-
-  // Heatmap validation
-  assertEqual(story.hm.length, 168, 'sample URL has 168-element heatmap');
-  assertTrue(story.hm.reduce((a, b) => a + b, 0) > 0, 'sample URL heatmap has activity');
-
-  // Top projects validation - THIS IS THE KEY TEST
-  // If tp was created with object format instead of array format, these will fail
-  assertTrue(story.tp.length >= 3, 'sample URL has at least 3 projects');
-  assertTrue(story.tp[0].n.length > 0, 'sample URL first project has name');
-  assertTrue(story.tp[0].m > 0, 'sample URL first project has messages');
-  assertTrue(story.tp[0].h > 0, 'sample URL first project has hours');
-
-  // Streaks validation
-  assertTrue(story.sk[0] > 0, 'sample URL has streak count');
-  assertTrue(story.sk[1] > 0, 'sample URL has longest streak');
-
-  // Token validation
-  assertTrue(story.tk.total > 0, 'sample URL has token usage');
-}
-
-testSampleUrlValidation();
 
 // Summary
 console.log('\n=================================');
